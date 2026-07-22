@@ -1,0 +1,43 @@
+{
+  "manifest_version": 3,
+  "name": "Mafsar — AI Chat to Quiz",
+  "version": "0.1.0",
+  "description": "Capture your AI chat learning sessions and turn them into flashcards, quizzes, and spaced-repetition reviews so you don't forget.",
+  "permissions": ["storage", "activeTab", "sidePanel", "scripting"],
+  "host_permissions": [
+    "https://chatgpt.com/*",
+    "https://chat.openai.com/*",
+    "https://claude.ai/*",
+    "https://api.anthropic.com/*",
+    "https://generativelanguage.googleapis.com/*",
+    "https://api.groq.com/*"
+  ],
+  "background": {
+    "service_worker": "src/background/service-worker.js",
+    "type": "module"
+  },
+  "side_panel": {
+    "default_path": "src/ui/panel.html"
+  },
+  "action": {
+    "default_title": "Open Mafsar panel"
+  },
+  "options_page": "src/ui/options.html",
+  "content_scripts": [
+    {
+      "matches": [
+        "https://chatgpt.com/*",
+        "https://chat.openai.com/*",
+        "https://claude.ai/*"
+      ],
+      "js": [
+        "src/content/adapters/adapter.js",
+        "src/content/adapters/chatgpt.js",
+        "src/content/adapters/claude.js",
+        "src/content/capture.js"
+      ],
+      "css": ["src/content/capture.css"],
+      "run_at": "document_idle"
+    }
+  ]
+}

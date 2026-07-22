@@ -1,0 +1,49 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Mafsar</title>
+    <link rel="stylesheet" href="panel.css" />
+  </head>
+  <body>
+    <header>
+      <div class="brand">📚 Mafsar</div>
+      <button id="settingsBtn" class="icon-btn" title="Settings">⚙</button>
+    </header>
+
+    <div id="apiWarning" class="banner hidden">
+      No API key set. <a href="#" id="openOptions">Add one in settings</a> to generate study sets.
+    </div>
+
+    <!-- View: session list -->
+    <section id="listView">
+      <div class="toolbar">
+        <button id="captureBtn" class="primary">＋ Capture current chat</button>
+      </div>
+      <div id="sessions" class="sessions"></div>
+      <p id="emptyState" class="empty hidden">
+        No sessions yet. Open ChatGPT or Claude, have a learning chat, then click
+        <b>Save to Mafsar</b> on the page (or “Capture current chat” above).
+      </p>
+    </section>
+
+    <!-- View: study set detail -->
+    <section id="studyView" class="hidden">
+      <div class="detail-head">
+        <button id="backBtn" class="icon-btn" title="Back">←</button>
+        <h2 id="studyTitle"></h2>
+      </div>
+      <div class="tabs">
+        <button class="tab active" data-tab="cards">Flashcards</button>
+        <button class="tab" data-tab="quiz">Quiz</button>
+      </div>
+      <div id="cardsTab" class="tab-panel"></div>
+      <div id="quizTab" class="tab-panel hidden"></div>
+    </section>
+
+    <div id="toast" class="toast hidden"></div>
+
+    <script type="module" src="panel.js"></script>
+  </body>
+</html>

@@ -1,0 +1,27 @@
+#mafsar-save-btn {
+  position: fixed;
+  right: 16px;
+  bottom: 16px;
+  z-index: 2147483000;
+  padding: 8px 14px;
+  font: 600 13px/1.2 system-ui, -apple-system, sans-serif;
+  color: #fff;
+  background: #6d4aff;
+  border: none;
+  border-radius: 999px;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.25);
+  cursor: pointer;
+  transition: background 0.15s ease, transform 0.1s ease;
+}
+
+#mafsar-save-btn:hover {
+  background: #5a37e6;
+}
+
+#mafsar-save-btn:active {
+  transform: translateY(1px);
+}
+
+#mafsar-save-btn.mafsar-err {
+  background: #d9534f;
+}

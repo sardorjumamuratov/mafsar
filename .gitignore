@@ -1,0 +1,11 @@
+# OS
+.DS_Store
+Thumbs.db
+
+# Editor
+.vscode/
+.idea/
+
+# Node (not used yet, but in case tooling is added later)
+node_modules/
+npm-debug.log*

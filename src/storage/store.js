@@ -1,0 +1,100 @@
+// Thin wrapper over chrome.storage.local. Everything is stored locally on the
+// user's machine — no sync, no server.
+//
+// Shape:
+//   settings        -> { apiKey, model }
+//   sessions        -> Session[]          (captured conversations)
+//   studySets       -> StudySet[]         (generated cards, keyed by sessionId)
+// A StudySet card carries its own SM-2 scheduling fields (see srs.js).
+
+const KEYS = {
+  SETTINGS: "settings",
+  SESSIONS: "sessions",
+  STUDY_SETS: "studySets",
+};
+
+const DEFAULT_SETTINGS = { provider: "gemini", apiKey: "", model: "" };
+
+function get(key, fallback) {
+  return new Promise((resolve) => {
+    chrome.storage.local.get(key, (obj) => resolve(obj[key] ?? fallback));
+  });
+}
+
+function set(key, value) {
+  return new Promise((resolve) => {
+    chrome.storage.local.set({ [key]: value }, () => resolve());
+  });
+}
+
+function uid() {
+  return `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
+}
+
+// --- Settings ---------------------------------------------------------------
+
+export async function getSettings() {
+  const s = await get(KEYS.SETTINGS, {});
+  return { ...DEFAULT_SETTINGS, ...s };
+}
+
+export async function saveSettings(patch) {
+  const current = await getSettings();
+  const next = { ...current, ...patch };
+  await set(KEYS.SETTINGS, next);
+  return next;
+}
+
+// --- Sessions ---------------------------------------------------------------
+
+export async function getSessions() {
+  return get(KEYS.SESSIONS, []);
+}
+
+export async function addSession(session) {
+  const sessions = await getSessions();
+  const record = { id: uid(), ...session };
+  sessions.unshift(record);
+  await set(KEYS.SESSIONS, sessions);
+  return record;
+}
+
+export async function deleteSession(id) {
+  const sessions = (await getSessions()).filter((s) => s.id !== id);
+  await set(KEYS.SESSIONS, sessions);
+  const sets = (await getStudySets()).filter((s) => s.sessionId !== id);
+  await set(KEYS.STUDY_SETS, sets);
+}
+
+// --- Study sets -------------------------------------------------------------
+
+export async function getStudySets() {
+  return get(KEYS.STUDY_SETS, []);
+}
+
+export async function getStudySetForSession(sessionId) {
+  return (await getStudySets()).find((s) => s.sessionId === sessionId) || null;
+}
+
+export async function saveStudySet(studySet) {
+  const sets = await getStudySets();
+  const idx = sets.findIndex((s) => s.sessionId === studySet.sessionId);
+  const record = { id: studySet.id || uid(), ...studySet };
+  if (idx >= 0) sets[idx] = record;
+  else sets.unshift(record);
+  await set(KEYS.STUDY_SETS, sets);
+  return record;
+}
+
+export async function updateCard(sessionId, cardId, patch) {
+  const sets = await getStudySets();
+  const setRec = sets.find((s) => s.sessionId === sessionId);
+  if (!setRec) return null;
+  const card = setRec.flashcards.find((c) => c.id === cardId);
+  if (!card) return null;
+  Object.assign(card, patch);
+  await set(KEYS.STUDY_SETS, sets);
+  return card;
+}
+
+export { uid };
