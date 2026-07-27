@@ -34,6 +34,7 @@ export const PROVIDERS = {
   gemini: {
     label: "Google Gemini",
     defaultModel: "gemini-2.0-flash",
+    models: ["gemini-2.0-flash", "gemini-2.5-flash", "gemini-1.5-flash", "gemini-1.5-flash-8b"],
     consoleUrl: "https://aistudio.google.com/app/apikey",
     buildRequest({ apiKey, model, system, user }) {
       return {
@@ -55,6 +56,7 @@ export const PROVIDERS = {
   groq: {
     label: "Groq (Llama)",
     defaultModel: "llama-3.3-70b-versatile",
+    models: ["llama-3.3-70b-versatile", "llama-3.1-8b-instant", "gemma2-9b-it"],
     consoleUrl: "https://console.groq.com/keys",
     buildRequest({ apiKey, model, system, user }) {
       return {
@@ -78,6 +80,7 @@ export const PROVIDERS = {
   anthropic: {
     label: "Anthropic (Claude)",
     defaultModel: "claude-sonnet-5",
+    models: ["claude-sonnet-5", "claude-opus-4-8", "claude-haiku-4-5-20251001"],
     consoleUrl: "https://console.anthropic.com/",
     buildRequest({ apiKey, model, system, user }) {
       return {
@@ -98,6 +101,10 @@ export const PROVIDERS = {
 
 export function providerDefaultModel(provider) {
   return (PROVIDERS[provider] || PROVIDERS.gemini).defaultModel;
+}
+
+export function providerModels(provider) {
+  return (PROVIDERS[provider] || PROVIDERS.gemini).models || [];
 }
 
 // --- Parsing helpers --------------------------------------------------------

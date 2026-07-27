@@ -1,4 +1,5 @@
-#mafsar-save-btn {
+#mafsar-save-btn,
+#mafsar-import-btn {
   position: fixed;
   right: 16px;
   bottom: 16px;
@@ -14,14 +15,17 @@
   transition: background 0.15s ease, transform 0.1s ease;
 }
 
-#mafsar-save-btn:hover {
+#mafsar-save-btn:hover,
+#mafsar-import-btn:hover {
   background: #5a37e6;
 }
 
-#mafsar-save-btn:active {
+#mafsar-save-btn:active,
+#mafsar-import-btn:active {
   transform: translateY(1px);
 }
 
-#mafsar-save-btn.mafsar-err {
+#mafsar-save-btn.mafsar-err,
+#mafsar-import-btn.mafsar-err {
   background: #d9534f;
 }

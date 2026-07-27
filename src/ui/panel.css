@@ -85,6 +85,102 @@ button.primary:disabled {
   cursor: default;
 }
 
+button.secondary {
+  width: 100%;
+  margin-top: 8px;
+  padding: 9px;
+  font: 600 13px inherit;
+  color: inherit;
+  background: transparent;
+  border: 1px solid var(--border);
+  border-radius: 9px;
+  cursor: pointer;
+}
+
+button.secondary:hover {
+  border-color: var(--accent);
+}
+
+/* Import view */
+.import-body {
+  padding: 14px;
+}
+
+.import-body .help {
+  font-size: 12.5px;
+  line-height: 1.5;
+  opacity: 0.85;
+  background: var(--card-bg);
+  padding: 10px 12px;
+  border-radius: 8px;
+  margin: 4px 0 14px;
+}
+
+.import-body label {
+  display: block;
+  font-weight: 600;
+  font-size: 13px;
+  margin: 12px 0 5px;
+}
+
+.import-body input,
+.import-body select,
+.import-body textarea {
+  width: 100%;
+  padding: 8px 10px;
+  font: inherit;
+  color: inherit;
+  background: transparent;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  box-sizing: border-box;
+}
+
+.import-body textarea {
+  resize: vertical;
+  font-family: ui-monospace, "Cascadia Code", monospace;
+  font-size: 12.5px;
+}
+
+.sep-row {
+  display: flex;
+  gap: 10px;
+}
+
+.sep-row > div {
+  flex: 1;
+}
+
+.preview {
+  margin-top: 12px;
+  font-size: 12.5px;
+}
+
+.preview .pv-card {
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 7px 10px;
+  margin-bottom: 6px;
+}
+
+.preview .pv-card b {
+  display: block;
+}
+
+.preview .pv-card span {
+  opacity: 0.75;
+}
+
+.import-actions {
+  display: flex;
+  gap: 10px;
+  margin-top: 16px;
+}
+
+.import-actions button {
+  margin-top: 0;
+}
+
 .sessions {
   padding: 0 14px 20px;
   display: flex;

@@ -1,5 +1,5 @@
 import { getSettings, saveSettings } from "../storage/store.js";
-import { PROVIDERS, providerDefaultModel } from "../llm/generate.js";
+import { PROVIDERS, providerDefaultModel, providerModels } from "../llm/generate.js";
 
 const $ = (id) => document.getElementById(id);
 
@@ -11,6 +11,14 @@ function keyHintFor(provider) {
 
 function applyProvider(provider, modelValue) {
   $("keyHint").innerHTML = keyHintFor(provider);
+  // Populate the model suggestion list for this provider.
+  const list = $("modelList");
+  list.innerHTML = "";
+  for (const m of providerModels(provider)) {
+    const opt = document.createElement("option");
+    opt.value = m;
+    list.appendChild(opt);
+  }
   // Fill model with the stored value if present, else the provider default.
   $("model").value = modelValue || providerDefaultModel(provider);
 }

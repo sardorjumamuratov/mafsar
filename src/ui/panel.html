@@ -20,12 +20,62 @@
     <section id="listView">
       <div class="toolbar">
         <button id="captureBtn" class="primary">＋ Capture current chat</button>
+        <button id="importBtn" class="secondary">⇪ Import flashcards</button>
       </div>
       <div id="sessions" class="sessions"></div>
       <p id="emptyState" class="empty hidden">
         No sessions yet. Open ChatGPT or Claude, have a learning chat, then click
         <b>Save to Mafsar</b> on the page (or “Capture current chat” above).
+        You can also <b>Import flashcards</b> from Quizlet.
       </p>
+    </section>
+
+    <!-- View: import flashcards -->
+    <section id="importView" class="hidden">
+      <div class="detail-head">
+        <button id="importBackBtn" class="icon-btn" title="Back">←</button>
+        <h2>Import flashcards</h2>
+      </div>
+      <div class="import-body">
+        <p class="help">
+          <b>From Quizlet:</b> open your set → <b>⋯ More → Export</b> → set
+          “Between term and definition” to <b>Tab</b> and “Between rows” to
+          <b>New line</b> → copy → paste below. Works for CSV/TSV too.
+        </p>
+
+        <label>Title</label>
+        <input id="importTitle" type="text" placeholder="e.g. Biology — Chapter 3" />
+
+        <div class="sep-row">
+          <div>
+            <label>Term / definition separator</label>
+            <select id="termSep">
+              <option value="\t">Tab</option>
+              <option value=",">Comma</option>
+              <option value=" - ">Dash ( - )</option>
+              <option value="|">Pipe ( | )</option>
+            </select>
+          </div>
+          <div>
+            <label>Between cards</label>
+            <select id="cardSep">
+              <option value="\n">New line</option>
+              <option value="\n\n">Blank line</option>
+              <option value=";">Semicolon</option>
+            </select>
+          </div>
+        </div>
+
+        <label>Pasted content</label>
+        <textarea id="importText" rows="8" placeholder="term<Tab>definition&#10;term<Tab>definition"></textarea>
+
+        <div id="importPreview" class="preview"></div>
+
+        <div class="import-actions">
+          <button id="importPreviewBtn" class="secondary">Preview</button>
+          <button id="importSaveBtn" class="primary">Import</button>
+        </div>
+      </div>
     </section>
 
     <!-- View: study set detail -->

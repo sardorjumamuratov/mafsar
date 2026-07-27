@@ -4,9 +4,11 @@ import {
   addSession,
   deleteSession,
   getStudySetForSession,
+  saveStudySet,
   updateCard,
+  uid,
 } from "../storage/store.js";
-import { review, isDue, byDue } from "../storage/srs.js";
+import { initSchedule, review, isDue, byDue } from "../storage/srs.js";
 
 const $ = (sel) => document.querySelector(sel);
 
@@ -40,9 +42,27 @@ function send(msg) {
   });
 }
 
+// Callback-wrapped tab helpers — the callback form works in both Chrome and
+// Firefox (Firefox's chrome.* namespace doesn't return promises).
+function queryActiveTab() {
+  return new Promise((resolve) => {
+    chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => resolve(tabs && tabs[0]));
+  });
+}
+
+function sendToTab(tabId, msg) {
+  return new Promise((resolve) => {
+    chrome.tabs.sendMessage(tabId, msg, (resp) => {
+      if (chrome.runtime.lastError) return resolve(null);
+      resolve(resp);
+    });
+  });
+}
+
 function show(view) {
   $("#listView").classList.toggle("hidden", view !== "list");
   $("#studyView").classList.toggle("hidden", view !== "study");
+  $("#importView").classList.toggle("hidden", view !== "import");
 }
 
 // --- settings / warning -----------------------------------------------------
@@ -78,7 +98,10 @@ async function renderList() {
     el.querySelector(".title").textContent = sess.title || "Untitled conversation";
     el.querySelector(".pill").textContent = sess.sourceLabel || sess.source || "chat";
     el.querySelector(".ago").textContent = timeAgo(sess.capturedAt);
-    el.querySelector(".count").textContent = `${sess.messages.length} msgs`;
+    const isImport = sess.source === "quizlet" || !sess.messages?.length;
+    el.querySelector(".count").textContent = isImport
+      ? `${sess.importedCount ?? set?.flashcards?.length ?? 0} cards`
+      : `${sess.messages.length} msgs`;
     el.querySelector(".go").textContent = set ? "Study" : "Make study set";
     el.querySelector(".go").addEventListener("click", (e) => {
       e.stopPropagation();
@@ -103,11 +126,11 @@ async function captureCurrent() {
   const original = btn.textContent;
   btn.textContent = "Capturing…";
   try {
-    const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+    const tab = await queryActiveTab();
     if (!tab?.id) throw new Error("No active tab.");
-    const resp = await chrome.tabs.sendMessage(tab.id, { type: "CAPTURE_ACTIVE" }).catch(() => null);
+    const resp = await sendToTab(tab.id, { type: "CAPTURE_ACTIVE" });
     if (!resp) {
-      throw new Error("Open a ChatGPT or Claude conversation tab first.");
+      throw new Error("Open a ChatGPT, Claude, or Gemini conversation tab first.");
     }
     if (!resp.ok) throw new Error(resp.error || "Nothing to capture.");
     await addSession(resp.session);
@@ -282,6 +305,102 @@ function renderQuiz() {
   });
 }
 
+// --- import flashcards (Quizlet / CSV / TSV) --------------------------------
+
+// <select> option values store escaped sequences ("\t", "\n") as literal text;
+// turn them into real control characters here.
+function unescapeSep(v) {
+  return v.replace(/\\t/g, "\t").replace(/\\n/g, "\n");
+}
+
+function parseCards(text, termSepRaw, cardSepRaw) {
+  const termSep = unescapeSep(termSepRaw);
+  const cardSep = unescapeSep(cardSepRaw);
+
+  let rows;
+  if (cardSep === "\n\n") rows = text.split(/\r?\n\s*\r?\n/);
+  else if (cardSep === "\n") rows = text.split(/\r?\n/);
+  else rows = text.split(cardSep);
+
+  const cards = [];
+  for (let row of rows) {
+    row = row.trim();
+    if (!row) continue;
+    const i = row.indexOf(termSep);
+    let front, back;
+    if (i === -1) {
+      front = row;
+      back = "";
+    } else {
+      front = row.slice(0, i).trim();
+      back = row.slice(i + termSep.length).trim();
+    }
+    if (!front) continue;
+    cards.push({ front, back });
+  }
+  return cards;
+}
+
+function currentImportCards() {
+  return parseCards($("#importText").value, $("#termSep").value, $("#cardSep").value);
+}
+
+function previewImport() {
+  const cards = currentImportCards();
+  const box = $("#importPreview");
+  if (!cards.length) {
+    box.innerHTML = '<p class="empty">No cards detected — try a different separator.</p>';
+    return;
+  }
+  box.innerHTML = `<p>${cards.length} card(s) detected. First few:</p>`;
+  cards.slice(0, 3).forEach((c) => {
+    const div = document.createElement("div");
+    div.className = "pv-card";
+    const b = document.createElement("b");
+    b.textContent = c.front; // textContent — never inject pasted HTML
+    const s = document.createElement("span");
+    s.textContent = c.back;
+    div.append(b, s);
+    box.appendChild(div);
+  });
+}
+
+async function doImport() {
+  const cards = currentImportCards();
+  if (!cards.length) {
+    toast("Nothing to import — check your separators.");
+    return;
+  }
+  const title = $("#importTitle").value.trim() || "Imported flashcards";
+  const now = Date.now();
+  const flashcards = cards.map((c) => ({
+    id: uid(),
+    front: c.front,
+    back: c.back,
+    ...initSchedule(now),
+  }));
+
+  const session = await addSession({
+    source: "quizlet",
+    sourceLabel: "Imported",
+    title,
+    url: "",
+    capturedAt: now,
+    messages: [],
+    importedCount: flashcards.length,
+  });
+  await saveStudySet({ sessionId: session.id, title, createdAt: now, flashcards, quiz: [] });
+
+  // reset the form
+  $("#importTitle").value = "";
+  $("#importText").value = "";
+  $("#importPreview").innerHTML = "";
+
+  toast(`Imported ${flashcards.length} cards`);
+  show("list");
+  renderList();
+}
+
 // --- tabs -------------------------------------------------------------------
 
 function switchTab(name) {
@@ -298,6 +417,13 @@ document.querySelectorAll(".tab").forEach((t) =>
   t.addEventListener("click", () => switchTab(t.dataset.tab))
 );
 $("#captureBtn").addEventListener("click", captureCurrent);
+$("#importBtn").addEventListener("click", () => show("import"));
+$("#importBackBtn").addEventListener("click", () => {
+  show("list");
+  renderList();
+});
+$("#importPreviewBtn").addEventListener("click", previewImport);
+$("#importSaveBtn").addEventListener("click", doImport);
 $("#backBtn").addEventListener("click", () => {
   show("list");
   renderList();

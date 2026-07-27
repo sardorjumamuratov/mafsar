@@ -8,15 +8,24 @@ import {
   deleteSession,
   getStudySetForSession,
   saveStudySet,
+  uid,
 } from "../storage/store.js";
+import { initSchedule } from "../storage/srs.js";
 import { generateStudySet } from "../llm/generate.js";
 
-// Open the side panel on toolbar click.
+// Chrome: open the side panel when the toolbar icon is clicked.
 chrome.runtime.onInstalled.addListener(() => {
   if (chrome.sidePanel?.setPanelBehavior) {
     chrome.sidePanel.setPanelBehavior({ openPanelOnActionClick: true }).catch(() => {});
   }
 });
+
+// Firefox: no sidePanel API — toggle the sidebar when the toolbar icon is clicked.
+if (chrome.action?.onClicked && globalThis.chrome?.sidebarAction) {
+  chrome.action.onClicked.addListener(() => {
+    chrome.sidebarAction.toggle();
+  });
+}
 
 // Message router. Content script + side panel both talk to us via runtime messages.
 chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
@@ -31,6 +40,33 @@ async function handle(msg) {
     case "SAVE_SESSION": {
       const session = await addSession(msg.payload);
       return { session };
+    }
+
+    case "IMPORT_CARDS": {
+      const rawCards = Array.isArray(msg.cards) ? msg.cards : [];
+      const now = Date.now();
+      const flashcards = rawCards
+        .filter((c) => c && c.front)
+        .map((c) => ({
+          id: uid(),
+          front: String(c.front),
+          back: String(c.back || ""),
+          ...initSchedule(now),
+        }));
+      if (!flashcards.length) throw new Error("No cards to import.");
+
+      const title = msg.title || "Imported set";
+      const session = await addSession({
+        source: msg.source || "quizlet",
+        sourceLabel: msg.sourceLabel || "Imported",
+        title,
+        url: msg.url || "",
+        capturedAt: now,
+        messages: [],
+        importedCount: flashcards.length,
+      });
+      await saveStudySet({ sessionId: session.id, title, createdAt: now, flashcards, quiz: [] });
+      return { count: flashcards.length };
     }
 
     case "LIST_SESSIONS": {

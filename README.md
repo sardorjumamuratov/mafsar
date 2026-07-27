@@ -10,18 +10,34 @@ provider of your choice using **your own API key** — pick a **free** provider
 (Google Gemini or Groq) or paid Anthropic Claude in settings. Nothing is sent to
 any server other than the provider you choose.
 
-## Install (load unpacked)
+The same folder works in both **Chrome/Edge** (side panel) and **Firefox**
+(sidebar). One manifest, feature-detected at runtime.
 
-1. Open `chrome://extensions`.
+### Chrome / Edge
+
+1. Open `chrome://extensions` (or `edge://extensions`).
 2. Turn on **Developer mode** (top right).
 3. Click **Load unpacked** and select this `mafsar/` folder.
-4. Click the extension's **Details → Extension options** (or the ⚙ in the panel),
-   choose a provider, and paste your API key. **Google Gemini** is free and
-   recommended — get a key at
-   [aistudio.google.com/app/apikey](https://aistudio.google.com/app/apikey). Save.
+4. Click the toolbar icon to open the **side panel**.
 
-> Note: no toolbar icon image is bundled yet, so Chrome shows a default puzzle
-> piece. Drop 16/48/128px PNGs in `icons/` and add an `"icons"` block to
+### Firefox
+
+1. Open `about:debugging#/runtime/this-firefox`.
+2. Click **Load Temporary Add-on…**.
+3. Select the **`manifest.json`** file inside this folder.
+4. Click the toolbar icon to toggle the **sidebar** (or View → Sidebar → Mafsar).
+
+> Temporary add-ons are removed when Firefox restarts — reload it the same way,
+> or sign/package it for a permanent install. Firefox 128+ required.
+
+### Then, in either browser
+
+Open **Extension options** (⚙ in the panel), choose a provider, and paste your
+API key. **Google Gemini** is free and recommended — get a key at
+[aistudio.google.com/app/apikey](https://aistudio.google.com/app/apikey). Save.
+
+> Note: no toolbar icon image is bundled yet, so the browser shows a default
+> icon. Drop 16/48/128px PNGs in `icons/` and add an `"icons"` block to
 > `manifest.json` to brand it.
 
 ## Use
@@ -34,6 +50,22 @@ any server other than the provider you choose.
    build flashcards + a quiz.
 4. Review flashcards (grade Again/Hard/Good/Easy — SM-2 schedules the next
    review) and take the quiz. Come back later; due cards resurface first.
+
+### Import from Quizlet
+
+**One-click (easiest):** open any Quizlet set page — a floating **⇪ Import to
+Mafsar** button appears bottom-right. Click it; the whole set is read from the
+page and saved as a study set.
+
+**Paste method (fallback / any CSV/TSV):**
+
+1. In the side panel click **⇪ Import flashcards**.
+2. In Quizlet, open your set → **⋯ More → Export** → set “Between term and
+   definition” to **Tab** and “Between rows” to **New line** → copy the text.
+3. Paste it into Mafsar, pick matching separators, click **Preview** then
+   **Import**.
+
+Imported sets are flashcards only (no quiz).
 
 ## Project layout
 
