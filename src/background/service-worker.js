@@ -42,6 +42,34 @@ async function handle(msg) {
       return { session };
     }
 
+    case "SAVE_AND_GENERATE": {
+      // The "Save to Mafsar" page action: store the conversation, then generate
+      // flashcards + quiz automatically if an API key is configured.
+      const session = await addSession(msg.payload);
+      const settings = await getSettings();
+      if (!settings.apiKey) {
+        return { session, generated: false, reason: "no-key" };
+      }
+      try {
+        const generated = await generateStudySet(settings, session);
+        const studySet = await saveStudySet({
+          sessionId: session.id,
+          title: session.title,
+          createdAt: Date.now(),
+          flashcards: generated.flashcards,
+          quiz: generated.quiz,
+        });
+        return {
+          session,
+          generated: true,
+          cards: studySet.flashcards.length,
+          quiz: studySet.quiz.length,
+        };
+      } catch (e) {
+        return { session, generated: false, reason: e?.message || "generation-failed" };
+      }
+    }
+
     case "IMPORT_CARDS": {
       const rawCards = Array.isArray(msg.cards) ? msg.cards : [];
       const now = Date.now();

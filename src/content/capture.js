@@ -30,9 +30,10 @@
     button.textContent = text;
     button.classList.toggle("mafsar-err", !ok);
     setTimeout(() => {
-      button.textContent = original;
-      button.classList.remove("mafsar-err");
-    }, 2200);
+      button.textContent = button.dataset.label;
+      button.classList.remove("mafsar-err", "mafsar-busy");
+      button.disabled = false;
+    }, 2600);
   }
 
   function onSaveClick(e) {
@@ -42,14 +43,24 @@
       flash(button, "⚠ Nothing to save", false);
       return;
     }
+    // Save + auto-generate flashcards and a quiz in one action.
+    button.disabled = true;
+    button.classList.add("mafsar-busy");
+    button.textContent = "Saving & generating…";
     chrome.runtime.sendMessage(
-      { type: "SAVE_SESSION", payload: result.session },
+      { type: "SAVE_AND_GENERATE", payload: result.session },
       (resp) => {
         if (chrome.runtime.lastError || !resp || !resp.ok) {
           flash(button, "⚠ Save failed", false);
           return;
         }
-        flash(button, `✓ Saved (${result.session.messages.length} msgs)`);
+        if (resp.generated) {
+          flash(button, `✓ Study set ready · ${resp.cards} cards`);
+        } else if (resp.reason === "no-key") {
+          flash(button, "✓ Saved — add API key to generate", false);
+        } else {
+          flash(button, "✓ Saved — generation failed", false);
+        }
       }
     );
   }
@@ -59,8 +70,9 @@
     const btn = document.createElement("button");
     btn.id = BTN_ID;
     btn.type = "button";
-    btn.textContent = "📚 Save to Mafsar";
-    btn.title = "Capture this conversation as a Mafsar study session";
+    btn.dataset.label = "📚 Save to Mafsar";
+    btn.textContent = btn.dataset.label;
+    btn.title = "Save this conversation and generate flashcards + a quiz";
     btn.addEventListener("click", onSaveClick);
     document.body.appendChild(btn);
   }

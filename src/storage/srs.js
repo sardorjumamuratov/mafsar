@@ -48,3 +48,11 @@ export function isDue(card, now = Date.now()) {
 export function byDue(a, b) {
   return (a.dueDate ?? 0) - (b.dueDate ?? 0);
 }
+
+/** Mastery bucket for a card, derived from SM-2 repetitions. */
+export function masteryOf(card) {
+  const reps = card.repetitions ?? 0;
+  if (reps >= 3) return "mastered";
+  if (reps >= 1) return "learning";
+  return "new";
+}

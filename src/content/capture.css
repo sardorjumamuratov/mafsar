@@ -1,23 +1,23 @@
 #mafsar-save-btn,
 #mafsar-import-btn {
   position: fixed;
-  right: 16px;
-  bottom: 16px;
+  right: 18px;
+  bottom: 18px;
   z-index: 2147483000;
-  padding: 8px 14px;
-  font: 600 13px/1.2 system-ui, -apple-system, sans-serif;
+  padding: 10px 16px;
+  font: 600 13px/1.2 system-ui, -apple-system, "Segoe UI", sans-serif;
   color: #fff;
-  background: #6d4aff;
+  background: #0b6e77;
   border: none;
   border-radius: 999px;
-  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.25);
+  box-shadow: 0 6px 20px -6px rgba(11, 110, 119, 0.55), 0 2px 6px rgba(0, 0, 0, 0.15);
   cursor: pointer;
-  transition: background 0.15s ease, transform 0.1s ease;
+  transition: background 0.15s ease, transform 0.1s ease, opacity 0.15s ease;
 }
 
 #mafsar-save-btn:hover,
 #mafsar-import-btn:hover {
-  background: #5a37e6;
+  background: #085a62;
 }
 
 #mafsar-save-btn:active,
@@ -25,7 +25,13 @@
   transform: translateY(1px);
 }
 
+#mafsar-save-btn.mafsar-busy,
+#mafsar-import-btn.mafsar-busy {
+  opacity: 0.75;
+  cursor: default;
+}
+
 #mafsar-save-btn.mafsar-err,
 #mafsar-import-btn.mafsar-err {
-  background: #d9534f;
+  background: #cd584e;
 }
