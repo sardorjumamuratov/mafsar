@@ -1,21 +1,35 @@
-import Database from "better-sqlite3";
+import { createClient, type Client } from "@libsql/client";
 import { randomUUID } from "node:crypto";
 
-export type DB = Database.Database;
+// libSQL client — talks to Turso in production (TURSO_DATABASE_URL) or a local
+// file in dev. The server stays stateless: no DB file on the container, so
+// redeploys can't lose data.
+export type DB = Client;
 
-// To move to Turso/libSQL for hosting: replace this factory with
-// @libsql/client, keep the same SQL statements, and swap ? placeholders (1,2,3)
-// for libSQL's named-parameter style. Everything else is plain SQL.
-export function openDB(path: string): DB {
-  const db = new Database(path);
-  db.pragma("journal_mode = WAL");
-  db.pragma("foreign_keys = ON");
-  migrate(db);
-  return db;
+export function openDB(url?: string): DB {
+  return createClient({
+    url: url ?? process.env.TURSO_DATABASE_URL ?? "file:mafsar.db",
+    authToken: process.env.TURSO_AUTH_TOKEN,
+  });
 }
 
-// --- migrations -------------------------------------------------------------
-// Ordered list of DDL batches; `migrations` table tracks applied ones.
+// --- thin async query helpers ------------------------------------------------
+export async function one<T = any>(db: DB, sql: string, args: unknown[] = []): Promise<T | undefined> {
+  const res = await db.execute({ sql, args: args as any[] });
+  return res.rows[0] as T | undefined;
+}
+export async function all<T = any>(db: DB, sql: string, args: unknown[] = []): Promise<T[]> {
+  const res = await db.execute({ sql, args: args as any[] });
+  return res.rows as T[];
+}
+export async function run(db: DB, sql: string, args: unknown[] = []): Promise<number> {
+  const res = await db.execute({ sql, args: args as any[] });
+  return Number(res.rowsAffected ?? 0);
+}
+
+// --- migrations ---------------------------------------------------------------
+// Ordered list of DDL batches; the `migrations` table tracks applied ones.
+// Each batch is split on ';' because libSQL executes one statement at a time.
 const MIGRATIONS: string[] = [
   `
   CREATE TABLE users (
@@ -24,7 +38,9 @@ const MIGRATIONS: string[] = [
     password_hash TEXT NOT NULL,
     created_at TEXT NOT NULL
   );
-
+  CREATE INDEX idx_users_email ON users(email);
+  `,
+  `
   CREATE TABLE sets (
     id TEXT PRIMARY KEY,             -- client-generated UUID, matches extension
     user_id TEXT NOT NULL REFERENCES users(id),
@@ -38,7 +54,8 @@ const MIGRATIONS: string[] = [
     deleted INTEGER NOT NULL DEFAULT 0
   );
   CREATE INDEX idx_sets_user_updated ON sets(user_id, updated_at);
-
+  `,
+  `
   CREATE TABLE cards (
     id TEXT PRIMARY KEY,
     set_id TEXT NOT NULL REFERENCES sets(id),
@@ -53,7 +70,8 @@ const MIGRATIONS: string[] = [
     deleted INTEGER NOT NULL DEFAULT 0
   );
   CREATE INDEX idx_cards_user_updated ON cards(user_id, updated_at);
-
+  `,
+  `
   CREATE TABLE quiz (
     id TEXT PRIMARY KEY,
     set_id TEXT NOT NULL REFERENCES sets(id),
@@ -66,14 +84,16 @@ const MIGRATIONS: string[] = [
     deleted INTEGER NOT NULL DEFAULT 0
   );
   CREATE INDEX idx_quiz_user_updated ON quiz(user_id, updated_at);
-
+  `,
+  `
   CREATE TABLE activity (
     user_id TEXT NOT NULL REFERENCES users(id),
     day TEXT NOT NULL,               -- 'YYYY-MM-DD'
     count INTEGER NOT NULL DEFAULT 0,
     PRIMARY KEY (user_id, day)
   );
-
+  `,
+  `
   CREATE TABLE review_log (
     id TEXT PRIMARY KEY,
     user_id TEXT NOT NULL REFERENCES users(id),
@@ -87,28 +107,25 @@ const MIGRATIONS: string[] = [
   `,
 ];
 
-export function migrate(db: DB): void {
-  db.exec(`CREATE TABLE IF NOT EXISTS migrations (
-    name TEXT PRIMARY KEY, applied_at TEXT NOT NULL
-  )`);
-  const applied = new Set(
-    (db.prepare("SELECT name FROM migrations").all() as { name: string }[]).map(
-      (r) => r.name,
-    ),
+export async function migrate(db: DB): Promise<void> {
+  await db.execute(
+    "CREATE TABLE IF NOT EXISTS migrations (name TEXT PRIMARY KEY, applied_at TEXT NOT NULL)"
   );
-  MIGRATIONS.forEach((sql, i) => {
-    const name = `00${i + 1}_init`;
-    if (applied.has(name)) return;
-    db.transaction(() => {
-      db.exec(sql);
-      db.prepare("INSERT INTO migrations (name, applied_at) VALUES (?, ?)").run(
-        name,
-        new Date().toISOString(),
-      );
-    })();
-  });
+  const res = await db.execute("SELECT name FROM migrations");
+  const applied = new Set(res.rows.map((r) => r.name as string));
+  for (let i = 0; i < MIGRATIONS.length; i++) {
+    const name = `00${i + 1}`;
+    if (applied.has(name)) continue;
+    const stmts = MIGRATIONS[i].split(";").map((s) => s.trim()).filter(Boolean);
+    await db.batch(
+      [
+        ...stmts.map((sql) => ({ sql })),
+        { sql: "INSERT INTO migrations (name, applied_at) VALUES (?, ?)", args: [name, new Date().toISOString()] },
+      ],
+      "write"
+    );
+  }
 }
 
-// --- thin query helpers ------------------------------------------------------
 export const uid = () => randomUUID();
 export const nowISO = () => new Date().toISOString();

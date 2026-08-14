@@ -1,6 +1,6 @@
 import { serve } from "@hono/node-server";
 import { readFileSync, existsSync } from "node:fs";
-import { openDB } from "./db.js";
+import { openDB, migrate } from "./db.js";
 import { createApp } from "./app.js";
 
 // .env loading without a dependency: KEY=VALUE lines, nothing fancier.
@@ -11,10 +11,11 @@ if (existsSync(".env")) {
   }
 }
 
-const db = openDB(process.env.DATABASE_PATH ?? "mafsar.sqlite");
+const db = openDB();
+await migrate(db); // creates tables on first boot (Turso or local file)
 const app = createApp(db);
 
-const port = Number(process.env.PORT ?? 8787);
+const port = Number(process.env.PORT ?? 8787); // Railway injects PORT
 serve({ fetch: app.fetch, port }, (info) => {
   console.log(`mafsar-server listening on http://localhost:${info.port}`);
 });

@@ -1,14 +1,18 @@
 import { Hono } from "hono";
+import { cors } from "hono/cors";
 import type { DB } from "./db.js";
 import {
   register, login, requireAuth, signAccessToken, signRefreshToken,
 } from "./auth.js";
 import { syncSchema, registerSchema, loginSchema } from "./schema.js";
 import { applySync, changesSince } from "./sync.js";
-import { nowISO } from "./db.js";
+import { nowISO, one } from "./db.js";
 
 export function createApp(db: DB) {
   const app = new Hono();
+
+  // The extension / future web app call the API cross-origin.
+  app.use("*", cors());
 
   app.use("/v1/*", async (c, next) => {
     // Auth routes are public; everything else under /v1 requires a token.
@@ -59,11 +63,11 @@ export function createApp(db: DB) {
     }
   });
 
-  app.get("/v1/me", (c) => {
+  app.get("/v1/me", async (c) => {
     const userId = c.get("userId") as string;
-    const user = db
-      .prepare("SELECT id, email, created_at FROM users WHERE id = ?")
-      .get(userId);
+    const user = await one(
+      db, "SELECT id, email, created_at FROM users WHERE id = ?", [userId]
+    );
     if (!user) return c.json({ error: "not_found" }, 404);
     return c.json({ user });
   });
@@ -71,9 +75,9 @@ export function createApp(db: DB) {
   app.post("/v1/sync", async (c) => {
     const userId = c.get("userId") as string;
     const body = syncSchema.parse(await c.req.json().catch(() => ({})));
-    applySync(db, userId, body);
+    await applySync(db, userId, body);
     const serverTime = nowISO();
-    return c.json({ serverTime, ...changesSince(db, userId, body.since) });
+    return c.json({ serverTime, ...(await changesSince(db, userId, body.since)) });
   });
 
   // --- Phase 2: LLM proxy (mode-aware) — TODO ---

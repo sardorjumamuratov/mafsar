@@ -3,7 +3,7 @@ import {
   registerSchema, loginSchema, syncSchema,
   setSchema, cardSchema, quizSchema, activitySchema, reviewSchema,
 } from "../src/schema.js";
-import { openDB } from "../src/db.js";
+import { openDB, migrate, one, all, run } from "../src/db.js";
 
 describe("auth schemas", () => {
   it("accepts valid credentials", () => {
@@ -66,25 +66,27 @@ describe("sync schema", () => {
 });
 
 describe("db + migrations", () => {
-  it("creates all tables and is idempotent on re-open", () => {
+  it("creates all tables and is idempotent on re-run", async () => {
     const db = openDB(":memory:");
-    const tables = db
-      .prepare("SELECT name FROM sqlite_master WHERE type='table' ORDER BY name")
-      .all() as { name: string }[];
+    await migrate(db);
+    const tables = await all<{ name: string }>(
+      db, "SELECT name FROM sqlite_master WHERE type='table' ORDER BY name"
+    );
     const names = tables.map((t) => t.name);
     for (const t of ["users", "sets", "cards", "quiz", "activity", "review_log", "migrations"]) {
       expect(names).toContain(t);
     }
     // Re-running migrations must not throw or duplicate.
-    expect(() => openDB(":memory:")).not.toThrow();
-    const rows = db.prepare("SELECT COUNT(*) n FROM migrations").get() as { n: number };
-    expect(rows.n).toBeGreaterThan(0);
+    await expect(migrate(db)).resolves.toBeUndefined();
+    const rows = await one<{ n: number }>(db, "SELECT COUNT(*) n FROM migrations");
+    expect(Number(rows!.n)).toBe(6);
   });
 
-  it("enforces FK integrity for cards", () => {
+  it("enforces FK integrity for cards", async () => {
     const db = openDB(":memory:");
-    expect(() =>
-      db.prepare("INSERT INTO cards (id, set_id, user_id, front, back, updated_at) VALUES ('c', 'nope', 'nope', 'f', 'b', 't')").run()
-    ).toThrow();
+    await migrate(db);
+    await expect(
+      run(db, "INSERT INTO cards (id, set_id, user_id, front, back, updated_at) VALUES ('c', 'nope', 'nope', 'f', 'b', 't')")
+    ).rejects.toThrow();
   });
 });

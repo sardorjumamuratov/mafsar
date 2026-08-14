@@ -2,7 +2,7 @@ import { SignJWT, jwtVerify } from "jose";
 import bcrypt from "bcryptjs";
 import type { Context, Next } from "hono";
 import type { DB } from "./db.js";
-import { uid, nowISO } from "./db.js";
+import { uid, nowISO, one, run } from "./db.js";
 
 const ACCESS_TTL = "15m";
 const REFRESH_TTL = "30d";
@@ -55,7 +55,7 @@ export function requireAuth() {
 // POST /v1/auth/register
 export async function register(db: DB, email: string, password: string) {
   const normalized = email.trim().toLowerCase();
-  if (await db.prepare("SELECT 1 FROM users WHERE email = ?").get(normalized)) {
+  if (await one(db, "SELECT 1 AS x FROM users WHERE email = ?", [normalized])) {
     return null; // already registered
   }
   const user = {
@@ -64,19 +64,21 @@ export async function register(db: DB, email: string, password: string) {
     password_hash: await hashPassword(password),
     created_at: nowISO(),
   };
-  db.prepare(
+  await run(
+    db,
     "INSERT INTO users (id, email, password_hash, created_at) VALUES (?, ?, ?, ?)",
-  ).run(user.id, user.email, user.password_hash, user.created_at);
+    [user.id, user.email, user.password_hash, user.created_at]
+  );
   return user;
 }
 
 // POST /v1/auth/login
 export async function login(db: DB, email: string, password: string) {
-  const user = db
-    .prepare("SELECT * FROM users WHERE email = ?")
-    .get(email.trim().toLowerCase()) as
-    | { id: string; email: string; password_hash: string }
-    | undefined;
+  const user = await one<{ id: string; email: string; password_hash: string }>(
+    db,
+    "SELECT * FROM users WHERE email = ?",
+    [email.trim().toLowerCase()]
+  );
   if (!user || !(await verifyPassword(password, user.password_hash))) {
     return null;
   }

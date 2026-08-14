@@ -1,6 +1,6 @@
 // Standalone migration runner: npm run migrate
 import { readFileSync, existsSync } from "node:fs";
-import { openDB } from "./db.js";
+import { openDB, migrate } from "./db.js";
 
 if (existsSync(".env")) {
   for (const line of readFileSync(".env", "utf8").split(/\r?\n/)) {
@@ -9,5 +9,5 @@ if (existsSync(".env")) {
   }
 }
 
-openDB(process.env.DATABASE_PATH ?? "mafsar.sqlite");
+await migrate(openDB());
 console.log("migrations applied");

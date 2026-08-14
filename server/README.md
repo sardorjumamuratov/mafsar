@@ -67,47 +67,47 @@ Semantics:
 
 First sync: omit `since` to receive all data. Subsequently pass the `serverTime` from the previous response.
 
-## Deploy
+## Deploy (Railway + Turso)
 
-### Railway (recommended first stop)
+The server is stateless: it talks to Turso (hosted libSQL) over the network, so redeploys can't lose data and no volume is needed. Local dev falls back to a file (`file:mafsar.db`) automatically.
 
-The service uses better-sqlite3 with a file DB, so it needs a **volume** — data on the container filesystem is lost on every deploy.
+### 1. Create the Turso database
 
-1. Push the repo to GitHub, then at [railway.app](https://railway.app): **New Project → Deploy from GitHub repo**.
-2. **Settings → Root Directory**: `server` (Railway will pick up `server/railway.json`; it runs `npm ci && npm start` and health-checks `/healthz`).
-3. **Storage → Add Volume**, mount path `/data`.
-4. **Variables** — add:
-   - `JWT_SECRET` = output of `openssl rand -hex 32` (required in production; the dev fallback refuses to run without warning otherwise)
-   - `DATABASE_PATH` = `/data/mafsar.sqlite` (on the volume — this is what makes data survive deploys)
+```bash
+turso auth signup              # or: turso auth login
+turso db create mafsar
+turso db show mafsar --url     # -> libsql://mafsar-<org>.turso.io  (TURSO_DATABASE_URL)
+turso db tokens create mafsar  # -> long token                     (TURSO_AUTH_TOKEN)
+```
+
+(Windows: run these in WSL, or create the DB + token from the Turso web dashboard.)
+
+### 2. Deploy the server
+
+1. [railway.app](https://railway.app) → **New Project → Deploy from GitHub repo** → `sardorjumamuratov/mafsar`.
+2. **Settings → Root Directory**: `server` (essential — the backend is in a subfolder). Railway picks up `server/railway.json` (`npm ci` + `npm start`, healthcheck `/healthz`).
+3. **Variables**:
+   - `TURSO_DATABASE_URL` = your libsql URL
+   - `TURSO_AUTH_TOKEN` = your token
+   - `JWT_SECRET` = output of `openssl rand -hex 32`
    - `NODE_ENV` = `production`
-   - `PORT` — leave unset; Railway injects it.
-5. Deploy, then **Settings → Networking → Generate Domain** for a public URL (e.g. `https://mafsar.up.railway.app`). You can attach a custom domain later, which you'll want before payments.
+   - Don't set `PORT` — Railway injects it.
+4. Deploy → **Settings → Networking → Generate Domain**. Tables are created automatically on first boot.
 
-Verify from anywhere:
-
-```bash
-curl https://<your-app>.up.railway.app/healthz
-# {"ok":true}
-```
-
-Notes:
-- Migrations run automatically on boot (`openDB` → `migrate`).
-- Cost on the Hobby plan: ~$5/mo including usage; the tiny service + 1GB volume fits inside the included credit.
-- The volume is single-region — pick the region closest to your users. When you outgrow that, migrate the DB to Turso (below) and the host becomes swappable.
-
-### Later: Turso/libSQL (for scale or global deploys)
-
-Swap `openDB` in `src/db.ts` to `@libsql/client` pointing at Turso (`DATABASE_URL` + `TURSO_AUTH_TOKEN`), then any host works — including free/spin-down ones like Render, since data no longer lives on the compute host:
+### 3. Verify
 
 ```bash
-fly launch --no-deploy
-fly secrets set JWT_SECRET=$(openssl rand -hex 32)
-fly deploy
+BASE=https://<your-app>.up.railway.app
+curl -s $BASE/healthz          # {"ok":true}
+curl -s -X POST $BASE/v1/auth/register -H 'content-type: application/json' \
+  -d '{"email":"you@test.com","password":"secret123"}'
+# check data landed:
+turso db shell mafsar "SELECT email FROM users;"
 ```
 
-## Roadmap (stubbed, returns 501)
+### Cost & gotchas
 
-- **Phase 2** — LLM proxy: `/v1/generate`, `/v1/grade`, `/v1/hypothetical` (mode-aware, grounded in user source, rate-limited).
-- **Phase 3** — `/v1/insights`: weak topics, exam readiness, forgetting model from `review_log`.
-- **Phase 4** — Teams + Redis: shared sets, streak leaderboards, rate limiting.
-- **Phase 5** — Stripe payments, review reminders.
+- Railway Hobby ≈ $5/mo (includes $5 usage); Turso free tier covers launch.
+- Secrets live only in Railway Variables / local `.env` (gitignored) — never commit them.
+- Rotate the Turso token if it ever leaks: `turso db tokens create mafsar` + update the Railway variable.
+- Later: point the extension at the API base URL (config constant + `host_permissions` entry in `manifest.json`). chrome.storage stays the offline cache; login stays optional.

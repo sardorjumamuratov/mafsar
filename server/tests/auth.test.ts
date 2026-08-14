@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach } from "vitest";
-import { openDB, type DB } from "../src/db.js";
+import { openDB, migrate, type DB } from "../src/db.js";
 import {
   register, login, requireAuth, signAccessToken, signRefreshToken,
 } from "../src/auth.js";
@@ -8,8 +8,9 @@ let db: DB;
 const EMAIL = "auth@mafsar.dev";
 const PW = "password123";
 
-beforeEach(() => {
+beforeEach(async () => {
   db = openDB(":memory:");
+  await migrate(db);
 });
 
 function fakeCtx(authHeader?: string) {

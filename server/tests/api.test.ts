@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach } from "vitest";
-import { openDB, type DB } from "../src/db.js";
+import { openDB, migrate, type DB } from "../src/db.js";
 import { createApp } from "../src/app.js";
 import { register, signAccessToken, signRefreshToken } from "../src/auth.js";
 
@@ -8,8 +8,9 @@ import { register, signAccessToken, signRefreshToken } from "../src/auth.js";
 let db: DB;
 let app: ReturnType<typeof createApp>;
 
-beforeEach(() => {
+beforeEach(async () => {
   db = openDB(":memory:");
+  await migrate(db);
   app = createApp(db);
 });
 
