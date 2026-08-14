@@ -100,6 +100,14 @@
     <datalist id="modelList"></datalist>
     <div class="hint">Pick from the list or type any model id. If one model is out of free quota, try another.</div>
 
+    <label for="reminders">Daily study reminder</label>
+    <div class="row" style="margin-top:6px">
+      <input id="reminders" type="checkbox" style="width:auto" />
+      <span>Remind me at</span>
+      <input id="remindTime" type="time" style="width:auto" />
+      <span class="hint" style="margin:0">if cards are due</span>
+    </div>
+
     <div class="row">
       <button id="save">Save</button>
       <span id="status"></span>

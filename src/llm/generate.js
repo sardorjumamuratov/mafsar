@@ -148,8 +148,8 @@ function normalize(parsed) {
   return { flashcards, quiz };
 }
 
-async function callApi(provider, { apiKey, model, user }) {
-  const req = provider.buildRequest({ apiKey, model, system: SYSTEM_PROMPT, user });
+async function callApi(provider, { apiKey, model, system, user }) {
+  const req = provider.buildRequest({ apiKey, model, system, user });
   const res = await fetch(req.url, {
     method: "POST",
     headers: req.headers,
@@ -177,22 +177,14 @@ async function callApi(provider, { apiKey, model, user }) {
  * @returns {Promise<{flashcards:Array, quiz:Array}>}
  */
 export async function generateStudySet(settings, session) {
-  const provider = PROVIDERS[settings.provider] || PROVIDERS.gemini;
-  if (!settings.apiKey) {
-    throw new Error(
-      `No API key set. Add your ${provider.label} API key in the extension options.`
-    );
-  }
-  const model = settings.model || provider.defaultModel;
   const user =
     "Here is the conversation transcript:\n\n" +
     transcriptToText(session.messages) +
     "\n\nGenerate the study material now.";
-
   // One retry on malformed JSON.
   let lastErr;
   for (let attempt = 0; attempt < 2; attempt++) {
-    const raw = await callApi(provider, { apiKey: settings.apiKey, model, user });
+    const raw = await callLLM(settings, { system: SYSTEM_PROMPT, user });
     try {
       const normalized = normalize(extractJson(raw));
       if (!normalized.flashcards.length && !normalized.quiz.length) {
@@ -204,4 +196,105 @@ export async function generateStudySet(settings, session) {
     }
   }
   throw new Error(`Couldn't parse study material: ${lastErr?.message || "unknown error"}`);
+}
+
+// --- Task-specific prompts (all grounded strictly in user-supplied source) ---
+
+const GRADE_PROMPT = `You are a fair, concise exam grader. You get a question, the reference
+answer (ground truth from the user's own study material), and the student's typed answer.
+
+Rules:
+- Judge only against the reference. Never invent facts or require knowledge not in it.
+- Award partial credit for partially correct answers.
+- "feedback" is 1-3 sentences: what was right, what was missing/wrong.
+
+Respond with ONLY valid JSON: { "score": number 0-100, "correct": boolean, "feedback": string }`;
+
+const HYPOTHETICAL_PROMPT = `You are a study-practice generator. You get a concept (a flashcard
+front/back pair from the user's own material) and must write ONE fresh application exercise that
+tests the same concept in a new scenario — a new fact pattern, example, or situation the student
+hasn't seen.
+
+Rules:
+- The exercise must be answerable using only the concept provided. Do not introduce facts the
+  concept doesn't support, and never fabricate citations, statistics, or legal/medical facts.
+- "scenario" is 2-5 sentences ending with a clear question or task.
+- "rubric" is the reference answer/key points a correct response must cover (grounded in the concept).
+
+Respond with ONLY valid JSON: { "scenario": string, "rubric": string }`;
+
+const SUMMARIZE_PROMPT = `You are a study summarizer. You get a transcript of a conversation the
+user had while learning. Produce a concise TL;DR and the key takeaways.
+
+Rules:
+- Ground everything in the transcript; do not add outside knowledge.
+- "summary" is 2-4 sentences in plain language.
+- "keyPoints" is 3-6 short bullet strings.
+
+Respond with ONLY valid JSON: { "summary": string, "keyPoints": [string] }`;
+
+/** Shared low-level call: any { system, user } prompt pair against the user's provider. */
+export async function callLLM(settings, { system, user }) {
+  const provider = PROVIDERS[settings.provider] || PROVIDERS.gemini;
+  if (!settings.apiKey) {
+    throw new Error(`No API key set. Add your ${provider.label} API key in the extension options.`);
+  }
+  const model = settings.model || provider.defaultModel;
+  return callApi(provider, { apiKey: settings.apiKey, model, system, user });
+}
+
+// One retry on malformed JSON, shared by the small task prompts.
+async function callJsonRetry(settings, system, user) {
+  let lastErr;
+  for (let attempt = 0; attempt < 2; attempt++) {
+    const raw = await callLLM(settings, { system, user });
+    try {
+      return extractJson(raw);
+    } catch (e) {
+      lastErr = e;
+    }
+  }
+  throw new Error(`Couldn't parse model response: ${lastErr?.message || "unknown error"}`);
+}
+
+/**
+ * Grade a typed short answer against reference material.
+ * @returns {Promise<{score:number, correct:boolean, feedback:string}>}
+ */
+export async function gradeAnswer(settings, { question, reference, answer }) {
+  const user = `Question: ${question}\n\nReference answer:\n${reference}\n\nStudent's answer:\n${answer}\n\nGrade it now.`;
+  const parsed = await callJsonRetry(settings, GRADE_PROMPT, user);
+  const score = Math.max(0, Math.min(100, Math.round(Number(parsed.score) || 0)));
+  return {
+    score,
+    correct: typeof parsed.correct === "boolean" ? parsed.correct : score >= 60,
+    feedback: String(parsed.feedback || ""),
+  };
+}
+
+/**
+ * Generate a fresh application exercise (hypothetical) for a concept.
+ * A new scenario each call — never cached.
+ * @returns {Promise<{scenario:string, rubric:string}>}
+ */
+export async function generateHypothetical(settings, { concept, reference }) {
+  const user = `Concept (flashcard front):\n${concept}\n\nReference (flashcard back):\n${reference}\n\nWrite the exercise now.`;
+  const parsed = await callJsonRetry(settings, HYPOTHETICAL_PROMPT, user);
+  if (!parsed.scenario || !parsed.rubric) throw new Error("Model returned an incomplete exercise.");
+  return { scenario: String(parsed.scenario), rubric: String(parsed.rubric) };
+}
+
+/**
+ * TL;DR + key takeaways for a captured conversation.
+ * @returns {Promise<{summary:string, keyPoints:string[]}>}
+ */
+export async function summarizeConversation(settings, session) {
+  const user = "Here is the conversation transcript:\n\n" +
+    transcriptToText(session.messages) +
+    "\n\nSummarize it now.";
+  const parsed = await callJsonRetry(settings, SUMMARIZE_PROMPT, user);
+  return {
+    summary: String(parsed.summary || ""),
+    keyPoints: (parsed.keyPoints || []).map(String).slice(0, 6),
+  };
 }

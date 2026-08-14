@@ -14,9 +14,11 @@ export function initSchedule(now = Date.now()) {
  * @param {{easiness:number,interval:number,repetitions:number}} card
  * @param {number} grade 0..5
  * @param {number} now epoch ms
+ * @param {number} [examDate] epoch ms — when set and in the future, the new
+ *   dueDate is clamped to ≤ examDate so cards keep resurfacing before the exam.
  * @returns updated scheduling fields
  */
-export function review(card, grade, now = Date.now()) {
+export function review(card, grade, now = Date.now(), examDate) {
   let { easiness = 2.5, interval = 0, repetitions = 0 } = card;
   grade = Math.max(0, Math.min(5, Math.round(grade)));
 
@@ -35,7 +37,8 @@ export function review(card, grade, now = Date.now()) {
   easiness = easiness + (0.1 - (5 - grade) * (0.08 + (5 - grade) * 0.02));
   if (easiness < 1.3) easiness = 1.3;
 
-  const dueDate = now + interval * DAY_MS;
+  let dueDate = now + interval * DAY_MS;
+  if (examDate && examDate > now) dueDate = Math.min(dueDate, examDate);
   return { easiness: Number(easiness.toFixed(2)), interval, repetitions, dueDate };
 }
 

@@ -28,6 +28,8 @@ async function load() {
   $("provider").value = s.provider || "gemini";
   $("apiKey").value = s.apiKey || "";
   applyProvider($("provider").value, s.model);
+  $("reminders").checked = !!s.reminders;
+  $("remindTime").value = s.remindTime || "19:00";
 }
 
 $("provider").addEventListener("change", () => {
@@ -40,6 +42,8 @@ async function save() {
     provider: $("provider").value,
     apiKey: $("apiKey").value.trim(),
     model: $("model").value.trim(),
+    reminders: $("reminders").checked,
+    remindTime: $("remindTime").value || "19:00",
   });
   const status = $("status");
   status.textContent = "✓ Saved";

@@ -1,5 +1,7 @@
 // Thin wrapper over chrome.storage.local. Everything is stored locally on the
 // user's machine — no sync, no server.
+
+import { initSchedule } from "./srs.js";
 //
 // Shape:
 //   settings        -> { apiKey, model }
@@ -12,9 +14,11 @@ const KEYS = {
   SESSIONS: "sessions",
   STUDY_SETS: "studySets",
   ACTIVITY: "activity",
+  REVIEW_LOG: "reviewLog",
 };
 
-const DEFAULT_SETTINGS = { provider: "gemini", apiKey: "", model: "" };
+const DEFAULT_SETTINGS = { provider: "gemini", apiKey: "", model: "", reminders: false, remindTime: "19:00" };
+const REVIEW_LOG_CAP = 2000;
 
 function get(key, fallback) {
   return new Promise((resolve) => {
@@ -96,6 +100,70 @@ export async function updateCard(sessionId, cardId, patch) {
   Object.assign(card, patch);
   await set(KEYS.STUDY_SETS, sets);
   return card;
+}
+
+/** Set or clear (null) the exam date for a set's cards. epoch ms or null. */
+export async function setExamDate(sessionId, examDate) {
+  const sets = await getStudySets();
+  const setRec = sets.find((s) => s.sessionId === sessionId);
+  if (!setRec) return null;
+  setRec.examDate = examDate || null;
+  await set(KEYS.STUDY_SETS, sets);
+  return setRec;
+}
+
+export async function addCard(sessionId, front, back) {
+  const sets = await getStudySets();
+  const setRec = sets.find((s) => s.sessionId === sessionId);
+  if (!setRec) return null;
+  const card = { id: uid(), front, back, ...initSchedule() };
+  setRec.flashcards.push(card);
+  await set(KEYS.STUDY_SETS, sets);
+  return card;
+}
+
+export async function deleteCard(sessionId, cardId) {
+  const sets = await getStudySets();
+  const setRec = sets.find((s) => s.sessionId === sessionId);
+  if (!setRec) return false;
+  const before = setRec.flashcards.length;
+  setRec.flashcards = setRec.flashcards.filter((c) => c.id !== cardId);
+  await set(KEYS.STUDY_SETS, sets);
+  return setRec.flashcards.length < before;
+}
+
+// --- Review log (insights + forgetting predictions) --------------------------
+// reviewLog -> [{ cardId, sessionId, grade, at }] capped to the last 2,000.
+
+export async function getReviewLog() {
+  return get(KEYS.REVIEW_LOG, []);
+}
+
+export async function appendReviewLog(entry) {
+  const log = await getReviewLog();
+  log.push(entry);
+  if (log.length > REVIEW_LOG_CAP) log.splice(0, log.length - REVIEW_LOG_CAP);
+  await set(KEYS.REVIEW_LOG, log);
+  return log;
+}
+
+// --- Backup / restore --------------------------------------------------------
+
+/** Everything user-owned in one JSON-serializable object. */
+export async function exportAll() {
+  const obj = await new Promise((resolve) =>
+    chrome.storage.local.get(null, (all) => resolve(all))
+  );
+  return obj;
+}
+
+/** Replace all local data from a backup object (as produced by exportAll). */
+export async function importAll(data) {
+  if (!data || typeof data !== "object" || !Array.isArray(data[KEYS.STUDY_SETS])) {
+    throw new Error("Not a Mafsar backup file.");
+  }
+  await new Promise((resolve) => chrome.storage.local.clear(() => resolve()));
+  await new Promise((resolve) => chrome.storage.local.set(data, () => resolve()));
 }
 
 // --- Activity & streaks -----------------------------------------------------

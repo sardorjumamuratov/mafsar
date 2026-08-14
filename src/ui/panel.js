@@ -6,14 +6,22 @@ import {
   getStudySets,
   saveStudySet,
   updateCard,
+  addCard,
+  deleteCard,
+  setExamDate,
   getActivity,
   bumpActivity,
   computeStreak,
   weekActivity,
   dayKey,
   uid,
+  getReviewLog,
+  appendReviewLog,
+  exportAll,
+  importAll,
 } from "../storage/store.js";
 import { initSchedule, review, isDue, byDue, masteryOf } from "../storage/srs.js";
+import { examReadiness, nextExam, weakTopics } from "../storage/readiness.js";
 
 const app = document.getElementById("app");
 const nav = document.getElementById("bottomNav");
@@ -65,6 +73,18 @@ function timeUntil(ts) {
   if (h < 24) return `in ${h}h`;
   return `in ${Math.round(h / 24)}d`;
 }
+function examDaysLeft(examDate) {
+  const d = Math.ceil((examDate - Date.now()) / 86400000);
+  if (d < 0) return "Exam passed";
+  if (d === 0) return "Today's the day";
+  return `${d} day${d === 1 ? "" : "s"} to go`;
+}
+function dateInputValue(examDate) {
+  // yyyy-mm-dd for <input type="date">, local time.
+  if (!examDate) return "";
+  const d = new Date(examDate);
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+}
 function greeting() {
   const h = new Date().getHours();
   return h < 12 ? "Good morning" : h < 18 ? "Good afternoon" : "Good evening";
@@ -79,13 +99,14 @@ function sourceLabel(session) {
 
 // ---------------------------------------------------------------- data
 async function bundle() {
-  const [sessions, studySets, activity, settings] = await Promise.all([
+  const [sessions, studySets, activity, settings, reviewLog] = await Promise.all([
     getSessions(),
     getStudySets(),
     getActivity(),
     getSettings(),
+    getReviewLog(),
   ]);
-  return { sessions, studySets, activity, settings };
+  return { sessions, studySets, activity, settings, reviewLog };
 }
 const setFor = (sessionId, studySets) => studySets.find((s) => s.sessionId === sessionId) || null;
 
@@ -140,6 +161,36 @@ async function renderHome() {
   const withSets = sessions.filter((s) => setFor(s.id, studySets));
   const topSets = withSets.slice(0, 4);
 
+  const exam = nextExam(studySets, sessions);
+  const examCard = exam
+    ? `<div class="exam-card" data-action="open-set" data-id="${esc(exam.sessionId)}">
+         <span class="exam-ic">🎯</span>
+         <div><div class="t-label">Next exam</div>
+           <div class="exam-title">${esc(exam.title)}</div>
+           <div class="sub">${examDaysLeft(exam.examDate)}</div></div>
+         <span class="tag">in ${Math.max(1, Math.ceil((exam.examDate - Date.now()) / 86400000))}d</span>
+       </div>`
+    : "";
+
+  const allCards = studySets.flatMap((s) => s.flashcards || []);
+  const weak = weakTopics(reviewLog, allCards);
+  const insightsCard = weak.length
+    ? `<div class="listhd"><span class="t-label">Needs work</span></div>
+       <div class="block insight" style="display:flex;flex-direction:column;gap:9px">
+         ${weak
+           .slice(0, 3)
+           .map(
+             (w) =>
+               `<div class="insight-row"><span class="q">${esc(w.front)}</span>${
+                 w.forgetRisk
+                   ? `<span class="tag dot" style="color:var(--warm)">forget soon</span>`
+                   : `<span class="tag">${w.fails} miss${w.fails === 1 ? "" : "es"}</span>`
+               }</div>`
+           )
+           .join("")}
+       </div>`
+    : "";
+
   const heroHtml = due
     ? `<div class="due-hero">
          <div><div class="t-label">Due today</div><div class="n tnum">${due}</div>
@@ -174,6 +225,7 @@ async function renderHome() {
 
       ${keyBanner}
       ${heroHtml}
+      ${examCard}
 
       <div class="block" style="display:flex;flex-direction:column;gap:11px">
         <div class="listhd"><span class="t-label">This week</span>
@@ -193,6 +245,8 @@ async function renderHome() {
         <div class="stat"><div class="v tnum">${progress}%</div><div class="k">Progress</div></div>
         <div class="stat"><div class="v tnum">${studySets.length}</div><div class="k">Sets</div></div>
       </div>
+
+      ${insightsCard}
 
       <div class="listhd"><span class="t-label">Your sets</span>
         <button class="linkbtn" data-action="open-import">＋ Import</button></div>
@@ -240,6 +294,7 @@ async function renderSets() {
 
 // ================================================================ SET DETAIL
 let detail = null; // { session, studySet, summary, tab }
+let editingCardId = null;
 
 async function renderSetDetail(sessionId, tab = "cards") {
   showChrome(false);
@@ -262,12 +317,50 @@ function paintDetail() {
         <div style="margin-top:14px"><button class="btn btn-primary" data-action="make-set" data-id="${esc(session.id)}">Generate flashcards & quiz</button></div>
       </div>`;
   } else if (tab === "cards") {
+    const exam = studySet.examDate
+      ? examReadiness({ examDate: studySet.examDate, total: s.total, mastered: s.mastered, due: s.due })
+      : null;
+    const statusLabel = { "on-track": "On track", behind: "Behind", today: "Exam today", past: "Exam passed" }[exam?.status];
+    const statusColor = exam?.status === "behind" || exam?.status === "today" ? "var(--warm)" : "var(--success)";
+
+    const examPanel = `
+      <div class="block" style="display:flex;flex-direction:column;gap:10px">
+        <div class="prog-line" style="font-size:12px"><span class="t-label" style="margin:0">Exam date</span>
+          <div style="display:flex;gap:8px;align-items:center">
+            <input type="date" id="examDate" class="date-input" value="${dateInputValue(studySet.examDate)}" data-session="${esc(session.id)}" />
+            ${studySet.examDate ? `<button class="linkbtn" data-action="clear-exam" data-id="${esc(session.id)}">Clear</button>` : ""}
+          </div></div>
+        ${
+          exam
+            ? `<div class="readiness">
+                 <div class="r-cell"><div class="v tnum">${exam.daysLeft < 0 ? "—" : exam.daysLeft}</div><div class="k">days left</div></div>
+                 <div class="r-cell"><div class="v tnum">${s.progress}%</div><div class="k">ready</div></div>
+                 <div class="r-cell"><div class="v tnum">${exam.status === "past" ? "—" : exam.dailyTarget}</div><div class="k">cards/day</div></div>
+                 <div class="r-cell"><div class="v" style="font-size:12px;color:${statusColor}">${statusLabel}</div><div class="k">status</div></div>
+               </div>`
+            : `<div class="help" style="margin:0">Set an exam date to get a countdown, daily target, and pre-exam resurfacing of cards.</div>`
+        }
+      </div>`;
+
+    const editForm = editingCardId
+      ? `<div class="block editcard">
+           <div class="field"><label>Front</label><textarea id="editFront" rows="2">${esc(studySet.flashcards.find((c) => c.id === editingCardId)?.front || "")}</textarea></div>
+           <div class="field"><label>Back</label><textarea id="editBack" rows="3">${esc(studySet.flashcards.find((c) => c.id === editingCardId)?.back || "")}</textarea></div>
+           <div style="display:flex;gap:10px">
+             <button class="btn btn-ghost" style="flex:1" data-action="edit-cancel">Cancel</button>
+             <button class="btn btn-primary" style="flex:1" data-action="edit-save" data-id="${esc(editingCardId)}">Save card</button>
+           </div>
+         </div>`
+      : "";
+
     body = `
+      ${examPanel}
       <div class="mastery">
         <div class="m new"><div class="v tnum">${s.fresh}</div><div class="k">New</div></div>
         <div class="m learn"><div class="v tnum">${s.learning}</div><div class="k">Learning</div></div>
         <div class="m mast"><div class="v tnum">${s.mastered}</div><div class="k">Mastered</div></div>
       </div>
+      ${editForm}
       <div class="block" style="padding:6px 14px">
         ${
           studySet.flashcards.length
@@ -276,12 +369,21 @@ function paintDetail() {
                   (c) =>
                     `<div class="cardrow"><span class="sdot ${masteryOf(c)}"></span><span class="q">${esc(c.front)}</span><span class="due">${
                       isDue(c) ? "Due now" : timeUntil(c.dueDate)
-                    }</span></div>`
+                    }</span>
+                     <span class="rowbtns">
+                       <button class="iconbtn ic-xs" data-action="card-edit" data-id="${esc(c.id)}" aria-label="Edit"><svg class="ic" viewBox="0 0 24 24"><path d="M4 20l4-1L20 7l-3-3L5 16l-1 4z"/></svg></button>
+                       <button class="iconbtn ic-xs" data-action="card-del" data-id="${esc(c.id)}" aria-label="Delete"><svg class="ic" viewBox="0 0 24 24"><path d="M5 7h14M9 7V5h6v2m-8 0l1 13h8l1-13"/></svg></button>
+                     </span></div>`
                 )
                 .join("")
             : '<div class="empty">No flashcards.</div>'
         }
-      </div>`;
+      </div>
+      <div style="display:flex;gap:10px">
+        <button class="btn btn-ghost" style="flex:1" data-action="add-card" data-id="${esc(session.id)}">＋ Card</button>
+        <button class="btn btn-ghost" style="flex:1" data-action="start-typed" data-id="${esc(session.id)}">✍️ Type answers</button>
+      </div>
+      <button class="btn btn-ghost btn-block" data-action="export-tsv" data-id="${esc(session.id)}">⇩ Export to Anki/CSV</button>`;
   } else if (tab === "quiz") {
     body = studySet.quiz?.length
       ? `<div class="block" style="text-align:center">
@@ -294,7 +396,7 @@ function paintDetail() {
         }</div>`;
   } else {
     // summary
-    const points = (studySet.flashcards || []).slice(0, 8);
+    const summ = studySet.summary;
     body = `
       <div class="block" style="display:flex;flex-direction:column;gap:8px">
         <div style="display:flex;gap:6px;flex-wrap:wrap">
@@ -302,10 +404,22 @@ function paintDetail() {
           <span class="tag">${studySet.flashcards.length} cards</span>
           ${session.messages?.length ? `<span class="tag">${session.messages.length} messages</span>` : ""}
         </div>
-        <div class="t-label" style="margin-top:6px">Key points</div>
-        <ul style="margin:0;padding-left:18px;font-size:13px;line-height:1.6;color:var(--muted)">
-          ${points.map((c) => `<li>${esc(c.front)}</li>`).join("") || "<li>No cards</li>"}
-        </ul>
+        ${
+          summ
+            ? `<div class="t-label" style="margin-top:6px">TL;DR</div>
+               <div style="font-size:13px;line-height:1.6;color:var(--ink)">${esc(summ.summary)}</div>
+               ${summ.keyPoints?.length ? `<div class="t-label" style="margin-top:10px">Key points</div>
+               <ul style="margin:0;padding-left:18px;font-size:13px;line-height:1.6;color:var(--muted)">
+                 ${summ.keyPoints.map((p) => `<li>${esc(p)}</li>`).join("")}
+               </ul>` : ""}`
+            : session.messages?.length
+            ? `<div class="help" style="margin:0">Get an AI TL;DR and key takeaways from this conversation.</div>
+               <button class="btn btn-primary btn-block" data-action="gen-summary" data-id="${esc(session.id)}">✨ Summarize conversation</button>`
+            : `<div class="t-label" style="margin-top:6px">Key points</div>
+               <ul style="margin:0;padding-left:18px;font-size:13px;line-height:1.6;color:var(--muted)">
+                 ${(studySet.flashcards || []).slice(0, 8).map((c) => `<li>${esc(c.front)}</li>`).join("") || "<li>No cards</li>"}
+               </ul>`
+        }
       </div>
       <button class="btn btn-ghost btn-block" data-action="delete-set" data-id="${esc(session.id)}">Delete set</button>`;
   }
@@ -376,8 +490,8 @@ function startReview(items, ret) {
   paintReviewCard();
 }
 
-function gradePreview(card, g) {
-  return review(card, g).interval;
+function gradePreview(card, g, examDate) {
+  return review(card, g, Date.now(), examDate).interval;
 }
 
 function paintReviewCard() {
@@ -403,21 +517,180 @@ function revealCard() {
     <div class="rule"></div><div class="back">${esc(card.back || "—")}</div>`;
   const hint = app.querySelector(".flip-hint");
   hint.outerHTML = `<div class="grades">
-      <button class="grade again" data-action="grade" data-g="0"><span class="g">Again</span><span class="iv">${gradePreview(card, 0)}d</span></button>
-      <button class="grade" data-action="grade" data-g="3"><span class="g">Hard</span><span class="iv">${gradePreview(card, 3)}d</span></button>
-      <button class="grade good" data-action="grade" data-g="4"><span class="g">Good</span><span class="iv">${gradePreview(card, 4)}d</span></button>
-      <button class="grade good" data-action="grade" data-g="5"><span class="g">Easy</span><span class="iv">${gradePreview(card, 5)}d</span></button>
-    </div>`;
+      <button class="grade again" data-action="grade" data-g="0"><span class="g">Again</span><span class="iv">${gradePreview(card, 0, queue[qIdx].examDate)}d</span></button>
+      <button class="grade" data-action="grade" data-g="3"><span class="g">Hard</span><span class="iv">${gradePreview(card, 3, queue[qIdx].examDate)}d</span></button>
+      <button class="grade good" data-action="grade" data-g="4"><span class="g">Good</span><span class="iv">${gradePreview(card, 4, queue[qIdx].examDate)}d</span></button>
+      <button class="grade good" data-action="grade" data-g="5"><span class="g">Easy</span><span class="iv">${gradePreview(card, 5, queue[qIdx].examDate)}d</span></button>
+    </div>
+    <button class="btn btn-ghost btn-block" data-action="apply-card" style="margin-top:10px">🎯 Apply it — fresh scenario</button>`;
 }
 
 async function gradeCard(g) {
   const item = queue[qIdx];
-  const upd = review(item.card, g);
+  const upd = review(item.card, g, Date.now(), item.examDate);
   Object.assign(item.card, upd);
   await updateCard(item.sessionId, item.card.id, upd);
-  await bumpActivity(1);
+  await Promise.all([
+    bumpActivity(1),
+    appendReviewLog({ cardId: item.card.id, sessionId: item.sessionId, grade: g, at: Date.now() }),
+  ]);
   qIdx++;
   paintReviewCard();
+}
+
+// --- Apply step: a fresh hypothetical per concept, then typed grading --------
+let applyState = null; // { item, hypothetical, phase }
+
+async function startApply() {
+  const item = queue[qIdx];
+  if (!item || !item.card.back) return paintReviewCard();
+  applyState = { item, phase: "loading" };
+  app.innerHTML = `
+    <div class="rev-top">${XBTN}<div class="bar"><i style="width:${Math.round((qIdx / queue.length) * 100)}%"></i></div>
+      <span class="rev-count tnum">${qIdx + 1} / ${queue.length}</span></div>
+    <div class="rev-body">
+      <div class="t-label">Apply it</div>
+      <div style="display:flex;align-items:center;gap:10px;margin-top:8px">
+        <span class="spinner" style="border-color:var(--border);border-top-color:var(--primary)"></span>
+        <span style="font-size:13px;color:var(--muted)">Writing a fresh scenario…</span>
+      </div>
+    </div>`;
+  try {
+    const r = await send({
+      type: "GENERATE_HYPOTHETICAL",
+      concept: item.card.front,
+      reference: item.card.back,
+    });
+    applyState.hypothetical = r.hypothetical;
+    applyState.phase = "answer";
+    paintApplyAnswer();
+  } catch (e) {
+    toast(e.message);
+    qIdx++;
+    paintReviewCard();
+  }
+}
+
+function paintApplyAnswer() {
+  const { hypothetical } = applyState;
+  app.innerHTML = `
+    <div class="rev-top">${XBTN}<div class="bar"><i style="width:${Math.round((qIdx / queue.length) * 100)}%"></i></div>
+      <span class="rev-count tnum">${qIdx + 1} / ${queue.length}</span></div>
+    <div class="rev-body">
+      <div class="t-label">Apply it — new scenario</div>
+      <div class="hypothetical">${esc(hypothetical.scenario)}</div>
+      <textarea id="applyAnswer" class="sa-input" rows="4" placeholder="Type your answer…"></textarea>
+      <button class="btn btn-primary btn-block" data-action="apply-check">Check answer</button>
+    </div>`;
+}
+
+async function checkApply() {
+  const answer = document.getElementById("applyAnswer")?.value.trim();
+  if (!answer) return toast("Type an answer first.");
+  const { item, hypothetical } = applyState;
+  const btn = app.querySelector('[data-action="apply-check"]');
+  btn.disabled = true;
+  btn.textContent = "Grading…";
+  try {
+    const r = await send({
+      type: "GRADE_ANSWER",
+      question: hypothetical.scenario,
+      reference: hypothetical.rubric,
+      answer,
+    });
+    await Promise.all([
+      bumpActivity(1),
+      appendReviewLog({ cardId: item.card.id, sessionId: item.sessionId, grade: r.grading.correct ? 4 : 1, at: Date.now() }),
+    ]);
+    paintGraded(r.grading, "apply-next");
+  } catch (e) {
+    toast(e.message);
+    btn.disabled = false;
+    btn.textContent = "Check answer";
+  }
+}
+
+/** Shared score + feedback panel for AI-graded typed answers. */
+function paintGraded(grading, nextAction) {
+  const box = document.createElement("div");
+  box.className = "graded";
+  box.innerHTML = `
+    <div class="score-row">
+      <div class="score tnum ${grading.correct ? "ok" : "no"}">${grading.score}</div>
+      <div><b style="color:${grading.correct ? "var(--success)" : "var(--danger)"}">${grading.correct ? "Correct" : "Needs work"}</b>
+        <div class="feedback">${esc(grading.feedback)}</div></div>
+    </div>
+    <button class="btn btn-primary btn-block" data-action="${nextAction}">Continue</button>`;
+  const body = app.querySelector(".rev-body");
+  if (body) {
+    body.querySelector(".sa-input")?.remove();
+    body.querySelector('[data-action="apply-check"]')?.remove();
+    body.querySelector('[data-action="typed-check"]')?.remove();
+    body.appendChild(box);
+  }
+}
+
+// --- Typed-answer practice over a set's cards (AI assessment) ---------------
+let typedState = null; // { sessionId, items, idx }
+
+async function startTypedPractice(sessionId) {
+  const { studySets } = await bundle();
+  const set = setFor(sessionId, studySets);
+  const cards = (set?.flashcards || []).filter((c) => c.back);
+  if (!cards.length) return toast("No cards to practice.");
+  const due = cards.filter((c) => isDue(c));
+  const items = (due.length ? due : cards).slice(0, 10).map((card) => ({ sessionId, card }));
+  typedState = { sessionId, items, idx: 0 };
+  focusReturn = "set:" + sessionId;
+  showChrome(false);
+  paintTypedQ();
+}
+
+function paintTypedQ() {
+  const { items, idx } = typedState;
+  if (idx >= items.length) {
+    app.innerHTML = `
+      <div class="view">
+        <div class="done-msg"><div class="big">✍️</div>
+          <div style="font-weight:650;color:var(--ink)">Practice complete</div>
+          <div style="margin-top:4px">${items.length} typed answer${items.length === 1 ? "" : "s"} graded.</div>
+        </div>
+        <button class="btn btn-primary btn-block" data-action="return-focus">Done</button>
+      </div>`;
+    return;
+  }
+  const { card } = items[idx];
+  app.innerHTML = `
+    <div class="rev-top">${XBTN}<div class="bar"><i style="width:${Math.round((idx / items.length) * 100)}%"></i></div>
+      <span class="rev-count tnum">${idx + 1} / ${items.length}</span></div>
+    <div class="rev-body">
+      <div class="t-label">Type the answer</div>
+      <div style="font-size:16px;font-weight:600;line-height:1.35">${esc(card.front)}</div>
+      <textarea id="typedAnswer" class="sa-input" rows="3" placeholder="Answer in your own words…"></textarea>
+      <button class="btn btn-primary btn-block" data-action="typed-check">Check answer</button>
+      <div class="help" style="margin:0;text-align:center">AI-graded against this card's answer.</div>
+    </div>`;
+}
+
+async function checkTyped() {
+  const answer = document.getElementById("typedAnswer")?.value.trim();
+  if (!answer) return toast("Type an answer first.");
+  const { card } = typedState.items[typedState.idx];
+  const btn = app.querySelector('[data-action="typed-check"]');
+  btn.disabled = true;
+  btn.textContent = "Grading…";
+  try {
+    const r = await send({ type: "GRADE_ANSWER", question: card.front, reference: card.back, answer });
+    await Promise.all([
+      bumpActivity(1),
+      appendReviewLog({ cardId: card.id, sessionId: typedState.sessionId, grade: r.grading.correct ? 4 : 1, at: Date.now() }),
+    ]);
+    paintGraded(r.grading, "typed-next");
+  } catch (e) {
+    toast(e.message);
+    btn.disabled = false;
+    btn.textContent = "Check answer";
+  }
 }
 
 function paintReviewDone() {
@@ -632,6 +905,12 @@ async function renderYou() {
         <div class="stat"><div class="v tnum">${studySets.length}</div><div class="k">Sets</div></div>
       </div>
       <button class="btn btn-ghost btn-block" data-action="settings">Settings · ${esc(provider)}${settings.apiKey ? "" : " · no key"}</button>
+      <div class="listhd"><span class="t-label">Backup</span></div>
+      <div style="display:flex;gap:10px">
+        <button class="btn btn-ghost" style="flex:1" data-action="export-backup">⇩ Export JSON</button>
+        <button class="btn btn-ghost" style="flex:1" data-action="import-backup">⇪ Restore</button>
+      </div>
+      <input type="file" id="backupFile" accept="application/json,.json" class="hidden" />
       <div class="block" style="text-align:center">
         <div style="font-weight:600;font-size:13px">Sign in — coming soon</div>
         <div style="font-size:12px;color:var(--muted);margin-top:4px">Accounts will sync your sets across devices and unlock teams.</div>
@@ -680,6 +959,29 @@ document.addEventListener("click", (e) => {
     case "set-review": startSetReview(id); break;
     case "flip": revealCard(); break;
     case "grade": gradeCard(Number(t.dataset.g)); break;
+    case "apply-card": startApply(); break;
+    case "apply-check": checkApply(); break;
+    case "apply-next": qIdx++; paintReviewCard(); break;
+    case "start-typed": startTypedPractice(id); break;
+    case "typed-check": checkTyped(); break;
+    case "typed-next": typedState.idx++; paintTypedQ(); break;
+    case "clear-exam": setExamDate(id, null).then(() => renderSetDetail(id, "cards")); break;
+    case "add-card": promptAddCard(id); break;
+    case "card-edit": editingCardId = id; paintDetail(); break;
+    case "edit-cancel": editingCardId = null; paintDetail(); break;
+    case "edit-save":
+      saveCardEdit(detail.session.id, id).then(() => {
+        editingCardId = null;
+        renderSetDetail(detail.session.id, "cards");
+      });
+      break;
+    case "card-del":
+      if (confirm("Delete this card?")) deleteCard(detail.session.id, id).then(() => paintDetail());
+      break;
+    case "export-tsv": exportSetTsv(id); break;
+    case "gen-summary": generateSummary(id); break;
+    case "export-backup": exportBackup(); break;
+    case "import-backup": document.getElementById("backupFile")?.click(); break;
     case "start-quiz": startQuiz(detail.studySet, "set:" + detail.session.id); break;
     case "quiz-opt": answerQuiz(Number(t.dataset.i)); break;
     case "quiz-next": quizIdx++; paintQuizQ(); break;
@@ -699,7 +1001,9 @@ function goReturn() {
 async function startGlobalReview() {
   const { studySets } = await bundle();
   const items = [];
-  studySets.forEach((set) => (set.flashcards || []).forEach((card) => isDue(card) && items.push({ sessionId: set.sessionId, card })));
+  studySets.forEach((set) =>
+    (set.flashcards || []).forEach((card) => isDue(card) && items.push({ sessionId: set.sessionId, card, examDate: set.examDate }))
+  );
   items.sort((a, b) => byDue(a.card, b.card));
   if (!items.length) return toast("Nothing due right now 🎉");
   startReview(items, "home");
@@ -707,11 +1011,119 @@ async function startGlobalReview() {
 async function startSetReview(sessionId) {
   const { studySets } = await bundle();
   const set = setFor(sessionId, studySets);
-  const items = (set?.flashcards || []).filter((c) => isDue(c)).map((card) => ({ sessionId, card }));
+  const items = (set?.flashcards || []).filter((c) => isDue(c)).map((card) => ({ sessionId, card, examDate: set.examDate }));
   items.sort((a, b) => byDue(a.card, b.card));
   if (!items.length) return toast("Nothing due in this set.");
   startReview(items, "set:" + sessionId);
 }
+
+// ================================================================ card editing / export / summary / backup
+async function promptAddCard(sessionId) {
+  editingCardId = null;
+  detail.addingCard = true;
+  paintAddCard();
+}
+function paintAddCard() {
+  const btn = app.querySelector('[data-action="add-card"]');
+  const html = `<div class="block editcard">
+      <div class="field"><label>Front</label><textarea id="newFront" rows="2" placeholder="Question / term"></textarea></div>
+      <div class="field"><label>Back</label><textarea id="newBack" rows="3" placeholder="Answer / definition"></textarea></div>
+      <div style="display:flex;gap:10px">
+        <button class="btn btn-ghost" style="flex:1" data-action="add-cancel">Cancel</button>
+        <button class="btn btn-primary" style="flex:1" data-action="add-save" data-id="${esc(detail.session.id)}">Add card</button>
+      </div>
+    </div>`;
+  if (btn) btn.closest("div").insertAdjacentHTML("beforebegin", html);
+}
+async function saveNewCard(sessionId) {
+  const front = document.getElementById("newFront")?.value.trim();
+  const back = document.getElementById("newBack")?.value.trim();
+  if (!front) return toast("The front is required.");
+  await addCard(sessionId, front, back || "");
+  toast("Card added");
+  renderSetDetail(sessionId, "cards");
+}
+async function saveCardEdit(sessionId, cardId) {
+  const front = document.getElementById("editFront")?.value.trim();
+  const back = document.getElementById("editBack")?.value.trim();
+  if (!front) return toast("The front is required.");
+  await updateCard(sessionId, cardId, { front, back: back || "" });
+  toast("Card saved");
+}
+
+function downloadFile(filename, text, type = "text/plain") {
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(new Blob([text], { type }));
+  a.download = filename;
+  a.click();
+  setTimeout(() => URL.revokeObjectURL(a.href), 5000);
+}
+
+/** Anki-friendly TSV: tabs separate front/back; newlines separate cards. */
+async function exportSetTsv(sessionId) {
+  const { studySets } = await bundle();
+  const set = setFor(sessionId, studySets);
+  if (!set?.flashcards?.length) return toast("No cards to export.");
+  const tsv = set.flashcards
+    .map((c) => `${c.front.replace(/\t/g, " ").replace(/\r?\n/g, " ")}\t${(c.back || "").replace(/\t/g, " ").replace(/\r?\n/g, " ")}`)
+    .join("\n");
+  downloadFile(`${(set.title || "mafsar-set").replace(/[^\w\- ]+/g, "")}.txt`, tsv, "text/tab-separated-values");
+  toast(`Exported ${set.flashcards.length} cards`);
+}
+
+async function generateSummary(sessionId) {
+  toast("Summarizing…");
+  try {
+    await send({ type: "SUMMARIZE", sessionId });
+    renderSetDetail(sessionId, "summary");
+  } catch (e) {
+    toast(e.message);
+  }
+}
+
+async function exportBackup() {
+  const data = await exportAll();
+  downloadFile(`mafsar-backup-${dayKey()}.json`, JSON.stringify(data, null, 2), "application/json");
+  toast("Backup downloaded");
+}
+
+function importBackupFile(file) {
+  const reader = new FileReader();
+  reader.onload = async () => {
+    try {
+      if (!confirm("Restore this backup? It replaces ALL local Mafsar data.")) return;
+      await importAll(JSON.parse(String(reader.result)));
+      toast("Backup restored");
+      renderHome();
+    } catch (e) {
+      toast(e.message || "Invalid backup file.");
+    }
+  };
+  reader.readAsText(file);
+}
+
+// date inputs + file input don't fire click-based data-action routing
+document.addEventListener("change", (e) => {
+  const t = e.target;
+  if (t.id === "examDate" && t.dataset.session) {
+    const ms = t.value ? new Date(`${t.value}T23:59:59`).getTime() : null;
+    setExamDate(t.dataset.session, ms).then(() => {
+      toast(ms ? "Exam date set — cards will resurface before it" : "Exam date cleared");
+      renderSetDetail(t.dataset.session, "cards");
+    });
+  } else if (t.id === "backupFile" && t.files?.[0]) {
+    importBackupFile(t.files[0]);
+    t.value = "";
+  }
+});
+
+// extra actions that need the add-card form state
+document.addEventListener("click", (e) => {
+  const t = e.target.closest("[data-action]");
+  if (!t) return;
+  if (t.dataset.action === "add-cancel") renderSetDetail(detail.session.id, "cards");
+  if (t.dataset.action === "add-save") saveNewCard(t.dataset.id);
+});
 // bottom nav
 nav.addEventListener("click", (e) => {
   const b = e.target.closest("button[data-nav]");
