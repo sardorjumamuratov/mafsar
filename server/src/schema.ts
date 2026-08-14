@@ -37,7 +37,7 @@ export const quizSchema = z.object({
   id: z.string().min(1),
   setId: z.string().min(1),
   q: z.string(),
-  options: z.array(z.string()),
+  options: z.array(z.string()).min(2),
   answer: z.number().int().min(0),
   explain: z.string().nullable().optional(),
   updatedAt: z.string(),
