@@ -22,6 +22,8 @@ import {
 } from "../storage/store.js";
 import { initSchedule, review, isDue, byDue, masteryOf } from "../storage/srs.js";
 import { examReadiness, nextExam, weakTopics } from "../storage/readiness.js";
+import { getAuth, register, login, logout } from "../sync/auth.js";
+import { syncNow } from "../sync/sync.js";
 
 const app = document.getElementById("app");
 const nav = document.getElementById("bottomNav");
@@ -470,6 +472,7 @@ async function makeSet(sessionId) {
   try {
     await send({ type: "GENERATE_STUDY_SET", sessionId });
     toast("Study set ready!");
+    syncNow().catch(() => {}); // background sync — silent if offline/signed out
     renderSetDetail(sessionId, "cards");
   } catch (e) {
     toast(e.message);
@@ -527,12 +530,16 @@ function revealCard() {
 
 async function gradeCard(g) {
   const item = queue[qIdx];
+  const prevInterval = item.card.interval ?? 0;
   const upd = review(item.card, g, Date.now(), item.examDate);
   Object.assign(item.card, upd);
   await updateCard(item.sessionId, item.card.id, upd);
   await Promise.all([
     bumpActivity(1),
-    appendReviewLog({ cardId: item.card.id, sessionId: item.sessionId, grade: g, at: Date.now() }),
+    appendReviewLog({
+      id: uid(), cardId: item.card.id, sessionId: item.sessionId, grade: g,
+      prevInterval, newInterval: upd.interval, reviewedAt: new Date().toISOString(),
+    }),
   ]);
   qIdx++;
   paintReviewCard();
@@ -600,7 +607,11 @@ async function checkApply() {
     });
     await Promise.all([
       bumpActivity(1),
-      appendReviewLog({ cardId: item.card.id, sessionId: item.sessionId, grade: r.grading.correct ? 4 : 1, at: Date.now() }),
+      appendReviewLog({
+        id: uid(), cardId: item.card.id, sessionId: item.sessionId,
+        grade: r.grading.correct ? 4 : 1, prevInterval: 0, newInterval: 0,
+        reviewedAt: new Date().toISOString(),
+      }),
     ]);
     paintGraded(r.grading, "apply-next");
   } catch (e) {
@@ -683,7 +694,11 @@ async function checkTyped() {
     const r = await send({ type: "GRADE_ANSWER", question: card.front, reference: card.back, answer });
     await Promise.all([
       bumpActivity(1),
-      appendReviewLog({ cardId: card.id, sessionId: typedState.sessionId, grade: r.grading.correct ? 4 : 1, at: Date.now() }),
+      appendReviewLog({
+        id: uid(), cardId: card.id, sessionId: typedState.sessionId,
+        grade: r.grading.correct ? 4 : 1, prevInterval: 0, newInterval: 0,
+        reviewedAt: new Date().toISOString(),
+      }),
     ]);
     paintGraded(r.grading, "typed-next");
   } catch (e) {
@@ -703,6 +718,7 @@ function paintReviewDone() {
       </div>
       <button class="btn btn-primary btn-block" data-action="return-focus">Done</button>
     </div>`;
+  syncNow().catch(() => {}); // push grades + pull changes after a session
 }
 
 // ================================================================ QUIZ (focus)
@@ -889,12 +905,40 @@ async function renderYou() {
   }
   const streak = computeStreak(activity);
   const provider = { gemini: "Google Gemini", groq: "Groq", anthropic: "Anthropic" }[settings.provider] || settings.provider;
+  const auth = await getAuth();
+
+  const accountHtml = auth?.user
+    ? `<div class="block" style="display:flex;flex-direction:column;gap:10px">
+         <div style="display:flex;align-items:center;gap:10px">
+           <span class="tag dot" style="color:var(--success)"></span>
+           <div style="min-width:0">
+             <div style="font-size:13px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(auth.user.email)}</div>
+             <div style="font-size:11.5px;color:var(--muted)">${
+               auth.lastSync ? "Last synced " + new Date(auth.lastSync).toLocaleString() : "Never synced"
+             }</div>
+           </div>
+         </div>
+         <div style="display:flex;gap:10px">
+           <button class="btn btn-primary" style="flex:1" data-action="sync-now">⟳ Sync now</button>
+           <button class="btn btn-ghost" style="flex:1" data-action="auth-signout">Sign out</button>
+         </div>
+       </div>`
+    : `<div class="block" style="display:flex;flex-direction:column;gap:10px">
+         <div style="font-weight:600;font-size:13px">Cloud sync</div>
+         <div style="font-size:12px;color:var(--muted);line-height:1.5">Sign in to sync your sets across devices. Everything works offline without an account.</div>
+         <div class="field"><label>Email</label><input id="youEmail" type="email" placeholder="you@example.com" autocomplete="email" /></div>
+         <div class="field"><label>Password</label><input id="youPass" type="password" placeholder="8+ characters" autocomplete="new-password" /></div>
+         <div style="display:flex;gap:10px">
+           <button class="btn btn-primary" style="flex:1" data-action="auth-signin">Sign in</button>
+           <button class="btn btn-ghost" style="flex:1" data-action="auth-register">Create account</button>
+         </div>
+       </div>`;
 
   app.innerHTML = `
     <div class="view">
       <div class="ahd"><div class="wordmark">Maf<b>sar</b></div></div>
       <div class="block" style="text-align:center;padding:20px">
-        <div style="font-size:13px;color:var(--muted)">Studying locally on this device</div>
+        <div style="font-size:13px;color:var(--muted)">${auth?.user ? "Syncing to the cloud" : "Studying locally on this device"}</div>
         <div style="display:flex;justify-content:center;gap:8px;margin-top:12px">
           <span class="streak">${FLAME}${streak}-day streak</span>
         </div>
@@ -904,6 +948,7 @@ async function renderYou() {
         <div class="stat"><div class="v tnum">${total}</div><div class="k">Cards</div></div>
         <div class="stat"><div class="v tnum">${studySets.length}</div><div class="k">Sets</div></div>
       </div>
+      ${accountHtml}
       <button class="btn btn-ghost btn-block" data-action="settings">Settings · ${esc(provider)}${settings.apiKey ? "" : " · no key"}</button>
       <div class="listhd"><span class="t-label">Backup</span></div>
       <div style="display:flex;gap:10px">
@@ -911,11 +956,40 @@ async function renderYou() {
         <button class="btn btn-ghost" style="flex:1" data-action="import-backup">⇪ Restore</button>
       </div>
       <input type="file" id="backupFile" accept="application/json,.json" class="hidden" />
-      <div class="block" style="text-align:center">
-        <div style="font-weight:600;font-size:13px">Sign in — coming soon</div>
-        <div style="font-size:12px;color:var(--muted);margin-top:4px">Accounts will sync your sets across devices and unlock teams.</div>
-      </div>
     </div>`;
+}
+
+// --- account actions ---------------------------------------------------------
+async function authSubmit(kind) {
+  const email = document.getElementById("youEmail")?.value.trim();
+  const password = document.getElementById("youPass")?.value;
+  if (!email || !password) return toast("Enter an email and password.");
+  if (password.length < 8) return toast("Password needs at least 8 characters.");
+  toast(kind === "register" ? "Creating account…" : "Signing in…");
+  try {
+    const user = kind === "register" ? await register(email, password) : await login(email, password);
+    toast(`Signed in as ${user.email} — syncing…`);
+    try {
+      const r = await syncNow();
+      if (!r.skipped) toast(`Synced · ${r.pulled} item(s) from cloud`);
+    } catch { /* offline is fine */ }
+    renderYou();
+  } catch (e) {
+    toast(e.message);
+  }
+}
+
+async function manualSync() {
+  toast("Syncing…");
+  try {
+    const r = await syncNow();
+    if (r.skipped) return toast("Sign in to sync.");
+    toast(r.pulled || r.pushed ? `Synced · ${r.pushed} up, ${r.pulled} down` : "Up to date");
+    renderHome();
+  } catch (e) {
+    toast(e.message);
+    renderYou();
+  }
 }
 
 // ================================================================ capture current tab
@@ -982,6 +1056,15 @@ document.addEventListener("click", (e) => {
     case "gen-summary": generateSummary(id); break;
     case "export-backup": exportBackup(); break;
     case "import-backup": document.getElementById("backupFile")?.click(); break;
+    case "auth-signin": authSubmit("login"); break;
+    case "auth-register": authSubmit("register"); break;
+    case "auth-signout":
+      logout().then(() => {
+        toast("Signed out — data stays on this device");
+        renderYou();
+      });
+      break;
+    case "sync-now": manualSync(); break;
     case "start-quiz": startQuiz(detail.studySet, "set:" + detail.session.id); break;
     case "quiz-opt": answerQuiz(Number(t.dataset.i)); break;
     case "quiz-next": quizIdx++; paintQuizQ(); break;
@@ -1138,3 +1221,5 @@ nav.addEventListener("click", (e) => {
 
 // init
 renderHome();
+// Background sync on panel open when signed in; silent failures offline.
+syncNow().catch(() => {});

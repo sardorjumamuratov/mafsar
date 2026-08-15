@@ -32,6 +32,17 @@ function set(key, value) {
   });
 }
 
+/** Raw multi-key read (sync layer needs tombstones the UI filters out). */
+export function readRaw(keys) {
+  return new Promise((resolve) => {
+    chrome.storage.local.get(keys, (obj) => resolve(obj));
+  });
+}
+
+export function nowISO() {
+  return new Date().toISOString();
+}
+
 function uid() {
   return `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
 }
@@ -51,9 +62,15 @@ export async function saveSettings(patch) {
 }
 
 // --- Sessions ---------------------------------------------------------------
+// UI getters hide tombstoned sets; the sync layer reads raw arrays instead.
 
 export async function getSessions() {
-  return get(KEYS.SESSIONS, []);
+  const [sessions, sets] = await Promise.all([
+    get(KEYS.SESSIONS, []),
+    get(KEYS.STUDY_SETS, []),
+  ]);
+  const deleted = new Set(sets.filter((s) => s.deleted).map((s) => s.sessionId));
+  return sessions.filter((s) => !deleted.has(s.id));
 }
 
 export async function addSession(session) {
@@ -65,26 +82,40 @@ export async function addSession(session) {
 }
 
 export async function deleteSession(id) {
-  const sessions = (await getSessions()).filter((s) => s.id !== id);
-  await set(KEYS.SESSIONS, sessions);
-  const sets = (await getStudySets()).filter((s) => s.sessionId !== id);
-  await set(KEYS.STUDY_SETS, sets);
+  // Tombstone, don't remove: the delete must propagate to other devices.
+  const sets = await get(KEYS.STUDY_SETS, []);
+  const setRec = sets.find((s) => s.sessionId === id);
+  if (setRec) {
+    setRec.deleted = true;
+    setRec.updatedAt = nowISO();
+    await set(KEYS.STUDY_SETS, sets);
+  }
 }
 
 // --- Study sets -------------------------------------------------------------
+// All writes stamp updatedAt (ISO) for last-write-wins sync. Deletes are
+// tombstones (deleted:true), never removals, so they can propagate.
 
 export async function getStudySets() {
-  return get(KEYS.STUDY_SETS, []);
+  const sets = await get(KEYS.STUDY_SETS, []);
+  return sets
+    .filter((s) => !s.deleted)
+    .map((s) => ({ ...s, flashcards: (s.flashcards || []).filter((c) => !c.deleted) }));
 }
 
 export async function getStudySetForSession(sessionId) {
-  return (await getStudySets()).find((s) => s.sessionId === sessionId) || null;
+  const sets = await get(KEYS.STUDY_SETS, []);
+  const found = sets.find((s) => s.sessionId === sessionId);
+  return found && !found.deleted ? found : null;
 }
 
 export async function saveStudySet(studySet) {
-  const sets = await getStudySets();
+  const sets = await get(KEYS.STUDY_SETS, []);
   const idx = sets.findIndex((s) => s.sessionId === studySet.sessionId);
-  const record = { id: studySet.id || uid(), ...studySet };
+  const record = { id: studySet.id || uid(), updatedAt: nowISO(), ...studySet };
+  // Stamp any unsynced children so LWW comparisons always have a timestamp.
+  for (const c of record.flashcards || []) c.updatedAt ||= record.updatedAt;
+  for (const q of record.quiz || []) q.updatedAt ||= record.updatedAt;
   if (idx >= 0) sets[idx] = record;
   else sets.unshift(record);
   await set(KEYS.STUDY_SETS, sets);
@@ -92,48 +123,56 @@ export async function saveStudySet(studySet) {
 }
 
 export async function updateCard(sessionId, cardId, patch) {
-  const sets = await getStudySets();
+  const sets = await get(KEYS.STUDY_SETS, []);
   const setRec = sets.find((s) => s.sessionId === sessionId);
   if (!setRec) return null;
   const card = setRec.flashcards.find((c) => c.id === cardId);
   if (!card) return null;
-  Object.assign(card, patch);
+  Object.assign(card, patch, { updatedAt: nowISO() });
+  setRec.updatedAt = nowISO();
   await set(KEYS.STUDY_SETS, sets);
   return card;
 }
 
 /** Set or clear (null) the exam date for a set's cards. epoch ms or null. */
 export async function setExamDate(sessionId, examDate) {
-  const sets = await getStudySets();
+  const sets = await get(KEYS.STUDY_SETS, []);
   const setRec = sets.find((s) => s.sessionId === sessionId);
   if (!setRec) return null;
   setRec.examDate = examDate || null;
+  setRec.updatedAt = nowISO();
   await set(KEYS.STUDY_SETS, sets);
   return setRec;
 }
 
 export async function addCard(sessionId, front, back) {
-  const sets = await getStudySets();
+  const sets = await get(KEYS.STUDY_SETS, []);
   const setRec = sets.find((s) => s.sessionId === sessionId);
   if (!setRec) return null;
-  const card = { id: uid(), front, back, ...initSchedule() };
+  const card = { id: uid(), front, back, updatedAt: nowISO(), ...initSchedule() };
   setRec.flashcards.push(card);
+  setRec.updatedAt = nowISO();
   await set(KEYS.STUDY_SETS, sets);
   return card;
 }
 
 export async function deleteCard(sessionId, cardId) {
-  const sets = await getStudySets();
+  const sets = await get(KEYS.STUDY_SETS, []);
   const setRec = sets.find((s) => s.sessionId === sessionId);
   if (!setRec) return false;
-  const before = setRec.flashcards.length;
-  setRec.flashcards = setRec.flashcards.filter((c) => c.id !== cardId);
+  const card = setRec.flashcards.find((c) => c.id === cardId);
+  if (!card) return false;
+  card.deleted = true; // tombstone so the delete syncs
+  card.updatedAt = nowISO();
+  setRec.updatedAt = nowISO();
   await set(KEYS.STUDY_SETS, sets);
-  return setRec.flashcards.length < before;
+  return true;
 }
 
 // --- Review log (insights + forgetting predictions) --------------------------
-// reviewLog -> [{ cardId, sessionId, grade, at }] capped to the last 2,000.
+// reviewLog -> [{ id, cardId, sessionId?, grade, prevInterval, newInterval,
+//                 reviewedAt }] capped to the last 2,000. Server-shaped so the
+// sync layer can push it verbatim.
 
 export async function getReviewLog() {
   return get(KEYS.REVIEW_LOG, []);
