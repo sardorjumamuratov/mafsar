@@ -9,7 +9,7 @@ import { applySync, changesSince } from "./sync.js";
 import { nowISO, one } from "./db.js";
 
 export function createApp(db: DB) {
-  const app = new Hono();
+  const app = new Hono<{ Variables: { userId: string } }>();
 
   // The extension / future web app call the API cross-origin.
   app.use("*", cors());
@@ -21,8 +21,9 @@ export function createApp(db: DB) {
   });
 
   app.onError((err, c) => {
-    if (err.name === "ZodError") {
-      return c.json({ error: "validation", details: err.issues }, 400);
+    const e = err as Error & { issues?: unknown };
+    if (e.name === "ZodError") {
+      return c.json({ error: "validation", details: e.issues }, 400);
     }
     console.error(err);
     return c.json({ error: "internal" }, 500);
