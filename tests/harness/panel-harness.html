@@ -1,0 +1,101 @@
+<!doctype html>
+<!-- Dev-only harness: loads the real panel with a stubbed chrome.* API so the
+     UI can be exercised in a plain browser tab. Not shipped. -->
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Mafsar panel harness</title>
+    <link rel="stylesheet" href="../../src/ui/panel.css" />
+    <style>
+      body { width: 380px; margin: 0 auto; }
+    </style>
+    <script>
+      // ---- console/error capture for the test driver ----
+      window.__errors = [];
+      window.addEventListener("error", (e) => window.__errors.push(String(e.message) + "\n" + (e.error?.stack || "")));
+      window.addEventListener("unhandledrejection", (e) =>
+        window.__errors.push("rejection: " + String(e.reason) + "\n" + (e.reason?.stack || "")));
+
+      // ---- chrome.* stub with realistic sample data ----
+      const NOW = Date.now();
+      const DATA = {
+        settings: { provider: "gemini", apiKey: "k", model: "", reminders: false, remindTime: "19:00" },
+        sessions: [
+          { id: "sess1", source: "chatgpt", sourceLabel: "ChatGPT", title: "Torts", url: "", capturedAt: NOW - 86400000, messages: [{ role: "user", text: "negligence?" }] },
+          { id: "sess2", source: "quizlet", sourceLabel: "Imported", title: "Bio ch3", url: "", capturedAt: NOW - 172800000, messages: [], importedCount: 2 },
+        ],
+        studySets: [
+          {
+            id: "set1", sessionId: "sess1", title: "Torts", mode: "law",
+            examDate: NOW + 5 * 86400000, createdAt: NOW - 86400000, updatedAt: "2026-08-14T10:00:00.000Z", deleted: false,
+            flashcards: [
+              { id: "c1", front: "Elements of negligence", back: "Duty, breach, causation, damages", easiness: 2.2, interval: 2, repetitions: 1, dueDate: NOW - 3600000, updatedAt: "2026-08-14T10:00:00.000Z", deleted: false },
+              { id: "c2", front: "Res ipsa loquitur", back: "The thing speaks for itself", easiness: 2.5, interval: 0, repetitions: 0, dueDate: NOW, updatedAt: "2026-08-14T10:00:00.000Z", deleted: false },
+            ],
+            quiz: [{ id: "q1", q: "2+2?", options: ["3", "4", "5", "6"], answer: 1, explain: "math", updatedAt: "2026-08-14T10:00:00.000Z", deleted: false }],
+          },
+          {
+            id: "set2", sessionId: "sess2", title: "Bio ch3", createdAt: NOW - 172800000, updatedAt: "2026-08-13T09:00:00.000Z", deleted: false,
+            flashcards: [
+              { id: "c3", front: "Mitochondria", back: "Powerhouse of the cell", easiness: 2.5, interval: 0, repetitions: 0, dueDate: NOW, updatedAt: "2026-08-13T09:00:00.000Z", deleted: false },
+            ],
+            quiz: [],
+          },
+        ],
+        activity: {},
+        reviewLog: [
+          { id: "r1", cardId: "c1", sessionId: "sess1", grade: 1, prevInterval: 1, newInterval: 1, reviewedAt: "2026-08-14T11:00:00.000Z" },
+          { id: "r2", cardId: "c1", sessionId: "sess1", grade: 2, prevInterval: 1, newInterval: 1, reviewedAt: "2026-08-14T12:00:00.000Z" },
+        ],
+        auth: null,
+      };
+      DATA.activity[new Date(NOW - 86400000).toISOString().slice(0, 10)] = 3;
+
+      function clone(v) { return v === undefined ? undefined : JSON.parse(JSON.stringify(v)); }
+
+      window.chrome = {
+        storage: {
+          local: {
+            get(arg, cb) {
+              const keys = Array.isArray(arg) ? arg : [arg];
+              const out = {};
+              for (const k of keys) if (DATA[k] !== undefined) out[k] = clone(DATA[k]);
+              setTimeout(() => cb(out), 0);
+            },
+            set(obj, cb) {
+              for (const [k, v] of Object.entries(obj)) DATA[k] = clone(v);
+              setTimeout(() => cb && cb(), 0);
+            },
+            remove(key, cb) { delete DATA[key]; setTimeout(() => cb && cb(), 0); },
+          },
+        },
+        runtime: {
+          lastError: null,
+          sendMessage(msg, cb) {
+            setTimeout(() => cb && cb({ ok: false, error: "harness: no service worker" }), 0);
+          },
+          openOptionsPage() {},
+          getURL: (p) => p,
+        },
+        tabs: {
+          query(_q, cb) { setTimeout(() => cb && cb([]), 0); },
+          sendMessage(_id, _msg, cb) { setTimeout(() => cb && cb(null), 0); },
+        },
+      };
+      window.__data = DATA;
+    </script>
+  </head>
+  <body>
+    <div id="app"></div>
+    <div id="toast" class="toast hidden"></div>
+    <nav id="bottomNav" class="hidden">
+      <button data-nav="home" class="on" title="Home">Home</button>
+      <button data-nav="sets" title="Sets">Sets</button>
+      <button data-nav="review" class="center" title="Review due">Review</button>
+      <button data-nav="teams" title="Teams">Teams</button>
+      <button data-nav="you" title="You">You</button>
+    </nav>
+    <script type="module" src="../../src/ui/panel.js?v=bust2"></script>
+  </body>
+</html>

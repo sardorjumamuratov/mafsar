@@ -143,7 +143,7 @@ function setNav(tab) {
 async function renderHome() {
   setNav("home");
   showChrome(true);
-  const { sessions, studySets, activity, settings } = await bundle();
+  const { sessions, studySets, activity, settings, reviewLog } = await bundle();
 
   let due = 0,
     mastered = 0,
