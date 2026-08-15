@@ -50,6 +50,7 @@ describe("sync", () => {
     expect(out.sets[0].title).toBe("Torts");
     expect(out.cards).toHaveLength(1);
     expect(out.cards[0].front).toBe("Rule?");
+    expect(out.cards[0].updatedAt).toBe(t); // guards the snake_case mapping bug
   });
 
   it("last-write-wins on updated_at", async () => {

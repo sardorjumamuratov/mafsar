@@ -118,7 +118,7 @@ export async function changesSince(db: DB, userId: string, since?: string) {
   )).map((r) => ({
     id: r.id, setId: r.set_id, front: r.front, back: r.back,
     easiness: r.easiness, interval: r.interval, repetitions: r.repetitions,
-    dueDate: r.due_date, updatedAt: r.updatedAt, deleted: !!r.deleted,
+    dueDate: r.due_date, updatedAt: r.updated_at, deleted: !!r.deleted,
   }));
   const quiz = (await all<any>(
     db, "SELECT * FROM quiz WHERE user_id = ? AND updated_at > ?", [userId, sinceEffective]
