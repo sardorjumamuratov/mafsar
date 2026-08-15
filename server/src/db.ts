@@ -119,7 +119,9 @@ export async function migrate(db: DB): Promise<void> {
     const stmts = MIGRATIONS[i].split(";").map((s) => s.trim()).filter(Boolean);
     await db.batch(
       [
-        ...stmts.map((sql) => ({ sql })),
+        // Plain strings for DDL — libSQL's HTTP client (Turso) requires `args`
+        // on object-form statements, so bare `{ sql }` throws in production.
+        ...stmts,
         { sql: "INSERT INTO migrations (name, applied_at) VALUES (?, ?)", args: [name, new Date().toISOString()] },
       ],
       "write"
