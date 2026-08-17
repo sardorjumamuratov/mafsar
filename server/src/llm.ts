@@ -4,6 +4,21 @@
 
 import { randomUUID } from "node:crypto";
 
+/**
+ * An LLM-proxy failure the caller can act on: missing server config, an
+ * upstream provider rejection, or an unparseable response. Distinguished from
+ * unexpected bugs so the API can report *why* generation failed instead of a
+ * bare 500 — the extension surfaces this text to the user.
+ */
+export class LLMError extends Error {
+  readonly status: number;
+  constructor(message: string, status = 502) {
+    super(message);
+    this.name = "LLMError";
+    this.status = status;
+  }
+}
+
 // --- provider adapters (same contract across providers) ----------------------
 
 interface Req {
@@ -77,7 +92,7 @@ async function callLLM(system: string, user: string): Promise<string> {
   const providerName = process.env.LLM_PROVIDER || "gemini";
   const provider = PROVIDERS[providerName] || PROVIDERS.gemini;
   const apiKey = process.env.LLM_API_KEY;
-  if (!apiKey) throw new Error("Server LLM key not configured (LLM_API_KEY).");
+  if (!apiKey) throw new LLMError("Server LLM key not configured (set LLM_API_KEY).", 503);
   const model = process.env.LLM_MODEL || provider.defaultModel;
   const req = provider.buildRequest({ apiKey, model, system, user });
   const res = await fetch(req.url, {
@@ -88,7 +103,12 @@ async function callLLM(system: string, user: string): Promise<string> {
   if (!res.ok) {
     let data: any = null;
     try { data = await res.json(); } catch { /* ignore */ }
-    throw new Error(provider.extractError(data, res.status));
+    // Name the provider and model: the usual causes are a bad key or a model
+    // id the provider has since retired, and both are invisible otherwise.
+    throw new LLMError(
+      `${providerName} (${model}) rejected the request: ${provider.extractError(data, res.status)}`,
+      502
+    );
   }
   return provider.extractText(await res.json());
 }

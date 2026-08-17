@@ -26,9 +26,16 @@ export function createApp(db: DB) {
   });
 
   app.onError((err, c) => {
-    const e = err as Error & { issues?: unknown };
+    const e = err as Error & { issues?: unknown; status?: number };
     if (e.name === "ZodError") {
       return c.json({ error: "validation", details: e.issues }, 400);
+    }
+    // LLM failures are operational (missing key, retired model, upstream
+    // outage), not bugs — report the reason so the user sees something
+    // actionable rather than "generation failed".
+    if (e.name === "LLMError") {
+      console.error("LLM:", e.message);
+      return c.json({ error: "llm_error", message: e.message }, (e.status ?? 502) as 502);
     }
     console.error(err);
     return c.json({ error: "internal" }, 500);

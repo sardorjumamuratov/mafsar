@@ -10,7 +10,9 @@ async function post(path, body) {
     body: JSON.stringify(body),
   });
   const data = await res.json().catch(() => ({}));
-  if (!res.ok) throw new Error(data.error || `Request failed (${res.status})`);
+  // `message` carries the human-readable reason (e.g. an LLM misconfiguration);
+  // `error` is the machine code. Prefer the former so the toast is actionable.
+  if (!res.ok) throw new Error(data.message || data.error || `Request failed (${res.status})`);
   return data;
 }
 
