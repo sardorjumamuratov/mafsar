@@ -88,6 +88,12 @@ If capture stops working on a site, the fix is almost always isolated to that
 site's file in `src/content/adapters/`. Each adapter is just a `matches()` test
 plus a `getMessages()` that returns `[{ role, text }]`.
 
+## License
+
+Proprietary — see [LICENSE](LICENSE). The source is public so anyone can audit
+how the extension handles their data, but it is not open source: reuse or
+redistribution requires written permission.
+
 ## Roadmap
 
 - Optional passive auto-capture (currently explicit "save" to avoid noise).

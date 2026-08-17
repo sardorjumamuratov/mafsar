@@ -1,0 +1,28 @@
+Copyright (c) 2026 Sardor Jumamuratov. All rights reserved.
+
+Mafsar is proprietary software. Its source code is published for transparency
+— so that anyone can inspect how the extension handles their data — but it is
+not offered under an open source license.
+
+No permission is granted to copy, modify, merge, publish, distribute,
+sublicense, sell, or create derivative works from this software or any part of
+it, without prior written permission from the copyright holder.
+
+Installing and running the Mafsar browser extension from an official extension
+store is permitted, and includes the incidental copying your browser performs
+in order to run it. That permission does not extend to redistributing the
+extension or reusing its source code.
+
+Viewing, forking on a code-hosting platform for the purpose of reading, and
+quoting short excerpts for commentary, review, or security research are not
+restricted by this notice, to the extent such uses are permitted by applicable
+law.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+COPYRIGHT HOLDER BE LIABLE FOR ANY CLAIM, DAMAGES, OR OTHER LIABILITY, WHETHER
+IN AN ACTION OF CONTRACT, TORT, OR OTHERWISE, ARISING FROM, OUT OF, OR IN
+CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+
+For licensing enquiries: sardoralien@gmail.com
