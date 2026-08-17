@@ -32,6 +32,30 @@ const nav = document.getElementById("bottomNav");
 const esc = (s) =>
   String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
 
+// --- the one place HTML enters the DOM ---------------------------------------
+// Every dynamic value interpolated into the render templates below is escaped
+// with esc() at the call site. This is the single sink that turns those strings
+// into nodes, so there's exactly one spot to audit. Parsing happens inside an
+// inert <template>: scripts don't run and images/iframes don't load while it's
+// being built, unlike assigning to a live element's innerHTML.
+function fragment(html) {
+  const t = document.createElement("template");
+  t.innerHTML = html;
+  return t.content;
+}
+/** Replace an element's children with parsed HTML (was: el.innerHTML = …). */
+function setHTML(el, html) {
+  el.replaceChildren(fragment(html));
+}
+/** Replace the element itself with parsed HTML (was: el.outerHTML = …). */
+function replaceHTML(el, html) {
+  el.replaceWith(fragment(html));
+}
+/** Insert parsed HTML immediately before an element. */
+function insertHTMLBefore(el, html) {
+  el.parentNode.insertBefore(fragment(html), el);
+}
+
 const FLAME =
   '<svg viewBox="0 0 24 24"><path d="M13 2c.5 3.5-2.5 4.8-2.5 8A2.5 2.5 0 0 0 15 10c0-1-.3-1.8-.7-2.6 2.4 1.2 4.2 3.6 4.2 6.6a6.5 6.5 0 1 1-13 0c0-4.7 4-6.4 7.5-12z"/></svg>';
 const XBTN =
@@ -233,7 +257,7 @@ async function renderHome() {
          <div style="font-size:12.5px;color:var(--muted);margin-top:4px">No cards due right now. Capture a chat or import a set.</div>
        </div>`;
 
-  app.innerHTML = `
+  setHTML(app, `
     <div class="view">
       <div class="ahd">
         <div><div class="h-sub">${greeting()}</div><div class="h-title">Ready to review</div></div>
@@ -278,7 +302,7 @@ async function renderHome() {
       }
       ${withSets.length > 4 ? `<button class="btn btn-ghost btn-block" data-action="nav-sets">View all ${withSets.length} sets</button>` : ""}
       ${reviewedToday ? `<div style="text-align:center;font-size:12px;color:var(--faint)">${reviewedToday} cards reviewed today</div>` : ""}
-    </div>`;
+    </div>`);
 }
 
 // --- Exam set picker (focus view): choose which sets count toward the exam ---
@@ -293,7 +317,7 @@ async function openExamPicker() {
     picked: new Set(examSets.map((s) => s.sessionId)),
   };
   showChrome(false);
-  app.innerHTML = `
+  setHTML(app, `
     <div class="view">
       <div class="ahd">
         <button class="iconbtn" data-action="nav-home" aria-label="Back"><svg class="ic" viewBox="0 0 24 24"><path d="M15 6l-6 6 6 6"/></svg></button>
@@ -323,7 +347,7 @@ async function openExamPicker() {
         }
       </div>
       <button class="btn btn-primary btn-block" data-action="picker-save" ${withSets.length ? "" : "disabled"}>Save exam</button>
-    </div>`;
+    </div>`);
   fillMissingBlurbs(withSets, studySets);
 }
 
@@ -378,7 +402,7 @@ async function renderSets() {
   setNav("sets");
   showChrome(true);
   const { sessions, studySets } = await bundle();
-  app.innerHTML = `
+  setHTML(app, `
     <div class="view">
       <div class="ahd"><div class="h-title">Your sets</div>
         <button class="btn btn-ghost" style="padding:8px 12px" data-action="open-import">⇪ Import</button></div>
@@ -388,7 +412,7 @@ async function renderSets() {
           : `<div class="empty"><div class="big">📚</div>No sets yet.<br>Capture an AI conversation with <b>Save to Mafsar</b>, or import from Quizlet.</div>`
       }
       <button class="btn btn-ghost btn-block" data-action="capture-current">＋ Capture this page</button>
-    </div>`;
+    </div>`);
 }
 
 // ================================================================ SET DETAIL
@@ -523,7 +547,7 @@ function paintDetail() {
       <button class="btn btn-ghost btn-block" data-action="delete-set" data-id="${esc(session.id)}">Delete set</button>`;
   }
 
-  app.innerHTML = `
+  setHTML(app, `
     <div class="view">
       <div class="ahd">
         <button class="iconbtn" data-action="nav-home" aria-label="Back"><svg class="ic" viewBox="0 0 24 24"><path d="M15 6l-6 6 6 6"/></svg></button>
@@ -551,12 +575,12 @@ function paintDetail() {
       studySet && tab === "cards" && s.due
         ? `<div class="footer-cta"><button class="btn btn-primary btn-block" data-action="set-review" data-id="${esc(session.id)}">Review ${s.due} due</button></div>`
         : ""
-    }`;
+    }`);
 }
 
 async function makeSet(sessionId) {
   showChrome(false);
-  app.innerHTML = `
+  setHTML(app, `
     <div class="view">
       <div class="ahd"><div class="h-title"><span class="spinner" style="border-color:var(--border);border-top-color:var(--primary)"></span>Generating…</div></div>
       <div style="display:flex;flex-direction:column;gap:10px">
@@ -565,7 +589,7 @@ async function makeSet(sessionId) {
         <div class="genstep wait"><span class="tick"></span>Building a quiz</div>
       </div>
       <div class="block"><div class="help">This can take 5–15 seconds.</div></div>
-    </div>`;
+    </div>`);
   try {
     await send({ type: "GENERATE_STUDY_SET", sessionId });
     toast("Study set ready!");
@@ -597,7 +621,7 @@ function gradePreview(card, g, examDate) {
 function paintReviewCard() {
   if (qIdx >= queue.length) return paintReviewDone();
   const { card } = queue[qIdx];
-  app.innerHTML = `
+  setHTML(app, `
     <div class="rev-top">${XBTN}<div class="bar"><i style="width:${Math.round((qIdx / queue.length) * 100)}%"></i></div>
       <span class="rev-count tnum">${qIdx + 1} / ${queue.length}</span></div>
     <div class="rev-body">
@@ -606,23 +630,23 @@ function paintReviewCard() {
         <div class="front">${esc(card.front)}</div>
       </div>
       <div class="flip-hint">Tap the card to reveal the answer</div>
-    </div>`;
+    </div>`);
 }
 
 function revealCard() {
   const { card } = queue[qIdx];
   const fc = app.querySelector(".flashcard");
   fc.removeAttribute("data-action");
-  fc.innerHTML = `<div class="lab">Question</div><div class="front">${esc(card.front)}</div>
-    <div class="rule"></div><div class="back">${esc(card.back || "—")}</div>`;
+  setHTML(fc, `<div class="lab">Question</div><div class="front">${esc(card.front)}</div>
+    <div class="rule"></div><div class="back">${esc(card.back || "—")}</div>`);
   const hint = app.querySelector(".flip-hint");
-  hint.outerHTML = `<div class="grades">
+  replaceHTML(hint, `<div class="grades">
       <button class="grade again" data-action="grade" data-g="0"><span class="g">Again</span><span class="iv">${gradePreview(card, 0, queue[qIdx].examDate)}d</span></button>
       <button class="grade" data-action="grade" data-g="3"><span class="g">Hard</span><span class="iv">${gradePreview(card, 3, queue[qIdx].examDate)}d</span></button>
       <button class="grade good" data-action="grade" data-g="4"><span class="g">Good</span><span class="iv">${gradePreview(card, 4, queue[qIdx].examDate)}d</span></button>
       <button class="grade good" data-action="grade" data-g="5"><span class="g">Easy</span><span class="iv">${gradePreview(card, 5, queue[qIdx].examDate)}d</span></button>
     </div>
-    <button class="btn btn-ghost btn-block" data-action="apply-card" style="margin-top:10px">🎯 Apply it — fresh scenario</button>`;
+    <button class="btn btn-ghost btn-block" data-action="apply-card" style="margin-top:10px">🎯 Apply it — fresh scenario</button>`);
 }
 
 async function gradeCard(g) {
@@ -649,7 +673,7 @@ async function startApply() {
   const item = queue[qIdx];
   if (!item || !item.card.back) return paintReviewCard();
   applyState = { item, phase: "loading" };
-  app.innerHTML = `
+  setHTML(app, `
     <div class="rev-top">${XBTN}<div class="bar"><i style="width:${Math.round((qIdx / queue.length) * 100)}%"></i></div>
       <span class="rev-count tnum">${qIdx + 1} / ${queue.length}</span></div>
     <div class="rev-body">
@@ -658,7 +682,7 @@ async function startApply() {
         <span class="spinner" style="border-color:var(--border);border-top-color:var(--primary)"></span>
         <span style="font-size:13px;color:var(--muted)">Writing a fresh scenario…</span>
       </div>
-    </div>`;
+    </div>`);
   try {
     const r = await send({
       type: "GENERATE_HYPOTHETICAL",
@@ -677,7 +701,7 @@ async function startApply() {
 
 function paintApplyAnswer() {
   const { hypothetical } = applyState;
-  app.innerHTML = `
+  setHTML(app, `
     <div class="rev-top">${XBTN}<div class="bar"><i style="width:${Math.round((qIdx / queue.length) * 100)}%"></i></div>
       <span class="rev-count tnum">${qIdx + 1} / ${queue.length}</span></div>
     <div class="rev-body">
@@ -685,7 +709,7 @@ function paintApplyAnswer() {
       <div class="hypothetical">${esc(hypothetical.scenario)}</div>
       <textarea id="applyAnswer" class="sa-input" rows="4" placeholder="Type your answer…"></textarea>
       <button class="btn btn-primary btn-block" data-action="apply-check">Check answer</button>
-    </div>`;
+    </div>`);
 }
 
 async function checkApply() {
@@ -722,13 +746,13 @@ async function checkApply() {
 function paintGraded(grading, nextAction) {
   const box = document.createElement("div");
   box.className = "graded";
-  box.innerHTML = `
+  setHTML(box, `
     <div class="score-row">
       <div class="score tnum ${grading.correct ? "ok" : "no"}">${grading.score}</div>
       <div><b style="color:${grading.correct ? "var(--success)" : "var(--danger)"}">${grading.correct ? "Correct" : "Needs work"}</b>
         <div class="feedback">${esc(grading.feedback)}</div></div>
     </div>
-    <button class="btn btn-primary btn-block" data-action="${nextAction}">Continue</button>`;
+    <button class="btn btn-primary btn-block" data-action="${nextAction}">Continue</button>`);
   const body = app.querySelector(".rev-body");
   if (body) {
     body.querySelector(".sa-input")?.remove();
@@ -757,18 +781,18 @@ async function startTypedPractice(sessionId) {
 function paintTypedQ() {
   const { items, idx } = typedState;
   if (idx >= items.length) {
-    app.innerHTML = `
+    setHTML(app, `
       <div class="view">
         <div class="done-msg"><div class="big">✍️</div>
           <div style="font-weight:650;color:var(--ink)">Practice complete</div>
           <div style="margin-top:4px">${items.length} typed answer${items.length === 1 ? "" : "s"} graded.</div>
         </div>
         <button class="btn btn-primary btn-block" data-action="return-focus">Done</button>
-      </div>`;
+      </div>`);
     return;
   }
   const { card } = items[idx];
-  app.innerHTML = `
+  setHTML(app, `
     <div class="rev-top">${XBTN}<div class="bar"><i style="width:${Math.round((idx / items.length) * 100)}%"></i></div>
       <span class="rev-count tnum">${idx + 1} / ${items.length}</span></div>
     <div class="rev-body">
@@ -777,7 +801,7 @@ function paintTypedQ() {
       <textarea id="typedAnswer" class="sa-input" rows="3" placeholder="Answer in your own words…"></textarea>
       <button class="btn btn-primary btn-block" data-action="typed-check">Check answer</button>
       <div class="help" style="margin:0;text-align:center">AI-graded against this card's answer.</div>
-    </div>`;
+    </div>`);
 }
 
 async function checkTyped() {
@@ -807,14 +831,14 @@ async function checkTyped() {
 
 function paintReviewDone() {
   showChrome(false);
-  app.innerHTML = `
+  setHTML(app, `
     <div class="view">
       <div class="done-msg"><div class="big">🎉</div>
         <div style="font-weight:650;color:var(--ink)">Review complete</div>
         <div style="margin-top:4px">${queue.length} card${queue.length === 1 ? "" : "s"} reviewed.</div>
       </div>
       <button class="btn btn-primary btn-block" data-action="return-focus">Done</button>
-    </div>`;
+    </div>`);
   syncNow().catch(() => {}); // push grades + pull changes after a session
 }
 
@@ -835,7 +859,7 @@ function startQuiz(studySet, ret) {
 function paintQuizQ() {
   if (quizIdx >= quizSet.quiz.length) return paintQuizDone();
   const q = quizSet.quiz[quizIdx];
-  app.innerHTML = `
+  setHTML(app, `
     <div class="rev-top">${XBTN}<div class="bar"><i style="width:${Math.round((quizIdx / quizSet.quiz.length) * 100)}%"></i></div>
       <span class="rev-count tnum">${quizIdx + 1} / ${quizSet.quiz.length}</span></div>
     <div class="rev-body">
@@ -849,7 +873,7 @@ function paintQuizQ() {
           )
           .join("")}
       </div>
-    </div>`;
+    </div>`);
 }
 
 function answerQuiz(i) {
@@ -864,9 +888,9 @@ function answerQuiz(i) {
   const body = app.querySelector(".rev-body");
   const ex = document.createElement("div");
   ex.className = "explain";
-  ex.innerHTML = `<b style="color:${i === q.answer ? "var(--success)" : "var(--danger)"}">${
+  setHTML(ex, `<b style="color:${i === q.answer ? "var(--success)" : "var(--danger)"}">${
     i === q.answer ? "Correct." : "Not quite."
-  }</b> ${esc(q.explain || "")}`;
+  }</b> ${esc(q.explain || "")}`);
   body.appendChild(ex);
   const next = document.createElement("button");
   next.className = "btn btn-primary btn-block";
@@ -878,14 +902,14 @@ function answerQuiz(i) {
 function paintQuizDone() {
   showChrome(false);
   const pct = Math.round((quizScore / quizSet.quiz.length) * 100);
-  app.innerHTML = `
+  setHTML(app, `
     <div class="view">
       <div class="done-msg"><div class="big">${pct >= 80 ? "🌟" : pct >= 50 ? "👍" : "📖"}</div>
         <div style="font-size:30px;font-weight:750;color:var(--ink)" class="tnum">${quizScore}/${quizSet.quiz.length}</div>
         <div style="margin-top:4px">${pct}% correct</div>
       </div>
       <button class="btn btn-primary btn-block" data-action="return-focus">Done</button>
-    </div>`;
+    </div>`);
 }
 
 // ================================================================ IMPORT
@@ -940,7 +964,7 @@ const importCards = () => {
 
 function renderImport() {
   showChrome(false);
-  app.innerHTML = `
+  setHTML(app, `
     <div class="view">
       <div class="ahd">
         <button class="iconbtn" data-action="nav-home" aria-label="Back"><svg class="ic" viewBox="0 0 24 24"><path d="M15 6l-6 6 6 6"/></svg></button>
@@ -968,21 +992,22 @@ function renderImport() {
         <button class="btn btn-ghost" style="flex:1" data-action="import-preview">Preview</button>
         <button class="btn btn-primary" style="flex:1" data-action="import-save">Import</button>
       </div>
-    </div>`;
+    </div>`);
 }
 function previewImport() {
   const cards = importCards();
   const box = document.getElementById("importPreview");
   if (!cards.length) {
-    box.innerHTML = '<div class="empty">No cards detected — try a different separator.</div>';
+    setHTML(box, '<div class="empty">No cards detected — try a different separator.</div>');
     return;
   }
-  box.innerHTML =
+  setHTML(
+    box,
     `<div style="font-size:12.5px;color:var(--muted);margin-bottom:8px">${cards.length} card(s) detected</div>` +
     cards
       .slice(0, 3)
       .map((c) => `<div class="pv-card"><b>${esc(c.front)}</b><span>${esc(c.back)}</span></div>`)
-      .join("");
+      .join(""));
 }
 async function doImport() {
   const cards = importCards();
@@ -1008,7 +1033,7 @@ async function doImport() {
 function renderTeams() {
   setNav("teams");
   showChrome(true);
-  app.innerHTML = `
+  setHTML(app, `
     <div class="view">
       <div class="ahd"><div class="h-title">Team learning</div></div>
       <div class="block tint" style="text-align:center;padding:22px 16px">
@@ -1019,7 +1044,7 @@ function renderTeams() {
           your sets can follow you across devices.</div>
       </div>
       <button class="btn btn-ghost btn-block" disabled>Create a team</button>
-    </div>`;
+    </div>`);
 }
 
 async function renderYou() {
@@ -1063,7 +1088,7 @@ async function renderYou() {
          </div>
        </div>`;
 
-  app.innerHTML = `
+  setHTML(app, `
     <div class="view">
       <div class="ahd"><div class="wordmark">Maf<b>sar</b></div></div>
       <div class="block" style="text-align:center;padding:20px">
@@ -1085,7 +1110,7 @@ async function renderYou() {
         <button class="btn btn-ghost" style="flex:1" data-action="import-backup">⇪ Restore</button>
       </div>
       <input type="file" id="backupFile" accept="application/json,.json" class="hidden" />
-    </div>`;
+    </div>`);
 }
 
 // --- account actions ---------------------------------------------------------
@@ -1262,7 +1287,7 @@ function paintAddCard() {
         <button class="btn btn-primary" style="flex:1" data-action="add-save" data-id="${esc(detail.session.id)}">Add card</button>
       </div>
     </div>`;
-  if (btn) btn.closest("div").insertAdjacentHTML("beforebegin", html);
+  if (btn) insertHTMLBefore(btn.closest("div"), html);
 }
 async function saveNewCard(sessionId) {
   const front = document.getElementById("newFront")?.value.trim();
@@ -1408,7 +1433,7 @@ nav.addEventListener("click", (e) => {
 // --- first-launch auth gate: an account is required (backend-first) ---------
 function renderAuthGate() {
   showChrome(false);
-  app.innerHTML = `
+  setHTML(app, `
     <div class="view" style="justify-content:center;min-height:100%">
       <div style="text-align:center;margin-bottom:8px">
         <div class="wordmark" style="font-size:26px">Maf<b>sar</b></div>
@@ -1423,7 +1448,7 @@ function renderAuthGate() {
         <button class="btn btn-ghost btn-block" data-action="auth-signin">Sign in</button>
       </div>
       <div class="help" style="text-align:center">Your sets sync across devices through your account.</div>
-    </div>`;
+    </div>`);
 }
 
 // init — account required: gate first launch until signed in, then sync.

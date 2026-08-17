@@ -48,7 +48,10 @@
           { id: "r1", cardId: "c1", sessionId: "sess1", grade: 1, prevInterval: 1, newInterval: 1, reviewedAt: "2026-08-14T11:00:00.000Z" },
           { id: "r2", cardId: "c1", sessionId: "sess1", grade: 2, prevInterval: 1, newInterval: 1, reviewedAt: "2026-08-14T12:00:00.000Z" },
         ],
-        auth: null,
+        // Load with ?signedIn to skip the first-launch auth gate and land on Home.
+        auth: new URLSearchParams(location.search).has("signedIn")
+          ? { accessToken: "harness", refreshToken: "harness", user: { email: "harness@example.com" }, lastSync: null }
+          : null,
       };
       DATA.activity[new Date(NOW - 86400000).toISOString().slice(0, 10)] = 3;
 
