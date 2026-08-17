@@ -134,7 +134,6 @@ function zip(files, outPath) {
   writeFileSync(outPath, Buffer.concat([...local, centralBuf, end]));
 }
 
-rmSync(DIST, { recursive: true, force: true });
 mkdirSync(DIST, { recursive: true });
 
 for (const [label, manifest] of [
@@ -142,8 +141,23 @@ for (const [label, manifest] of [
   ["firefox", firefoxManifest(source)],
 ]) {
   const files = collect(manifest, label);
+
+  // Unpacked directory — what chrome://extensions "Load unpacked" and
+  // about:debugging want. Only this build's own outputs are cleared, so
+  // sibling artifacts in dist/ (screenshots, store copy) survive a rebuild.
+  const dir = join(DIST, label);
+  rmSync(dir, { recursive: true, force: true });
+  for (const [name, data] of files) {
+    const dest = join(dir, name);
+    mkdirSync(dirname(dest), { recursive: true });
+    writeFileSync(dest, data);
+  }
+
   const out = join(DIST, `mafsar-${label}-${source.version}.zip`);
   zip(files, out);
   const kb = (statSync(out).size / 1024).toFixed(1);
-  console.log(`${label.padEnd(8)} ${files.length} files  ${kb} KB  ->  ${relative(ROOT, out)}`);
+  console.log(
+    `${label.padEnd(8)} ${String(files.length).padStart(2)} files  ${kb.padStart(5)} KB  ->  ` +
+    `${relative(ROOT, out)}  +  ${relative(ROOT, dir)}/`
+  );
 }
