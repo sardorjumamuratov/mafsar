@@ -51,7 +51,9 @@ const PROVIDERS: Record<string, Provider> = {
     extractError: (d, status) => d?.error?.message || `HTTP ${status}`,
   },
   groq: {
-    defaultModel: "llama-3.3-70b-versatile",
+    // llama-3.3-70b-versatile was decommissioned 2026-08-16; Groq's stated
+    // replacement. Override per-deployment with LLM_MODEL.
+    defaultModel: "openai/gpt-oss-120b",
     buildRequest({ apiKey, model, system, user }) {
       return {
         url: "https://api.groq.com/openai/v1/chat/completions",
