@@ -43,6 +43,13 @@ jobs:
             node --check "$f" || fail=1
           done
           exit $fail
+      # Guard against encoding corruption (a raw NUL byte once made
+      # quizlet-import.js unloadable by tooling).
+      - name: No control bytes in sources
+        run: |
+          if grep -rP '[\x00-\x08\x0b\x0c\x0e-\x1f]' src --include='*.js' --include='*.html' --include='*.css'; then
+            echo "::error::Raw control bytes found in source files"; exit 1
+          fi
 
   build-server:
     name: Server typecheck + boot smoke test
