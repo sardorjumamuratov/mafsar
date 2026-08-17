@@ -16,7 +16,6 @@
   ],
   "background": {
     "service_worker": "src/background/service-worker.js",
-    "scripts": ["src/background/service-worker.js"],
     "type": "module"
   },
   "side_panel": {
@@ -24,10 +23,22 @@
   },
   "sidebar_action": {
     "default_panel": "src/ui/panel.html",
-    "default_title": "Mafsar"
+    "default_title": "Mafsar",
+    "default_icon": "icons/icon48.png"
   },
   "action": {
-    "default_title": "Open Mafsar panel"
+    "default_title": "Open Mafsar panel",
+    "default_icon": {
+      "16": "icons/icon16.png",
+      "32": "icons/icon32.png",
+      "48": "icons/icon48.png"
+    }
+  },
+  "icons": {
+    "16": "icons/icon16.png",
+    "32": "icons/icon32.png",
+    "48": "icons/icon48.png",
+    "128": "icons/icon128.png"
   },
   "options_page": "src/ui/options.html",
   "content_scripts": [

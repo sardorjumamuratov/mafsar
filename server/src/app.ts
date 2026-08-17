@@ -8,12 +8,16 @@ import { syncSchema, registerSchema, loginSchema, generateSchema, gradeSchema, h
 import { applySync, changesSince } from "./sync.js";
 import { nowISO, one } from "./db.js";
 import { generateStudySet, gradeAnswer, generateHypothetical, summarizeConversation, setBlurb } from "./llm.js";
+import { PRIVACY_HTML } from "./privacy.js";
 
 export function createApp(db: DB) {
   const app = new Hono<{ Variables: { userId: string } }>();
 
   // The extension / future web app call the API cross-origin.
   app.use("*", cors());
+
+  // Public — required by the Chrome Web Store / Firefox Add-ons listings.
+  app.get("/privacy", (c) => c.html(PRIVACY_HTML));
 
   app.use("/v1/*", async (c, next) => {
     // Auth routes are public; everything else under /v1 requires a token.
