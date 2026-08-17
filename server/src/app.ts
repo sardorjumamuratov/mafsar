@@ -4,10 +4,10 @@ import type { DB } from "./db.js";
 import {
   register, login, requireAuth, signAccessToken, signRefreshToken,
 } from "./auth.js";
-import { syncSchema, registerSchema, loginSchema, generateSchema, gradeSchema, hypotheticalSchema, summarizeSchema } from "./schema.js";
+import { syncSchema, registerSchema, loginSchema, generateSchema, gradeSchema, hypotheticalSchema, summarizeSchema, blurbSchema } from "./schema.js";
 import { applySync, changesSince } from "./sync.js";
 import { nowISO, one } from "./db.js";
-import { generateStudySet, gradeAnswer, generateHypothetical, summarizeConversation } from "./llm.js";
+import { generateStudySet, gradeAnswer, generateHypothetical, summarizeConversation, setBlurb } from "./llm.js";
 
 export function createApp(db: DB) {
   const app = new Hono<{ Variables: { userId: string } }>();
@@ -102,6 +102,11 @@ export function createApp(db: DB) {
   app.post("/v1/summarize", async (c) => {
     const body = summarizeSchema.parse(await c.req.json());
     return c.json(await summarizeConversation(body.messages));
+  });
+
+  app.post("/v1/blurb", async (c) => {
+    const body = blurbSchema.parse(await c.req.json());
+    return c.json(await setBlurb(body.title, body.cardFronts));
   });
 
   // --- Phase 3: analytics — TODO ---

@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach, vi } from "vitest";
 import {
-  extractJson, generateStudySet, gradeAnswer, generateHypothetical, summarizeConversation,
+  extractJson, generateStudySet, gradeAnswer, generateHypothetical, summarizeConversation, setBlurb,
 } from "../src/llm.js";
 
 // The provider fetch is mocked; these tests cover prompt plumbing, JSON
@@ -91,6 +91,23 @@ describe("generateHypothetical / summarizeConversation", () => {
     vi.stubGlobal("fetch", ok({ summary: "s", keyPoints: ["1", "2", "3", "4", "5", "6", "7", "8"] }));
     const s = await summarizeConversation([{ role: "user", text: "x" }]);
     expect(s.keyPoints).toHaveLength(6);
+    vi.unstubAllGlobals();
+  });
+});
+
+describe("setBlurb", () => {
+  it("trims quotes/periods and caps the word count", async () => {
+    vi.stubGlobal("fetch", ok({ blurb: '"Torts: negligence and duty of care in common law systems today."' }));
+    const { blurb } = await setBlurb("Torts", ["Elements of negligence", "Duty of care"]);
+    expect(blurb.startsWith("Torts")).toBe(true);
+    expect(blurb.endsWith(".")).toBe(false);
+    expect(blurb.split(/\s+/).length).toBeLessThanOrEqual(8);
+    vi.unstubAllGlobals();
+  });
+
+  it("throws on an empty blurb", async () => {
+    vi.stubGlobal("fetch", ok({ blurb: "" }));
+    await expect(setBlurb("T", ["a"])).rejects.toThrow("empty blurb");
     vi.unstubAllGlobals();
   });
 });

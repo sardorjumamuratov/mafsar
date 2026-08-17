@@ -33,3 +33,8 @@ export function backendHypothetical({ concept, reference }) {
 export function backendSummarize(messages) {
   return post("/v1/summarize", { messages });
 }
+
+/** { title, cardFronts } -> { blurb } (tiny 5-6 word set description) */
+export function backendBlurb(title, cardFronts) {
+  return post("/v1/blurb", { title, cardFronts });
+}

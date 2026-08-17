@@ -145,6 +145,11 @@ Rules:
 
 Respond with ONLY valid JSON: { "summary": string, "keyPoints": [string] }`;
 
+const BLURB_PROMPT = `You get the title and flashcard fronts of a study set. Write a single tiny
+description of what this set covers — a natural phrase of 5-6 words, no quotes, no ending period.
+
+Respond with ONLY valid JSON: { "blurb": string }`;
+
 // --- parsing helpers -----------------------------------------------------------
 
 export function extractJson(raw: string): any {
@@ -226,4 +231,14 @@ export async function summarizeConversation(messages: { role: string; text: stri
     summary: String(parsed.summary || ""),
     keyPoints: (parsed.keyPoints || []).map(String).slice(0, 6),
   };
+}
+
+/** Tiny 5-6 word description of a set, from its title + card fronts. */
+export async function setBlurb(title: string, cardFronts: string[]) {
+  const fronts = cardFronts.slice(0, 12).map((f) => `- ${f}`).join("\n");
+  const user = `Set title: ${title || "(untitled)"}\n\nCard fronts:\n${fronts}\n\nWrite the blurb now.`;
+  const parsed = await callJson(BLURB_PROMPT, user);
+  const blurb = String(parsed.blurb || "").replace(/^["']|["']$/g, "").replace(/\.$/, "").trim();
+  if (!blurb) throw new Error("Model returned an empty blurb.");
+  return { blurb: blurb.split(/\s+/).slice(0, 8).join(" ") };
 }

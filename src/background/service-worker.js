@@ -17,6 +17,7 @@ import {
   backendGrade,
   backendHypothetical,
   backendSummarize,
+  backendBlurb,
 } from "../sync/api.js";
 
 /** Generate a study set for a captured session via the backend. */
@@ -327,6 +328,19 @@ async function handle(msg) {
       existing.summary = summary;
       await saveStudySet(existing);
       return { summary };
+    }
+
+    // Tiny AI description of a set (title + card fronts -> 5-6 words).
+    case "GET_BLURB": {
+      const sets = await getStudySetForSession(msg.sessionId);
+      if (!sets?.flashcards?.length) throw new Error("Set has no cards.");
+      const { blurb } = await backendBlurb(
+        sets.title || msg.title || "",
+        sets.flashcards.map((c) => c.front)
+      );
+      sets.blurb = blurb; // cached on the set (local-only; not synced)
+      await saveStudySet(sets);
+      return { blurb };
     }
 
     default:

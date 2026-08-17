@@ -94,3 +94,8 @@ export const hypotheticalSchema = z.object({
 export const summarizeSchema = z.object({
   messages: z.array(messageSchema).min(1),
 });
+
+export const blurbSchema = z.object({
+  title: z.string().default(""),
+  cardFronts: z.array(z.string()).min(1),
+});

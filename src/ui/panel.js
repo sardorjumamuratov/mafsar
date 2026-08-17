@@ -163,16 +163,44 @@ async function renderHome() {
   const withSets = sessions.filter((s) => setFor(s.id, studySets));
   const topSets = withSets.slice(0, 4);
 
-  const exam = nextExam(studySets, sessions);
+  // --- Exam section: one date on Home, applied to the sets the user picks ---
+  const examSets = studySets.filter((s) => s.examDate && s.examDate > Date.now());
+  const examDate = examSets.length ? Math.min(...examSets.map((s) => s.examDate)) : null;
+  let totals = { total: 0, mastered: 0, due: 0 };
+  for (const s of examSets) {
+    const x = summarize(s);
+    totals.total += x.total;
+    totals.mastered += x.mastered;
+    totals.due += x.due;
+  }
+  const exam = examDate
+    ? examReadiness({ examDate, total: totals.total, mastered: totals.mastered, due: totals.due })
+    : null;
   const examCard = exam
-    ? `<div class="exam-card" data-action="open-set" data-id="${esc(exam.sessionId)}">
-         <span class="exam-ic">🎯</span>
-         <div><div class="t-label">Next exam</div>
-           <div class="exam-title">${esc(exam.title)}</div>
-           <div class="sub">${examDaysLeft(exam.examDate)}</div></div>
-         <span class="tag">in ${Math.max(1, Math.ceil((exam.examDate - Date.now()) / 86400000))}d</span>
+    ? `<div class="block" style="display:flex;flex-direction:column;gap:9px">
+         <div style="display:flex;align-items:center;gap:10px">
+           <span style="font-size:18px">🎯</span>
+           <div style="flex:1;min-width:0">
+             <div class="t-label">${examDaysLeft(examDate)}</div>
+             <div style="font-size:12.5px;color:var(--muted)">${totals.total} cards · ${examSets.length} set${examSets.length === 1 ? "" : "s"} · ${exam.dailyTarget}/day to finish</div>
+           </div>
+           <input type="date" id="homeExamDate" class="date-input" value="${dateInputValue(examDate)}" />
+         </div>
+         <div class="bar ${exam.progress === 100 ? "ok" : ""}"><i style="width:${totals.total ? exam.progress : 0}%"></i></div>
+         <div class="prog-line" style="font-size:12px">
+           <span style="color:${exam.status === "behind" ? "var(--warm)" : "var(--success)"};font-weight:600">${exam.progress}% ready · ${exam.status === "behind" ? "behind" : "on track"}</span>
+           <span style="display:flex;gap:10px">
+             <button class="linkbtn" data-action="exam-pick">Choose sets</button>
+             <button class="linkbtn" data-action="exam-clear">Clear</button>
+           </span>
+         </div>
        </div>`
-    : "";
+    : `<div class="exam-card" data-action="exam-pick">
+         <span class="exam-ic">🎯</span>
+         <div style="flex:1"><div class="t-label">Exam prep</div>
+           <div class="sub" style="font-size:12.5px">Set a date and pick which sets count</div></div>
+         <input type="date" id="homeExamDate" class="date-input" value="" />
+       </div>`;
 
   const allCards = studySets.flatMap((s) => s.flashcards || []);
   const weak = weakTopics(reviewLog, allCards);
@@ -253,6 +281,84 @@ async function renderHome() {
     </div>`;
 }
 
+// --- Exam set picker (focus view): choose which sets count toward the exam ---
+let examDraft = null; // { date: ms|null, picked: Set<sessionId> }
+
+async function openExamPicker() {
+  const { sessions, studySets } = await bundle();
+  const withSets = sessions.filter((s) => setFor(s.id, studySets));
+  const examSets = studySets.filter((s) => s.examDate && s.examDate > Date.now());
+  examDraft = {
+    date: examSets.length ? Math.min(...examSets.map((s) => s.examDate)) : examDraft?.date || null,
+    picked: new Set(examSets.map((s) => s.sessionId)),
+  };
+  showChrome(false);
+  app.innerHTML = `
+    <div class="view">
+      <div class="ahd">
+        <button class="iconbtn" data-action="nav-home" aria-label="Back"><svg class="ic" viewBox="0 0 24 24"><path d="M15 6l-6 6 6 6"/></svg></button>
+        <div class="h-title" style="font-size:16px">Exam sets</div><span style="width:32px"></span>
+      </div>
+      <div class="field"><label>Exam date</label>
+        <input type="date" id="pickerDate" class="date-input" value="${dateInputValue(examDraft.date)}" style="width:auto" /></div>
+      <div class="help" style="margin:0">Pick the sets this exam covers. Selected sets resurface cards before the date and count toward readiness.</div>
+      <div class="block" style="padding:6px 14px">
+        ${
+          withSets.length
+            ? withSets
+                .map((session) => {
+                  const set = setFor(session.id, studySets);
+                  const s = summarize(set);
+                  return `<label class="pick-row">
+                    <input type="checkbox" class="picker-check" data-id="${esc(session.id)}" ${examDraft.picked.has(session.id) ? "checked" : ""} />
+                    <span style="flex:1;min-width:0">
+                      <span class="name">${esc(session.title || "Untitled")}</span>
+                      <span class="blurb" id="blurb-${esc(session.id)}">${esc(set?.blurb || `${s.total} cards`)}</span>
+                    </span>
+                    <span class="tag">${s.total}</span>
+                  </label>`;
+                })
+                .join("")
+            : `<div class="empty">No sets yet — capture or import something first.</div>`
+        }
+      </div>
+      <button class="btn btn-primary btn-block" data-action="picker-save" ${withSets.length ? "" : "disabled"}>Save exam</button>
+    </div>`;
+  fillMissingBlurbs(withSets, studySets);
+}
+
+/** Fetch tiny AI blurbs for sets that don't have one; patch rows as they land. */
+async function fillMissingBlurbs(sessions, studySets) {
+  for (const session of sessions) {
+    const set = setFor(session.id, studySets);
+    if (!set || set.blurb || !set.flashcards?.length) continue;
+    const cell = document.getElementById(`blurb-${session.id}`);
+    if (!cell) continue;
+    try {
+      const r = await send({ type: "GET_BLURB", sessionId: session.id });
+      if (r.blurb && document.getElementById(`blurb-${session.id}`)) {
+        document.getElementById(`blurb-${session.id}`).textContent = r.blurb;
+      }
+    } catch {
+      /* offline or LLM error — the card count stays as the label */
+    }
+  }
+}
+
+async function saveExamSelection() {
+  const dateStr = document.getElementById("pickerDate")?.value;
+  const date = dateStr ? new Date(`${dateStr}T23:59:59`).getTime() : null;
+  if (!date) return toast("Pick an exam date first.");
+  const { studySets } = await bundle();
+  for (const set of studySets) {
+    const picked = examDraft?.picked.has(set.sessionId);
+    if (picked && set.examDate !== date) await setExamDate(set.sessionId, date);
+    if (!picked && set.examDate) await setExamDate(set.sessionId, null);
+  }
+  toast("Exam saved — cards will resurface before it");
+  renderHome();
+}
+
 function setRow(session, s) {
   const dueTag = s.due
     ? `<span class="tag dot" style="color:var(--warm)">${s.due} due</span>`
@@ -317,24 +423,22 @@ function paintDetail() {
     const statusLabel = { "on-track": "On track", behind: "Behind", today: "Exam today", past: "Exam passed" }[exam?.status];
     const statusColor = exam?.status === "behind" || exam?.status === "today" ? "var(--warm)" : "var(--success)";
 
+    // Exam dates are set on Home now (applied to picked sets); the set detail
+    // only shows this set's readiness. Per-set input kept here for reference:
+    // <input type="date" id="examDate" value="…" data-session="…" /> + Clear btn
     const examPanel = `
-      <div class="block" style="display:flex;flex-direction:column;gap:10px">
-        <div class="prog-line" style="font-size:12px"><span class="t-label" style="margin:0">Exam date</span>
-          <div style="display:flex;gap:8px;align-items:center">
-            <input type="date" id="examDate" class="date-input" value="${dateInputValue(studySet.examDate)}" data-session="${esc(session.id)}" />
-            ${studySet.examDate ? `<button class="linkbtn" data-action="clear-exam" data-id="${esc(session.id)}">Clear</button>` : ""}
-          </div></div>
-        ${
-          exam
-            ? `<div class="readiness">
+      ${
+        exam
+          ? `<div class="block" style="display:flex;flex-direction:column;gap:10px">
+               <div class="readiness">
                  <div class="r-cell"><div class="v tnum">${exam.daysLeft < 0 ? "—" : exam.daysLeft}</div><div class="k">days left</div></div>
                  <div class="r-cell"><div class="v tnum">${s.progress}%</div><div class="k">ready</div></div>
                  <div class="r-cell"><div class="v tnum">${exam.status === "past" ? "—" : exam.dailyTarget}</div><div class="k">cards/day</div></div>
                  <div class="r-cell"><div class="v" style="font-size:12px;color:${statusColor}">${statusLabel}</div><div class="k">status</div></div>
-               </div>`
-            : `<div class="help" style="margin:0">Set an exam date to get a countdown, daily target, and pre-exam resurfacing of cards.</div>`
-        }
-      </div>`;
+               </div>
+             </div>`
+          : `<div class="help" style="margin:0">Set an exam date on Home and pick this set to get a countdown, daily target, and pre-exam resurfacing.</div>`
+      }`;
 
     const editForm = editingCardId
       ? `<div class="block editcard">
@@ -377,7 +481,8 @@ function paintDetail() {
         <button class="btn btn-ghost" style="flex:1" data-action="add-card" data-id="${esc(session.id)}">＋ Card</button>
         <button class="btn btn-ghost" style="flex:1" data-action="start-typed" data-id="${esc(session.id)}">✍️ Type answers</button>
       </div>
-      <button class="btn btn-ghost btn-block" data-action="export-tsv" data-id="${esc(session.id)}">⇩ Export to Anki/CSV</button>`;
+      <!-- Export paused while import-from-Anki/Quizlet ships:
+      <button class="btn btn-ghost btn-block" data-action="export-tsv" data-id="${esc(session.id)}">⇩ Export to Anki/CSV</button> -->`;
   } else if (tab === "quiz") {
     body = studySet.quiz?.length
       ? `<div class="block" style="text-align:center">
@@ -787,7 +892,21 @@ function paintQuizDone() {
 function unescapeSep(v) {
   return v.replace(/\\t/g, "\t").replace(/\\n/g, "\n");
 }
-function parseCards(text, termRaw, cardRaw) {
+/** Anki plain-text exports carry HTML (<br>, <div>, [sound:…]) — strip it. */
+function stripAnkiMarkup(s) {
+  return s
+    .replace(/<br\s*\/?>/gi, " ")
+    .replace(/<\/(div|p|li)>/gi, " ")
+    .replace(/<[^>]+>/g, "")
+    .replace(/\[sound:[^\]]*\]/gi, "")
+    .replace(/&nbsp;/g, " ")
+    .replace(/&amp;/g, "&")
+    .replace(/&lt;/g, "<")
+    .replace(/&gt;/g, ">")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+function parseCards(text, termRaw, cardRaw, clean = false) {
   const termSep = unescapeSep(termRaw);
   const cardSep = unescapeSep(cardRaw);
   let rows;
@@ -797,16 +916,27 @@ function parseCards(text, termRaw, cardRaw) {
   const cards = [];
   for (let row of rows) {
     row = row.trim();
-    if (!row) continue;
+    if (!row || row.startsWith("#")) continue; // Anki export headers/comments
     const i = row.indexOf(termSep);
-    const front = i === -1 ? row : row.slice(0, i).trim();
-    const back = i === -1 ? "" : row.slice(i + termSep.length).trim();
+    let front = i === -1 ? row : row.slice(0, i).trim();
+    let back = i === -1 ? "" : row.slice(i + termSep.length).trim();
+    if (clean) {
+      front = stripAnkiMarkup(front);
+      back = stripAnkiMarkup(back);
+    }
     if (front) cards.push({ front, back });
   }
   return cards;
 }
-const importCards = () =>
-  parseCards(document.getElementById("importText").value, document.getElementById("termSep").value, document.getElementById("cardSep").value);
+const importCards = () => {
+  const clean = document.getElementById("importClean")?.checked;
+  return parseCards(
+    document.getElementById("importText").value,
+    document.getElementById("termSep").value,
+    document.getElementById("cardSep").value,
+    clean
+  );
+};
 
 function renderImport() {
   showChrome(false);
@@ -816,15 +946,23 @@ function renderImport() {
         <button class="iconbtn" data-action="nav-home" aria-label="Back"><svg class="ic" viewBox="0 0 24 24"><path d="M15 6l-6 6 6 6"/></svg></button>
         <div class="h-title" style="font-size:16px">Import flashcards</div><span style="width:32px"></span>
       </div>
-      <div class="help"><b>From Quizlet:</b> open a set page and click the floating <b>Import to Mafsar</b> button, or export (⋯ → Export, Tab + New line) and paste below. Works for CSV/TSV too.</div>
+      <div class="help"><b>Anki:</b> File → Export → "Notes in Plain Text" (.txt), then upload the file below (leave HTML cleanup on).<br>
+        <b>Quizlet:</b> open a set page and click the floating <b>Import to Mafsar</b> button, or export (⋯ → Export, Tab + New line) and paste below. CSV/TSV works too.</div>
       <div class="field"><label>Title</label><input id="importTitle" type="text" placeholder="e.g. Biology — Chapter 3" /></div>
+      <div style="display:flex;gap:10px;align-items:center">
+        <button class="btn btn-ghost" style="flex:1" data-action="import-file">⇪ Load Anki/CSV file</button>
+        <label style="display:flex;gap:6px;align-items:center;font-size:12.5px;color:var(--muted)">
+          <input type="checkbox" id="importClean" checked /> clean HTML
+        </label>
+      </div>
+      <input type="file" id="importFile" accept=".txt,.csv,.tsv,text/plain" class="hidden" />
       <div class="sep-row">
         <div class="field"><label>Term / definition</label>
           <select id="termSep"><option value="\\t">Tab</option><option value=",">Comma</option><option value=" - ">Dash</option><option value="|">Pipe</option></select></div>
         <div class="field"><label>Between cards</label>
           <select id="cardSep"><option value="\\n">New line</option><option value="\\n\\n">Blank line</option><option value=";">Semicolon</option></select></div>
       </div>
-      <div class="field"><label>Pasted content</label><textarea id="importText" rows="7" placeholder="term&#9;definition"></textarea></div>
+      <div class="field"><label>Content</label><textarea id="importText" rows="7" placeholder="term&#9;definition"></textarea></div>
       <div class="preview" id="importPreview"></div>
       <div style="display:flex;gap:10px">
         <button class="btn btn-ghost" style="flex:1" data-action="import-preview">Preview</button>
@@ -1049,7 +1187,7 @@ document.addEventListener("click", (e) => {
     case "card-del":
       if (confirm("Delete this card?")) deleteCard(detail.session.id, id).then(() => paintDetail());
       break;
-    case "export-tsv": exportSetTsv(id); break;
+    // case "export-tsv": exportSetTsv(id); break; // paused with the export button
     case "gen-summary": generateSummary(id); break;
     case "export-backup": exportBackup(); break;
     case "import-backup": document.getElementById("backupFile")?.click(); break;
@@ -1062,11 +1200,22 @@ document.addEventListener("click", (e) => {
       });
       break;
     case "sync-now": manualSync(); break;
+    case "exam-pick": openExamPicker(); break;
+    case "exam-clear":
+      (async () => {
+        const { studySets } = await bundle();
+        for (const s of studySets) if (s.examDate) await setExamDate(s.sessionId, null);
+        toast("Exam cleared");
+        renderHome();
+      })();
+      break;
+    case "picker-save": saveExamSelection(); break;
     case "start-quiz": startQuiz(detail.studySet, "set:" + detail.session.id); break;
     case "quiz-opt": answerQuiz(Number(t.dataset.i)); break;
     case "quiz-next": quizIdx++; paintQuizQ(); break;
     case "import-preview": previewImport(); break;
     case "import-save": doImport(); break;
+    case "import-file": document.getElementById("importFile")?.click(); break;
     case "close-focus":
     case "return-focus": goReturn(); break;
   }
@@ -1191,9 +1340,49 @@ document.addEventListener("change", (e) => {
       toast(ms ? "Exam date set — cards will resurface before it" : "Exam date cleared");
       renderSetDetail(t.dataset.session, "cards");
     });
+  } else if (t.id === "homeExamDate") {
+    // Date changed on Home: if an exam already exists, move it for every
+    // selected set; otherwise draft it and go pick sets.
+    const ms = t.value ? new Date(`${t.value}T23:59:59`).getTime() : null;
+    (async () => {
+      const { studySets } = await bundle();
+      const selected = studySets.filter((s) => s.examDate);
+      if (selected.length && ms) {
+        for (const s of selected) await setExamDate(s.sessionId, ms);
+        toast("Exam date updated");
+        renderHome();
+      } else {
+        examDraft = { date: ms, picked: new Set() };
+        openExamPicker();
+      }
+    })();
+  } else if (t.id === "pickerDate") {
+    if (examDraft) examDraft.date = t.value ? new Date(`${t.value}T23:59:59`).getTime() : null;
+  } else if (t.classList?.contains("picker-check")) {
+    if (examDraft) t.checked ? examDraft.picked.add(t.dataset.id) : examDraft.picked.delete(t.dataset.id);
   } else if (t.id === "backupFile" && t.files?.[0]) {
     importBackupFile(t.files[0]);
     t.value = "";
+  } else if (t.id === "importFile" && t.files?.[0]) {
+    const file = t.files[0];
+    t.value = "";
+    const reader = new FileReader();
+    reader.onload = () => {
+      const text = String(reader.result || "");
+      document.getElementById("importText").value = text;
+      // Auto-title from the filename ("Spanish Verbs.txt" -> "Spanish Verbs"),
+      // and default the term separator to Tab — Anki's plain-text export format.
+      const titleEl = document.getElementById("importTitle");
+      if (titleEl && !titleEl.value.trim()) {
+        titleEl.value = file.name.replace(/\.(txt|csv|tsv)$/i, "").replace(/[_-]+/g, " ") || "Imported";
+      }
+      if (/\.tsv$/i.test(file.name) || /\.txt$/i.test(file.name)) {
+        document.getElementById("termSep").value = "\\t";
+        document.getElementById("cardSep").value = "\\n";
+      }
+      previewImport();
+    };
+    reader.readAsText(file);
   }
 });
 
