@@ -24,12 +24,12 @@ const source = JSON.parse(readFileSync(join(ROOT, "manifest.json"), "utf8"));
 const SHIPPED_ICONS = ["icon16.png", "icon32.png", "icon48.png", "icon96.png", "icon128.png"];
 
 /**
- * Sources that only belong in one browser's package. Keeping chrome.sidePanel
- * out of the Firefox build means the shipped code contains no reference to an
- * API Gecko doesn't implement; service-worker.js guards the dynamic import so
- * the missing file is never requested there.
+ * Sources that only belong in one browser's package. Currently none: splitting
+ * the chrome.sidePanel call into a Firefox-excluded module silenced two linter
+ * warnings but broke the Chrome toolbar button, because the async import lost
+ * the race with service worker teardown. Working code beat a clean lint.
  */
-const EXCLUDE = { firefox: ["src/background/chrome-sidepanel.js"], chrome: [] };
+const EXCLUDE = { firefox: [], chrome: [] };
 
 function chromeManifest(m) {
   const out = structuredClone(m);

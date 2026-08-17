@@ -61,23 +61,28 @@ async function saveGeneratedStudySet(session, generated) {
   });
 }
 
-// Chrome: open the side panel when the toolbar icon is clicked. The API call
-// lives in a Chrome-only module that isn't shipped to Firefox, so the Firefox
-// package contains no reference to chrome.sidePanel at all.
+// Chrome: make a toolbar-icon click open the side panel. Called on every
+// service worker start (not just onInstalled) so it survives worker restarts.
+// Must stay a direct synchronous call — routing it through an async import
+// silently loses the race with worker teardown and leaves the icon dead.
+if (chrome.sidePanel?.setPanelBehavior) {
+  chrome.sidePanel.setPanelBehavior({ openPanelOnActionClick: true }).catch(() => {});
+}
+
 chrome.runtime.onInstalled.addListener(() => {
-  if (chrome.sidePanel) {
-    import("./chrome-sidepanel.js")
-      .then((m) => m.openPanelOnActionClick())
-      .catch(() => {});
-  }
   scheduleReminderAlarm();
   registerContextMenus();
 });
 
-// Firefox: no sidePanel API — toggle the sidebar when the toolbar icon is clicked.
-if (chrome.action?.onClicked && globalThis.chrome?.sidebarAction) {
-  chrome.action.onClicked.addListener(() => {
-    chrome.sidebarAction.toggle();
+// Toolbar click. Chrome only fires this when openPanelOnActionClick is off, so
+// it doubles as the fallback if the call above failed; Firefox always uses it.
+if (chrome.action?.onClicked) {
+  chrome.action.onClicked.addListener((tab) => {
+    if (globalThis.chrome?.sidebarAction) {
+      chrome.sidebarAction.toggle();
+    } else if (chrome.sidePanel?.open && tab?.windowId != null) {
+      chrome.sidePanel.open({ windowId: tab.windowId }).catch(() => {});
+    }
   });
 }
 
