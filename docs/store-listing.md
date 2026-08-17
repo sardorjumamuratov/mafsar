@@ -130,6 +130,50 @@ CONTACT
 Questions about this policy or your data: sardoralien@gmail.com
 ```
 
+## Chrome Web Store — extra fields
+
+CWS asks for things AMO doesn't. The Privacy tab is where submissions usually
+stall: every permission needs its own written justification.
+
+**Single purpose**
+
+```
+Mafsar turns learning material the user explicitly saves — AI chat
+conversations, articles, or selected text — into flashcards and quizzes, and
+schedules them for spaced-repetition review.
+```
+
+**Permission justifications** (one per permission; CWS rejects vague answers)
+
+| Permission | Justification |
+|---|---|
+| `storage` | Stores the user's study sets, flashcards, review schedule and settings locally so the extension works offline. |
+| `activeTab` | Reads the text of the current tab only when the user explicitly clicks "Save to Mafsar" or the right-click menu item. No background access. |
+| `scripting` | Injects a one-off text-extraction function into the active tab in response to that same user action, to read the article or conversation being saved. |
+| `sidePanel` | The entire study interface (flashcards, review, quizzes) is rendered in Chrome's side panel. |
+| `contextMenus` | Adds the "Save page to Mafsar" and "Save selection to Mafsar" right-click items, the primary way users capture content. |
+| `alarms` | Schedules the optional daily study reminder at the time the user chooses. |
+| `notifications` | Shows the daily reminder and confirms how many flashcards were generated after a capture. |
+| Host: `chatgpt.com`, `chat.openai.com`, `claude.ai`, `gemini.google.com` | Content scripts add a "Save to Mafsar" button and read the conversation on those pages when the user clicks it. |
+| Host: `mafsar-production.up.railway.app` | The extension's own backend — handles sign-in, flashcard generation, and cross-device sync. |
+
+**Remote code** — answer **No**. The extension calls a web API but never
+loads or executes remotely-hosted code; all JavaScript ships in the package.
+
+**Data usage disclosures** — tick: *Personally identifiable information*
+(email, for the account) and *User activity / website content* (only pages the
+user explicitly captures). Then certify all three statements: data is not sold
+to third parties, not used outside the single purpose, and not used to
+determine creditworthiness or for lending.
+
+**Assets**
+
+| Asset | Size | File |
+|---|---|---|
+| Store icon | 128×128 | `icons/icon128.png` |
+| Screenshots (1–5) | 1280×800 | `dist/screenshots/light-*.png` |
+| Small promo tile (optional) | 440×280 | `dist/screenshots/promo-440x280.png` |
+
 ## Data collection permissions
 
 Declared in `manifest.json` under `browser_specific_settings.gecko`. The AMO
