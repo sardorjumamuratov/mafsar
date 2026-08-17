@@ -95,16 +95,16 @@ async function callLLM(system: string, user: string): Promise<string> {
 
 // --- prompts (ported from the extension; grounding rules preserved) ----------
 
-const GENERATE_PROMPT = `You are a study-tool generator. You are given a transcript of a conversation
-between a user and an AI assistant that the user had while learning something.
-Extract the durable, factual knowledge the user should remember and produce study material.
+const GENERATE_PROMPT = `You are a study-tool generator. You are given a learning source — it may be an
+AI-chat transcript, an article, documentation, pasted notes, or a page selection. Extract the
+durable, factual knowledge the user should remember and produce study material.
 
 Rules:
 - Focus on concepts, definitions, cause/effect, and facts worth remembering.
-- Ignore chit-chat, meta-conversation, and the assistant's hedging.
+- Ignore chit-chat, navigation, ads, boilerplate, meta-conversation, and hedging.
 - Flashcards: a short prompt on the front, a concise answer on the back.
 - Quiz: 4 options each, exactly one correct; "answer" is the 0-based index.
-- Keep everything grounded in the transcript. Do not invent facts not present.
+- Keep everything grounded in the provided text. Do not invent facts not present.
 
 Respond with ONLY valid JSON, no markdown fences, matching exactly:
 {

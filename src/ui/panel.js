@@ -281,7 +281,7 @@ async function renderSets() {
           ? sessions.map((s) => setRow(s, summarize(setFor(s.id, studySets)))).join("")
           : `<div class="empty"><div class="big">📚</div>No sets yet.<br>Capture an AI conversation with <b>Save to Mafsar</b>, or import from Quizlet.</div>`
       }
-      <button class="btn btn-ghost btn-block" data-action="capture-current">＋ Capture current chat</button>
+      <button class="btn btn-ghost btn-block" data-action="capture-current">＋ Capture this page</button>
     </div>`;
 }
 
@@ -990,13 +990,17 @@ async function captureCurrent() {
   toast("Capturing…");
   const tab = await queryActiveTab();
   if (!tab?.id) return toast("No active tab.");
+  // Try the site adapter first (clean capture on AI-chat sites)…
   const resp = await sendToTab(tab.id, { type: "CAPTURE_ACTIVE" });
-  if (!resp) return toast("Open a ChatGPT, Claude, or Gemini chat first.");
-  if (!resp.ok) return toast(resp.error || "Nothing to capture.");
+  let r;
   try {
-    const r = await send({ type: "SAVE_AND_GENERATE", payload: resp.session });
+    if (resp?.ok) {
+      r = await send({ type: "SAVE_AND_GENERATE", payload: resp.session });
+    } else {
+      // …otherwise fall back to universal page-text capture on any site.
+      r = await send({ type: "CAPTURE_UNIVERSAL" });
+    }
     if (r.generated) toast(`Saved · ${r.cards} cards generated`);
-    else if (r.reason === "no-key") toast("Saved — add an API key to generate");
     else toast("Saved — generation failed; open the set to retry");
     renderHome();
   } catch (e) {

@@ -66,12 +66,95 @@ chrome.runtime.onInstalled.addListener(() => {
     chrome.sidePanel.setPanelBehavior({ openPanelOnActionClick: true }).catch(() => {});
   }
   scheduleReminderAlarm();
+  registerContextMenus();
 });
 
 // Firefox: no sidePanel API — toggle the sidebar when the toolbar icon is clicked.
 if (chrome.action?.onClicked && globalThis.chrome?.sidebarAction) {
   chrome.action.onClicked.addListener(() => {
     chrome.sidebarAction.toggle();
+  });
+}
+
+// --- Universal capture (any page, not just AI chats) --------------------------
+
+/** Runs INSIDE the page (serialized by executeScript — must stay self-contained). */
+function extractPage() {
+  const sel = (window.getSelection && window.getSelection().toString().trim()) || "";
+  let text = sel;
+  if (text.length < 40) {
+    // No meaningful selection → grab the main content instead of the whole page chrome.
+    const el = document.querySelector("main, article") || document.body;
+    text = (el.innerText || "").trim();
+  }
+  return {
+    title: document.title || location.hostname,
+    url: location.href,
+    text: text.slice(0, 24000),
+  };
+}
+
+function notify(message) {
+  if (chrome.notifications) {
+    chrome.notifications.create({
+      type: "basic",
+      iconUrl: chrome.runtime.getURL("icons/icon128.png"),
+      title: "Mafsar",
+      message,
+    });
+  }
+}
+
+/** Extract text from a tab and run the normal save → generate flow. */
+async function captureTabAndSave(tabId) {
+  let page;
+  try {
+    const results = await new Promise((resolve, reject) => {
+      chrome.scripting.executeScript({ target: { tabId }, func: extractPage }, (r) =>
+        chrome.runtime.lastError ? reject(new Error(chrome.runtime.lastError.message)) : resolve(r)
+      );
+    });
+    page = results?.[0]?.result;
+  } catch {
+    throw new Error("Can't capture this page — try a normal web page.");
+  }
+  if (!page?.text || page.text.length < 200) {
+    throw new Error("Not enough text to capture.");
+  }
+  let host = "web";
+  try {
+    host = new URL(page.url).hostname.replace(/^www\./, "");
+  } catch { /* keep fallback */ }
+  const session = {
+    source: "web",
+    sourceLabel: host,
+    title: page.title || host,
+    url: page.url,
+    capturedAt: Date.now(),
+    messages: [{ role: "user", text: page.text }],
+  };
+  const r = await saveAndGenerate(session);
+  if (!r.generated) throw new Error(r.reason || "generation-failed");
+  return r;
+}
+
+function registerContextMenus() {
+  if (!chrome.contextMenus) return;
+  chrome.contextMenus.removeAll(() => {
+    chrome.contextMenus.create({ id: "mafsar-save-page", title: "Save page to Mafsar", contexts: ["page"] });
+    chrome.contextMenus.create({ id: "mafsar-save-selection", title: "Save selection to Mafsar", contexts: ["selection"] });
+  });
+}
+
+if (chrome.contextMenus?.onClicked) {
+  chrome.contextMenus.onClicked.addListener(async (info, tab) => {
+    if (!tab?.id) return;
+    try {
+      const r = await captureTabAndSave(tab.id);
+      notify(`Saved · ${r.cards} cards from ${r.session.sourceLabel || "page"}`);
+    } catch (e) {
+      notify(e?.message || "Capture failed.");
+    }
   });
 }
 
@@ -128,6 +211,18 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
   return true; // async response
 });
 
+/** Store a captured session and generate its study set via the backend. */
+async function saveAndGenerate(sessionRecord) {
+  const session = await addSession(sessionRecord);
+  try {
+    const generated = await generateForSession(session);
+    const studySet = await saveGeneratedStudySet(session, generated);
+    return { session, generated: true, cards: studySet.flashcards.length, quiz: studySet.quiz.length };
+  } catch (e) {
+    return { session, generated: false, reason: e?.message || "generation-failed" };
+  }
+}
+
 async function handle(msg) {
   switch (msg?.type) {
     case "SAVE_SESSION": {
@@ -138,14 +233,17 @@ async function handle(msg) {
     case "SAVE_AND_GENERATE": {
       // The "Save to Mafsar" page action: store the conversation, then generate
       // flashcards + quiz via the backend (server-side API key).
-      const session = await addSession(msg.payload);
-      try {
-        const generated = await generateForSession(session);
-        const studySet = await saveGeneratedStudySet(session, generated);
-        return { session, generated: true, cards: studySet.flashcards.length, quiz: studySet.quiz.length };
-      } catch (e) {
-        return { session, generated: false, reason: e?.message || "generation-failed" };
-      }
+      return await saveAndGenerate(msg.payload);
+    }
+
+    // Universal capture from the panel: no content script needed — the worker
+    // extracts the active tab's text itself.
+    case "CAPTURE_UNIVERSAL": {
+      const tabs = await new Promise((resolve) =>
+        chrome.tabs.query({ active: true, currentWindow: true }, (t) => resolve(t || []))
+      );
+      if (!tabs[0]?.id) throw new Error("No active tab.");
+      return await captureTabAndSave(tabs[0].id);
     }
 
     case "IMPORT_CARDS": {
