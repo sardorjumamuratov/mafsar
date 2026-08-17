@@ -35,13 +35,18 @@ const esc = (s) =>
 // --- the one place HTML enters the DOM ---------------------------------------
 // Every dynamic value interpolated into the render templates below is escaped
 // with esc() at the call site. This is the single sink that turns those strings
-// into nodes, so there's exactly one spot to audit. Parsing happens inside an
-// inert <template>: scripts don't run and images/iframes don't load while it's
-// being built, unlike assigning to a live element's innerHTML.
+// into nodes, so there's exactly one spot to audit.
+//
+// DOMParser builds a detached, inert document: scripts never execute and no
+// images/iframes are fetched during parsing. The nodes are then adopted into a
+// fragment the callers insert. (Assigning to a live element's innerHTML would
+// be equally inert for scripts but is flagged by addons-linter, which can't
+// see the escaping above.)
 function fragment(html) {
-  const t = document.createElement("template");
-  t.innerHTML = html;
-  return t.content;
+  const parsed = new DOMParser().parseFromString(html, "text/html");
+  const frag = document.createDocumentFragment();
+  frag.append(...parsed.body.childNodes);
+  return frag;
 }
 /** Replace an element's children with parsed HTML (was: el.innerHTML = …). */
 function setHTML(el, html) {

@@ -61,10 +61,14 @@ async function saveGeneratedStudySet(session, generated) {
   });
 }
 
-// Chrome: open the side panel when the toolbar icon is clicked.
+// Chrome: open the side panel when the toolbar icon is clicked. The API call
+// lives in a Chrome-only module that isn't shipped to Firefox, so the Firefox
+// package contains no reference to chrome.sidePanel at all.
 chrome.runtime.onInstalled.addListener(() => {
-  if (chrome.sidePanel?.setPanelBehavior) {
-    chrome.sidePanel.setPanelBehavior({ openPanelOnActionClick: true }).catch(() => {});
+  if (chrome.sidePanel) {
+    import("./chrome-sidepanel.js")
+      .then((m) => m.openPanelOnActionClick())
+      .catch(() => {});
   }
   scheduleReminderAlarm();
   registerContextMenus();

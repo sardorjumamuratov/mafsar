@@ -23,6 +23,14 @@ const source = JSON.parse(readFileSync(join(ROOT, "manifest.json"), "utf8"));
 /** Icon sizes that ship inside the package (512 + masters are listing-only). */
 const SHIPPED_ICONS = ["icon16.png", "icon32.png", "icon48.png", "icon96.png", "icon128.png"];
 
+/**
+ * Sources that only belong in one browser's package. Keeping chrome.sidePanel
+ * out of the Firefox build means the shipped code contains no reference to an
+ * API Gecko doesn't implement; service-worker.js guards the dynamic import so
+ * the missing file is never requested there.
+ */
+const EXCLUDE = { firefox: ["src/background/chrome-sidepanel.js"], chrome: [] };
+
 function chromeManifest(m) {
   const out = structuredClone(m);
   // Firefox-only keys.
@@ -52,10 +60,12 @@ function walk(dir, out = []) {
 }
 
 /** Collect [zipPath, contents] pairs for one browser's package. */
-function collect(manifest) {
+function collect(manifest, target) {
   const files = [["manifest.json", Buffer.from(JSON.stringify(manifest, null, 2) + "\n", "utf8")]];
   for (const full of walk(join(ROOT, "src"))) {
-    files.push([relative(ROOT, full).split(sep).join("/"), readFileSync(full)]);
+    const rel = relative(ROOT, full).split(sep).join("/");
+    if (EXCLUDE[target].includes(rel)) continue;
+    files.push([rel, readFileSync(full)]);
   }
   for (const name of SHIPPED_ICONS) {
     files.push([`icons/${name}`, readFileSync(join(ROOT, "icons", name))]);
@@ -131,7 +141,7 @@ for (const [label, manifest] of [
   ["chrome", chromeManifest(source)],
   ["firefox", firefoxManifest(source)],
 ]) {
-  const files = collect(manifest);
+  const files = collect(manifest, label);
   const out = join(DIST, `mafsar-${label}-${source.version}.zip`);
   zip(files, out);
   const kb = (statSync(out).size / 1024).toFixed(1);
