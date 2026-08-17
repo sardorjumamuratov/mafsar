@@ -4,9 +4,10 @@ import type { DB } from "./db.js";
 import {
   register, login, requireAuth, signAccessToken, signRefreshToken,
 } from "./auth.js";
-import { syncSchema, registerSchema, loginSchema } from "./schema.js";
+import { syncSchema, registerSchema, loginSchema, generateSchema, gradeSchema, hypotheticalSchema, summarizeSchema } from "./schema.js";
 import { applySync, changesSince } from "./sync.js";
 import { nowISO, one } from "./db.js";
+import { generateStudySet, gradeAnswer, generateHypothetical, summarizeConversation } from "./llm.js";
 
 export function createApp(db: DB) {
   const app = new Hono<{ Variables: { userId: string } }>();
@@ -81,13 +82,27 @@ export function createApp(db: DB) {
     return c.json({ serverTime, ...(await changesSince(db, userId, body.since)) });
   });
 
-  // --- Phase 2: LLM proxy (mode-aware) — TODO ---
-  app.post("/v1/generate", (c) =>
-    c.json({ error: "not_implemented", phase: 2, todo: "transcript/sourceText -> flashcards + quiz + summary" }, 501));
-  app.post("/v1/grade", (c) =>
-    c.json({ error: "not_implemented", phase: 2, todo: "AI short-answer / IRAC grading" }, 501));
-  app.post("/v1/hypothetical", (c) =>
-    c.json({ error: "not_implemented", phase: 2, todo: "fresh fact-pattern for adaptive practice" }, 501));
+  // --- Phase 2: LLM proxy (server key, grounded in user-supplied source) ---
+  app.post("/v1/generate", async (c) => {
+    const body = generateSchema.parse(await c.req.json());
+    const generated = await generateStudySet(body.messages);
+    return c.json(generated);
+  });
+
+  app.post("/v1/grade", async (c) => {
+    const body = gradeSchema.parse(await c.req.json());
+    return c.json(await gradeAnswer(body.question, body.reference, body.answer));
+  });
+
+  app.post("/v1/hypothetical", async (c) => {
+    const body = hypotheticalSchema.parse(await c.req.json());
+    return c.json(await generateHypothetical(body.concept, body.reference));
+  });
+
+  app.post("/v1/summarize", async (c) => {
+    const body = summarizeSchema.parse(await c.req.json());
+    return c.json(await summarizeConversation(body.messages));
+  });
 
   // --- Phase 3: analytics — TODO ---
   app.get("/v1/insights", (c) =>

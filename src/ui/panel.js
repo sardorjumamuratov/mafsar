@@ -205,14 +205,6 @@ async function renderHome() {
          <div style="font-size:12.5px;color:var(--muted);margin-top:4px">No cards due right now. Capture a chat or import a set.</div>
        </div>`;
 
-  const keyBanner =
-    !settings.apiKey && sessions.length
-      ? `<div class="help" style="display:flex;justify-content:space-between;align-items:center;gap:10px">
-           <span>Add an API key to auto-generate study sets.</span>
-           <button class="linkbtn" data-action="settings">Settings</button>
-         </div>`
-      : "";
-
   app.innerHTML = `
     <div class="view">
       <div class="ahd">
@@ -225,7 +217,6 @@ async function renderHome() {
         </div>
       </div>
 
-      ${keyBanner}
       ${heroHtml}
       ${examCard}
 
@@ -315,8 +306,9 @@ function paintDetail() {
   let body = "";
   if (!studySet) {
     body = `<div class="empty">
-        <div class="big">✨</div>This conversation isn't a study set yet.
-        <div style="margin-top:14px"><button class="btn btn-primary" data-action="make-set" data-id="${esc(session.id)}">Generate flashcards & quiz</button></div>
+        <div class="big">✨</div>Flashcards are usually generated automatically when you save a chat.
+        <div style="font-size:12.5px;color:var(--muted);margin-top:4px">If generation failed (offline, or you weren't signed in yet), try again:</div>
+        <div style="margin-top:14px"><button class="btn btn-primary" data-action="make-set" data-id="${esc(session.id)}">Retry generation</button></div>
       </div>`;
   } else if (tab === "cards") {
     const exam = studySet.examDate
@@ -904,7 +896,6 @@ async function renderYou() {
     total += x.total;
   }
   const streak = computeStreak(activity);
-  const provider = { gemini: "Google Gemini", groq: "Groq", anthropic: "Anthropic" }[settings.provider] || settings.provider;
   const auth = await getAuth();
 
   const accountHtml = auth?.user
@@ -949,7 +940,7 @@ async function renderYou() {
         <div class="stat"><div class="v tnum">${studySets.length}</div><div class="k">Sets</div></div>
       </div>
       ${accountHtml}
-      <button class="btn btn-ghost btn-block" data-action="settings">Settings · ${esc(provider)}${settings.apiKey ? "" : " · no key"}</button>
+      <button class="btn btn-ghost btn-block" data-action="settings">Settings · reminders</button>
       <div class="listhd"><span class="t-label">Backup</span></div>
       <div style="display:flex;gap:10px">
         <button class="btn btn-ghost" style="flex:1" data-action="export-backup">⇩ Export JSON</button>
@@ -965,6 +956,7 @@ async function authSubmit(kind) {
   const password = document.getElementById("youPass")?.value;
   if (!email || !password) return toast("Enter an email and password.");
   if (password.length < 8) return toast("Password needs at least 8 characters.");
+  const wasSignedIn = !!(await getAuth())?.user;
   toast(kind === "register" ? "Creating account…" : "Signing in…");
   try {
     const user = kind === "register" ? await register(email, password) : await login(email, password);
@@ -973,7 +965,8 @@ async function authSubmit(kind) {
       const r = await syncNow();
       if (!r.skipped) toast(`Synced · ${r.pulled} item(s) from cloud`);
     } catch { /* offline is fine */ }
-    renderYou();
+    // From the first-launch gate go Home; from the You tab stay on You.
+    wasSignedIn ? renderYou() : renderHome();
   } catch (e) {
     toast(e.message);
   }
@@ -1003,7 +996,7 @@ async function captureCurrent() {
   try {
     const r = await send({ type: "SAVE_AND_GENERATE", payload: resp.session });
     if (r.generated) toast(`Saved · ${r.cards} cards generated`);
-    else if (r.reason === "no-key") toast("Saved — add an API key to generate");
+    else toast("Saved — generation failed, open the set to retry");
     else toast("Saved — generation failed");
     renderHome();
   } catch (e) {
@@ -1219,7 +1212,34 @@ nav.addEventListener("click", (e) => {
   else if (n === "you") renderYou();
 });
 
-// init
-renderHome();
-// Background sync on panel open when signed in; silent failures offline.
-syncNow().catch(() => {});
+// --- first-launch auth gate: an account is required (backend-first) ---------
+function renderAuthGate() {
+  showChrome(false);
+  app.innerHTML = `
+    <div class="view" style="justify-content:center;min-height:100%">
+      <div style="text-align:center;margin-bottom:8px">
+        <div class="wordmark" style="font-size:26px">Maf<b>sar</b></div>
+        <div style="font-size:13px;color:var(--muted);margin-top:6px;line-height:1.5">
+          Turn your AI chats into flashcards,<br>quizzes, and spaced-repetition review.
+        </div>
+      </div>
+      <div class="block" style="display:flex;flex-direction:column;gap:10px">
+        <div class="field"><label>Email</label><input id="youEmail" type="email" placeholder="you@example.com" autocomplete="email" /></div>
+        <div class="field"><label>Password</label><input id="youPass" type="password" placeholder="8+ characters" autocomplete="new-password" /></div>
+        <button class="btn btn-primary btn-block" data-action="auth-register">Create account</button>
+        <button class="btn btn-ghost btn-block" data-action="auth-signin">Sign in</button>
+      </div>
+      <div class="help" style="text-align:center">Your sets sync across devices through your account.</div>
+    </div>`;
+}
+
+// init — account required: gate first launch until signed in, then sync.
+(async function init() {
+  const auth = await getAuth();
+  if (!auth?.accessToken) {
+    renderAuthGate();
+    return;
+  }
+  renderHome();
+  syncNow().catch(() => {});
+})();

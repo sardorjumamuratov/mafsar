@@ -67,3 +67,30 @@ export const syncSchema = z.object({
   reviews: z.array(reviewSchema).default([]),
 });
 export type SyncBody = z.infer<typeof syncSchema>;
+
+// --- Phase 2: LLM proxy --------------------------------------------------------
+
+export const messageSchema = z.object({
+  role: z.enum(["user", "assistant"]),
+  text: z.string().min(1),
+});
+
+export const generateSchema = z.object({
+  messages: z.array(messageSchema).min(1),
+  title: z.string().optional(),
+});
+
+export const gradeSchema = z.object({
+  question: z.string().min(1),
+  reference: z.string().min(1),
+  answer: z.string().min(1),
+});
+
+export const hypotheticalSchema = z.object({
+  concept: z.string().min(1),
+  reference: z.string().min(1),
+});
+
+export const summarizeSchema = z.object({
+  messages: z.array(messageSchema).min(1),
+});

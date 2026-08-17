@@ -233,20 +233,32 @@ describe("sync endpoint", () => {
   });
 });
 
+describe("LLM proxy endpoints", () => {
+  it("still require a token (401 without)", async () => {
+    for (const path of ["/v1/generate", "/v1/grade", "/v1/hypothetical", "/v1/summarize"]) {
+      const res = await app.request(path, { method: "POST", headers: json, body: "{}" });
+      expect(res.status, path).toBe(401);
+    }
+  });
+
+  it("rejects malformed bodies with 400", async () => {
+    const { token } = await newUser("llmval@mafsar.dev");
+    const res = await app.request("/v1/grade", {
+      method: "POST", headers: auth(token), body: JSON.stringify({ question: "" }),
+    });
+    expect(res.status).toBe(400);
+  });
+});
+
 describe("later-phase stubs", () => {
   it("return documented 501s", async () => {
     const { token } = await newUser("stub@mafsar.dev");
     for (const [method, path] of [
-      ["POST", "/v1/generate"],
-      ["POST", "/v1/grade"],
-      ["POST", "/v1/hypothetical"],
       ["GET", "/v1/insights"],
       ["POST", "/v1/teams"],
     ] as const) {
       const res = await app.request(path, { method, headers: auth(token), ...(method !== "GET" ? { body: "{}" } : {}) });
       expect(res.status, `${method} ${path}`).toBe(501);
-      const body = await res.json();
-      expect(body.error).toBe("not_implemented");
     }
   });
 });

@@ -31,9 +31,11 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 22
-      # Pure-logic suite for the extension (readiness math, SM-2 clamping,
-      # weak-topic ranking).
+      # Pure-logic suites for the extension (readiness math, SM-2 clamping,
+      # weak-topic ranking, sync mapping, store tombstones/regression).
       - run: node tests/client-logic.test.mjs
+      - run: node tests/sync-map.test.mjs
+      - run: node tests/store.test.mjs
       # Syntax-check every extension source file.
       - run: |
           fail=0

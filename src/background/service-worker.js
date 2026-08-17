@@ -1,5 +1,6 @@
-// Background service worker (ES module). Orchestrates capture storage and LLM
-// generation, and opens the side panel when the toolbar icon is clicked.
+// Background service worker (ES module). Orchestrates capture storage and
+// generation through the Mafsar backend (server-side LLM key), and opens the
+// side panel when the toolbar icon is clicked.
 
 import {
   getSettings,
@@ -12,11 +13,52 @@ import {
 } from "../storage/store.js";
 import { initSchedule, isDue } from "../storage/srs.js";
 import {
-  generateStudySet,
-  gradeAnswer,
-  generateHypothetical,
-  summarizeConversation,
-} from "../llm/generate.js";
+  backendGenerate,
+  backendGrade,
+  backendHypothetical,
+  backendSummarize,
+} from "../sync/api.js";
+
+/** Generate a study set for a captured session via the backend. */
+async function generateForSession(session) {
+  const generated = await backendGenerate(session.messages, session.title);
+  const now = Date.now();
+  // Attach client-side SM-2 scheduling + ids to the server's cards.
+  generated.flashcards = (generated.flashcards || []).map((c) => ({
+    id: uid(),
+    front: String(c.front),
+    back: String(c.back),
+    updatedAt: new Date(now).toISOString(),
+    ...initSchedule(now),
+  }));
+  generated.quiz = (generated.quiz || []).map((q) => ({
+    id: uid(),
+    q: String(q.q),
+    options: q.options.map(String),
+    answer: Math.max(0, Math.min(q.options.length - 1, Number(q.answer) || 0)),
+    explain: q.explain ? String(q.explain) : "",
+    updatedAt: new Date(now).toISOString(),
+  }));
+  return generated;
+}
+
+/**
+ * Save generated content WITHOUT wiping fields the user already set on the set
+ * (examDate, mode, summary) — regeneration used to lose them.
+ */
+async function saveGeneratedStudySet(session, generated) {
+  const existing = await getStudySetForSession(session.id);
+  return saveStudySet({
+    sessionId: session.id,
+    title: existing?.title ?? session.title,
+    mode: existing?.mode,
+    examDate: existing?.examDate ?? null,
+    summary: existing?.summary,
+    createdAt: existing?.createdAt ?? Date.now(),
+    flashcards: generated.flashcards,
+    quiz: generated.quiz,
+  });
+}
 
 // Chrome: open the side panel when the toolbar icon is clicked.
 chrome.runtime.onInstalled.addListener(() => {
@@ -95,27 +137,12 @@ async function handle(msg) {
 
     case "SAVE_AND_GENERATE": {
       // The "Save to Mafsar" page action: store the conversation, then generate
-      // flashcards + quiz automatically if an API key is configured.
+      // flashcards + quiz via the backend (server-side API key).
       const session = await addSession(msg.payload);
-      const settings = await getSettings();
-      if (!settings.apiKey) {
-        return { session, generated: false, reason: "no-key" };
-      }
       try {
-        const generated = await generateStudySet(settings, session);
-        const studySet = await saveStudySet({
-          sessionId: session.id,
-          title: session.title,
-          createdAt: Date.now(),
-          flashcards: generated.flashcards,
-          quiz: generated.quiz,
-        });
-        return {
-          session,
-          generated: true,
-          cards: studySet.flashcards.length,
-          quiz: studySet.quiz.length,
-        };
+        const generated = await generateForSession(session);
+        const studySet = await saveGeneratedStudySet(session, generated);
+        return { session, generated: true, cards: studySet.flashcards.length, quiz: studySet.quiz.length };
       } catch (e) {
         return { session, generated: false, reason: e?.message || "generation-failed" };
       }
@@ -164,36 +191,27 @@ async function handle(msg) {
     }
 
     case "GENERATE_STUDY_SET": {
-      const settings = await getSettings();
       const sessions = await getSessions();
       const session = sessions.find((s) => s.id === msg.sessionId);
       if (!session) throw new Error("Session not found.");
-      const generated = await generateStudySet(settings, session);
-      const studySet = await saveStudySet({
-        sessionId: session.id,
-        title: session.title,
-        createdAt: Date.now(),
-        flashcards: generated.flashcards,
-        quiz: generated.quiz,
-      });
+      const generated = await generateForSession(session);
+      const studySet = await saveGeneratedStudySet(session, generated);
       return { studySet };
     }
 
     // AI short-answer grading — grounded strictly in the reference material.
     case "GRADE_ANSWER": {
-      const settings = await getSettings();
-      const result = await gradeAnswer(settings, {
+      const grading = await backendGrade({
         question: String(msg.question || ""),
         reference: String(msg.reference || ""),
         answer: String(msg.answer || ""),
       });
-      return { grading: result };
+      return { grading };
     }
 
     // Fresh application exercise for a concept — new scenario every call.
     case "GENERATE_HYPOTHETICAL": {
-      const settings = await getSettings();
-      const hypothetical = await generateHypothetical(settings, {
+      const hypothetical = await backendHypothetical({
         concept: String(msg.concept || ""),
         reference: String(msg.reference || ""),
       });
@@ -202,13 +220,12 @@ async function handle(msg) {
 
     // Conversation TL;DR + key points, stored on the study set.
     case "SUMMARIZE": {
-      const settings = await getSettings();
       const sessions = await getSessions();
       const session = sessions.find((s) => s.id === msg.sessionId);
       if (!session) throw new Error("Session not found.");
       const existing = await getStudySetForSession(session.id);
       if (!existing) throw new Error("Generate flashcards first.");
-      const summary = await summarizeConversation(settings, session);
+      const summary = await backendSummarize(session.messages);
       existing.summary = summary;
       await saveStudySet(existing);
       return { summary };

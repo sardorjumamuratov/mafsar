@@ -28,27 +28,19 @@
         font-weight: 600;
         margin: 18px 0 6px;
       }
-      input,
-      select {
-        width: 100%;
+      .row {
+        display: flex;
+        gap: 10px;
+        align-items: center;
+        margin-top: 6px;
+      }
+      input[type="time"] {
         padding: 9px 11px;
         font: inherit;
         border: 1px solid rgba(128, 128, 128, 0.4);
         border-radius: 8px;
         background: transparent;
         color: inherit;
-        box-sizing: border-box;
-      }
-      .hint {
-        font-size: 12px;
-        opacity: 0.7;
-        margin-top: 6px;
-      }
-      .row {
-        display: flex;
-        gap: 10px;
-        align-items: center;
-        margin-top: 24px;
       }
       button {
         padding: 9px 18px;
@@ -66,9 +58,6 @@
         font-size: 13px;
         opacity: 0.85;
       }
-      a {
-        color: var(--accent);
-      }
       .note {
         margin-top: 26px;
         padding: 11px 13px;
@@ -84,38 +73,22 @@
     <h1>Mafsar settings</h1>
     <p class="sub">Turn your AI chat learning sessions into flashcards & quizzes.</p>
 
-    <label for="provider">AI provider</label>
-    <select id="provider">
-      <option value="gemini">Google Gemini — free ✓ (recommended)</option>
-      <option value="groq">Groq / Llama — free ✓ (fast)</option>
-      <option value="anthropic">Anthropic Claude — paid (best quality)</option>
-    </select>
-
-    <label for="apiKey">API key</label>
-    <input id="apiKey" type="password" placeholder="paste your key…" autocomplete="off" />
-    <div class="hint" id="keyHint"></div>
-
-    <label for="model">Model</label>
-    <input id="model" type="text" placeholder="model id" autocomplete="off" list="modelList" />
-    <datalist id="modelList"></datalist>
-    <div class="hint">Pick from the list or type any model id. If one model is out of free quota, try another.</div>
-
     <label for="reminders">Daily study reminder</label>
-    <div class="row" style="margin-top:6px">
-      <input id="reminders" type="checkbox" style="width:auto" />
+    <div class="row">
+      <input id="reminders" type="checkbox" />
       <span>Remind me at</span>
-      <input id="remindTime" type="time" style="width:auto" />
-      <span class="hint" style="margin:0">if cards are due</span>
+      <input id="remindTime" type="time" />
+      <span style="opacity: 0.7">if cards are due</span>
     </div>
 
-    <div class="row">
+    <div class="row" style="margin-top: 24px">
       <button id="save">Save</button>
       <span id="status"></span>
     </div>
 
     <div class="note">
-      Your key is stored <b>locally in this browser only</b>. Free providers may use
-      submitted text to improve their models — don't capture sensitive conversations.
+      Generation and grading run on the Mafsar cloud with your account — no API key needed.
+      Your account and sync settings live in the extension panel under <b>You</b>.
     </div>
 
     <script type="module" src="options.js"></script>

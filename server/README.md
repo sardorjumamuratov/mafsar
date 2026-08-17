@@ -67,6 +67,17 @@ Semantics:
 
 First sync: omit `since` to receive all data. Subsequently pass the `serverTime` from the previous response.
 
+## Phase 2 — LLM proxy (live)
+
+The extension no longer holds an API key; generation and grading run server-side with the `LLM_PROVIDER` + `LLM_API_KEY` env vars (Gemini / Groq / Anthropic, optional `LLM_MODEL`). All routes require a Bearer token:
+
+- `POST /v1/generate` `{ messages: [{role, text}] }` → `{ flashcards: [{id, front, back}], quiz: [{id, q, options, answer, explain}] }`
+- `POST /v1/grade` `{ question, reference, answer }` → `{ score, correct, feedback }`
+- `POST /v1/hypothetical` `{ concept, reference }` → `{ scenario, rubric }`
+- `POST /v1/summarize` `{ messages }` → `{ summary, keyPoints }`
+
+Grounding rules are enforced in the prompts: judge/generate only from user-supplied content; never fabricate citations or facts.
+
 ## Deploy (Railway + Turso)
 
 The server is stateless: it talks to Turso (hosted libSQL) over the network, so redeploys can't lose data and no volume is needed. Local dev falls back to a file (`file:mafsar.db`) automatically.
