@@ -996,8 +996,8 @@ async function captureCurrent() {
   try {
     const r = await send({ type: "SAVE_AND_GENERATE", payload: resp.session });
     if (r.generated) toast(`Saved · ${r.cards} cards generated`);
-    else toast("Saved — generation failed, open the set to retry");
-    else toast("Saved — generation failed");
+    else if (r.reason === "no-key") toast("Saved — add an API key to generate");
+    else toast("Saved — generation failed; open the set to retry");
     renderHome();
   } catch (e) {
     toast(e.message);
