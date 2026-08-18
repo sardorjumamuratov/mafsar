@@ -404,11 +404,17 @@ body {
   font-weight: 600;
   line-height: 1.3;
 }
-.setrow .prog-line {
+/* Used inside .setrow and in the set-detail / exam blocks — the rule used to be
+   scoped to .setrow, so the two spans ran together everywhere else. */
+.prog-line {
   display: flex;
   justify-content: space-between;
-  font-size: 11px;
+  align-items: center;
+  gap: 12px;
   color: var(--muted);
+}
+.setrow .prog-line {
+  font-size: 11px;
 }
 
 /* --- segmented tabs --- */
@@ -892,52 +898,146 @@ body {
   }
 }
 
-/* --- exam date + readiness --- */
-.exam-card {
+/* --- quiz length picker --- */
+.qlens {
   display: flex;
-  align-items: center;
-  gap: 12px;
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: var(--r-md);
-  padding: 12px 14px;
-  cursor: pointer;
+  gap: 8px;
+  margin-bottom: 12px;
 }
-.exam-card:hover {
+.qlen {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 9px 6px;
+  border: 1px solid var(--border);
+  border-radius: var(--r-sm);
+  background: var(--surface);
+  cursor: pointer;
+  color: var(--muted);
+  font: inherit;
+  transition: border-color 0.15s, background 0.15s, color 0.15s;
+}
+.qlen:hover {
   border-color: var(--primary);
 }
+.qlen:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: 2px;
+}
+.qlen.on {
+  border-color: var(--primary);
+  background: var(--primary-soft);
+  color: var(--primary);
+}
+.qlen .l {
+  font-size: 12.5px;
+  font-weight: 620;
+}
+.qlen.on .l {
+  color: var(--primary);
+}
+.qlen .n {
+  font-size: 10.5px;
+  color: var(--faint);
+}
+.qlen.on .n {
+  color: var(--primary);
+}
+
+/* --- exam date + readiness --- */
 .exam-ic {
   font-size: 20px;
 }
-.exam-title {
-  font-weight: 650;
-  font-size: 13.5px;
-  color: var(--ink);
-  max-width: 170px;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
+/* Exam block: stacked rows rather than one crowded flex line. The native date
+   field can't shrink gracefully, so it gets a labeled row of its own. */
+.exam-live {
+  display: flex;
+  flex-direction: column;
+  gap: 11px;
 }
-.exam-card .sub {
-  font-size: 12px;
+.exam-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.exam-head[role="button"] {
+  cursor: pointer;
+  border-radius: var(--r-sm);
+}
+.exam-head[role="button"]:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: 3px;
+}
+.exam-head-txt {
+  flex: 1;
+  min-width: 0;
+}
+.exam-head-txt .sub {
+  font-size: 12.5px;
+  color: var(--muted);
+  margin-top: 1px;
+}
+.exam-head .chev {
+  width: 18px;
+  height: 18px;
+  color: var(--faint);
+  flex: none;
+}
+.pill {
+  flex: none;
+  padding: 3px 9px;
+  border-radius: 999px;
+  font-size: 11.5px;
+  font-weight: 620;
+  white-space: nowrap;
+}
+.pill.ok {
+  background: var(--success-soft);
+  color: var(--success);
+}
+.pill.warn {
+  background: var(--warm-soft);
+  color: var(--warm);
+}
+.date-field {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding-top: 2px;
+  font-size: 12.5px;
   color: var(--muted);
 }
-.exam-card .tag {
-  margin-left: auto;
-  white-space: nowrap;
-}
 .date-input {
-  padding: 6px 9px;
+  padding: 7px 10px;
   font: inherit;
   font-size: 13px;
-  color: inherit;
-  background: var(--surface);
+  color: var(--ink);
+  background: var(--surface-2);
   border: 1px solid var(--border);
-  border-radius: var(--r-md);
+  border-radius: var(--r-sm);
 }
+.date-input:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: 1px;
+}
+.exam-actions {
+  display: flex;
+  gap: 8px;
+}
+.exam-actions .btn {
+  flex: 1;
+}
+.btn-sm {
+  padding: 7px 10px;
+  font-size: 12.5px;
+}
+/* Three cells, not four — at 380px a fourth column wraps its label. Status
+   moved up to the header pill. */
 .readiness {
   display: grid;
-  grid-template-columns: repeat(4, 1fr);
+  grid-template-columns: repeat(3, 1fr);
   gap: 6px;
   text-align: center;
 }

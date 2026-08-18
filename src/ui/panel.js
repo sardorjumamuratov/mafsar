@@ -52,6 +52,14 @@ function fragment(html) {
 function setHTML(el, html) {
   el.replaceChildren(fragment(html));
 }
+/**
+ * New *view* renders call this to start at the title — #app keeps its scroll
+ * offset across setHTML. In-place repaints (grading, flipping, editing a card)
+ * must NOT call it: the user's position is part of that interaction.
+ */
+function topOfView() {
+  app.scrollTop = 0;
+}
 /** Replace the element itself with parsed HTML (was: el.outerHTML = …). */
 function replaceHTML(el, html) {
   el.replaceWith(fragment(html));
@@ -205,30 +213,46 @@ async function renderHome() {
   const exam = examDate
     ? examReadiness({ examDate, total: totals.total, mastered: totals.mastered, due: totals.due })
     : null;
+  const behind = exam?.status === "behind" || exam?.status === "today";
+  // The date input gets its own labeled row rather than competing with the
+  // heading in a flex row — a native date field can't be shrunk gracefully.
   const examCard = exam
-    ? `<div class="block" style="display:flex;flex-direction:column;gap:9px">
-         <div style="display:flex;align-items:center;gap:10px">
-           <span style="font-size:18px">🎯</span>
-           <div style="flex:1;min-width:0">
+    ? `<div class="block exam-live">
+         <div class="exam-head">
+           <span class="exam-ic">🎯</span>
+           <div class="exam-head-txt">
              <div class="t-label">${examDaysLeft(examDate)}</div>
-             <div style="font-size:12.5px;color:var(--muted)">${totals.total} cards · ${examSets.length} set${examSets.length === 1 ? "" : "s"} · ${exam.dailyTarget}/day to finish</div>
+             <div class="sub">${totals.total} card${totals.total === 1 ? "" : "s"} · ${examSets.length} set${examSets.length === 1 ? "" : "s"}</div>
            </div>
-           <input type="date" id="homeExamDate" class="date-input" value="${dateInputValue(examDate)}" />
+           <span class="pill ${behind ? "warn" : "ok"}">${behind ? "Behind" : "On track"}</span>
          </div>
          <div class="bar ${exam.progress === 100 ? "ok" : ""}"><i style="width:${totals.total ? exam.progress : 0}%"></i></div>
          <div class="prog-line" style="font-size:12px">
-           <span style="color:${exam.status === "behind" ? "var(--warm)" : "var(--success)"};font-weight:600">${exam.progress}% ready · ${exam.status === "behind" ? "behind" : "on track"}</span>
-           <span style="display:flex;gap:10px">
-             <button class="linkbtn" data-action="exam-pick">Choose sets</button>
-             <button class="linkbtn" data-action="exam-clear">Clear</button>
-           </span>
+           <span style="font-weight:600;color:var(--ink)">${exam.progress}% mastered</span>
+           <span>${exam.dailyTarget}/day to finish</span>
+         </div>
+         <label class="date-field">
+           <span>Exam date</span>
+           <input type="date" id="homeExamDate" class="date-input" value="${dateInputValue(examDate)}" />
+         </label>
+         <div class="exam-actions">
+           <button class="btn btn-ghost btn-sm" data-action="exam-pick">Choose sets</button>
+           <button class="btn btn-ghost btn-sm" data-action="exam-clear">Clear</button>
          </div>
        </div>`
-    : `<div class="exam-card" data-action="exam-pick">
-         <span class="exam-ic">🎯</span>
-         <div style="flex:1"><div class="t-label">Exam prep</div>
-           <div class="sub" style="font-size:12.5px">Set a date and pick which sets count</div></div>
-         <input type="date" id="homeExamDate" class="date-input" value="" />
+    : `<div class="block exam-live">
+         <div class="exam-head" data-action="exam-pick" role="button" tabindex="0">
+           <span class="exam-ic">🎯</span>
+           <div class="exam-head-txt">
+             <div class="t-label">Exam prep</div>
+             <div class="sub">Set a date and pick which sets count</div>
+           </div>
+           <svg class="ic chev" viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"/></svg>
+         </div>
+         <label class="date-field">
+           <span>Exam date</span>
+           <input type="date" id="homeExamDate" class="date-input" value="" />
+         </label>
        </div>`;
 
   const allCards = studySets.flatMap((s) => s.flashcards || []);
@@ -308,6 +332,7 @@ async function renderHome() {
       ${withSets.length > 4 ? `<button class="btn btn-ghost btn-block" data-action="nav-sets">View all ${withSets.length} sets</button>` : ""}
       ${reviewedToday ? `<div style="text-align:center;font-size:12px;color:var(--faint)">${reviewedToday} cards reviewed today</div>` : ""}
     </div>`);
+  topOfView();
 }
 
 // --- Exam set picker (focus view): choose which sets count toward the exam ---
@@ -353,6 +378,7 @@ async function openExamPicker() {
       </div>
       <button class="btn btn-primary btn-block" data-action="picker-save" ${withSets.length ? "" : "disabled"}>Save exam</button>
     </div>`);
+  topOfView();
   fillMissingBlurbs(withSets, studySets);
 }
 
@@ -418,6 +444,7 @@ async function renderSets() {
       }
       <button class="btn btn-ghost btn-block" data-action="capture-current">＋ Capture this page</button>
     </div>`);
+  topOfView();
 }
 
 // ================================================================ SET DETAIL
@@ -432,6 +459,7 @@ async function renderSetDetail(sessionId, tab = "cards") {
   const studySet = setFor(sessionId, studySets);
   detail = { session, studySet, tab };
   paintDetail();
+  topOfView(); // new view (also covers tab switches); paintDetail repaints must not reset
 }
 
 function paintDetail() {
@@ -458,12 +486,21 @@ function paintDetail() {
     const examPanel = `
       ${
         exam
-          ? `<div class="block" style="display:flex;flex-direction:column;gap:10px">
+          ? `<div class="block exam-live">
+               <div class="exam-head">
+                 <span class="exam-ic">🎯</span>
+                 <div class="exam-head-txt">
+                   <div class="t-label">${exam.daysLeft < 0 ? "Exam passed" : exam.daysLeft === 0 ? "Exam today" : `${exam.daysLeft} day${exam.daysLeft === 1 ? "" : "s"} to go`}</div>
+                   <div class="sub">${s.total} card${s.total === 1 ? "" : "s"} in this set</div>
+                 </div>
+                 <span class="pill ${statusColor === "var(--warm)" ? "warn" : "ok"}"
+                       title="On track = the daily pace below is sustainable (20 cards/day or fewer). Behind = it isn't, or the exam is within 2 days with most of the set unmastered.">${statusLabel}</span>
+               </div>
+               <div class="bar ${s.progress === 100 ? "ok" : ""}"><i style="width:${s.progress}%"></i></div>
                <div class="readiness">
-                 <div class="r-cell"><div class="v tnum">${exam.daysLeft < 0 ? "—" : exam.daysLeft}</div><div class="k">days left</div></div>
-                 <div class="r-cell"><div class="v tnum">${s.progress}%</div><div class="k">ready</div></div>
-                 <div class="r-cell"><div class="v tnum">${exam.status === "past" ? "—" : exam.dailyTarget}</div><div class="k">cards/day</div></div>
-                 <div class="r-cell"><div class="v" style="font-size:12px;color:${statusColor}">${statusLabel}</div><div class="k">status</div></div>
+                 <div class="r-cell" title="Share of this set's cards you've mastered."><div class="v tnum">${s.progress}%</div><div class="k">mastered</div></div>
+                 <div class="r-cell" title="Cards left to master ÷ days left."><div class="v tnum">${exam.status === "past" ? "—" : exam.dailyTarget}</div><div class="k">cards/day</div></div>
+                 <div class="r-cell" title="Cards scheduled for review right now."><div class="v tnum">${s.due}</div><div class="k">due now</div></div>
                </div>
              </div>`
           : `<div class="help" style="margin:0">Set an exam date on Home and pick this set to get a countdown, daily target, and pre-exam resurfacing.</div>`
@@ -487,6 +524,7 @@ function paintDetail() {
         <div class="m learn"><div class="v tnum">${s.learning}</div><div class="k">Learning</div></div>
         <div class="m mast"><div class="v tnum">${s.mastered}</div><div class="k">Mastered</div></div>
       </div>
+      <div class="help" style="margin:0">New → <b>Learning</b> after one correct review → <b>Mastered</b> once it is on a 6+ day interval (about a week of good grades). <i>Again</i> brings a card back later in this session and resets its schedule.</div>
       ${editForm}
       <div class="block" style="padding:6px 14px">
         ${
@@ -513,14 +551,43 @@ function paintDetail() {
       <!-- Export paused while import-from-Anki/Quizlet ships:
       <button class="btn btn-ghost btn-block" data-action="export-tsv" data-id="${esc(session.id)}">⇩ Export to Anki/CSV</button> -->`;
   } else if (tab === "quiz") {
-    body = studySet.quiz?.length
+    const available = studySet.quiz?.length || 0;
+    // Length is a share of the SET, capped by the questions we actually have.
+    // Under 20 cards a picker is noise — just sit the whole thing. Quick is
+    // preselected: a short quiz you finish beats a long one you abandon.
+    const lengths = (s.total >= 20 ? [[0.1, "Quick"], [0.5, "Half"], [1, "Full"]] : [[1, "Full"]])
+      .map(([pct, label]) => {
+        const n = Math.max(1, Math.min(available, Math.round(s.total * pct)));
+        // Sets generated before quizzes scaled with card count have far fewer
+        // questions than cards, so a share can land on "all of them" — say so.
+        return [n === available ? "Full" : label, n];
+      })
+      .filter(([, n], i, all) => all.findIndex(([, m]) => m === n) === i); // collapse ties
+
+    body = available
       ? `<div class="block" style="text-align:center">
-           <div style="font-weight:650">${studySet.quiz.length}-question quiz</div>
-           <div style="font-size:12.5px;color:var(--muted);margin:6px 0 14px">Test recall with multiple choice.</div>
-           <button class="btn btn-primary btn-block" data-action="start-quiz">Start quiz</button>
+           <div style="font-weight:650">Multiple-choice quiz</div>
+           <div style="font-size:12.5px;color:var(--muted);margin:6px 0 14px">Questions and options are shuffled every sitting.</div>
+           ${
+             lengths.length > 1
+               ? `<div class="qlens" role="group" aria-label="Quiz length">
+                    ${lengths
+                      .map(
+                        ([label, n], i) =>
+                          `<button class="qlen${i === 0 ? " on" : ""}" data-action="quiz-len" data-n="${n}" aria-pressed="${i === 0}">
+                             <span class="l">${label}</span><span class="n tnum">${n} question${n === 1 ? "" : "s"}</span>
+                           </button>`
+                      )
+                      .join("")}
+                  </div>`
+               : ""
+           }
+           <button class="btn btn-primary btn-block" data-action="start-quiz" data-n="${lengths[0][1]}">Start quiz</button>
          </div>`
       : `<div class="empty">No quiz for this set.<br>${
-          session.source === "quizlet" ? "Imported sets are flashcards only." : "Regenerate to add one."
+          session.source === "quizlet"
+            ? "Imported sets are flashcards only."
+            : "Tap <b>↻ Regenerate</b> (top right) — fresh sets scale the quiz with the cards."
         }</div>`;
   } else {
     // summary
@@ -556,7 +623,12 @@ function paintDetail() {
     <div class="view">
       <div class="ahd">
         <button class="iconbtn" data-action="nav-home" aria-label="Back"><svg class="ic" viewBox="0 0 24 24"><path d="M15 6l-6 6 6 6"/></svg></button>
-        ${studySet ? `<span class="tag">${s.total} cards</span>` : ""}
+        <span style="flex:1"></span>
+        ${
+          studySet
+            ? `<button class="linkbtn" data-action="make-set" data-id="${esc(session.id)}" title="Regenerate flashcards and quiz from the source — matching cards keep their review schedule">↻ Regenerate</button>`
+            : `<span class="tag">${s.total} cards</span>`
+        }
       </div>
       <div><div class="h-title" style="line-height:1.25">${esc(session.title || "Untitled")}</div>
         <div style="display:flex;gap:6px;margin-top:8px"><span class="tag dot" style="color:var(--primary)">${esc(sourceLabel(session))}</span></div>
@@ -577,13 +649,25 @@ function paintDetail() {
       ${body}
     </div>
     ${
-      studySet && tab === "cards" && s.due
-        ? `<div class="footer-cta"><button class="btn btn-primary btn-block" data-action="set-review" data-id="${esc(session.id)}">Review ${s.due} due</button></div>`
+      studySet && tab === "cards" && s.total
+        ? `<div class="footer-cta"><button class="btn btn-primary btn-block" data-action="set-review" data-id="${esc(session.id)}">${
+            s.due ? `Review ${s.due} due` : `Study ahead · ${s.total} cards`
+          }</button></div>`
         : ""
     }`);
 }
 
 async function makeSet(sessionId) {
+  // Regenerating an existing set replaces its cards — warn first. Cards whose
+  // fronts survive the regen keep their SM-2 schedule (service worker).
+  const { studySets } = await bundle();
+  if (setFor(sessionId, studySets)) {
+    const okToReplace = confirm(
+      "Regenerate this set from its source?\n\n" +
+        "Existing cards and quiz questions are replaced. Cards that come back with the same front keep their review schedule; everything else starts fresh. Your exam date and summary are kept."
+    );
+    if (!okToReplace) return;
+  }
   showChrome(false);
   setHTML(app, `
     <div class="view">
@@ -595,6 +679,7 @@ async function makeSet(sessionId) {
       </div>
       <div class="block"><div class="help">This can take 5–15 seconds.</div></div>
     </div>`);
+  topOfView();
   try {
     await send({ type: "GENERATE_STUDY_SET", sessionId });
     toast("Study set ready!");
@@ -610,10 +695,14 @@ async function makeSet(sessionId) {
 let queue = [],
   qIdx = 0,
   focusReturn = "home";
+// Distinct cards graded this sitting. Not queue.length — relearning requeues a
+// lapsed card, which would otherwise count it twice on the done screen.
+const reviewedIds = new Set();
 
 function startReview(items, ret) {
   queue = items;
   qIdx = 0;
+  reviewedIds.clear();
   focusReturn = ret;
   showChrome(false);
   paintReviewCard();
@@ -667,7 +756,16 @@ async function gradeCard(g) {
       prevInterval, newInterval: upd.interval, reviewedAt: new Date().toISOString(),
     }),
   ]);
+  reviewedIds.add(item.card.id);
   qIdx++;
+  // Relearning step: a lapsed card comes back a few positions later in this
+  // sitting (Anki-style), so "Again" does not hide it until tomorrow. The
+  // STORED schedule stays day-level (+1 day) for future sessions. Capped at 2
+  // requeues per card so an endless "Again" loop cannot stall the session.
+  if (g < 3 && (item.relearns || 0) < 2) {
+    item.relearns = (item.relearns || 0) + 1;
+    queue.splice(Math.min(qIdx + 3, queue.length), 0, item);
+  }
   paintReviewCard();
 }
 
@@ -834,17 +932,36 @@ async function checkTyped() {
   }
 }
 
-function paintReviewDone() {
+async function paintReviewDone() {
   showChrome(false);
-  setHTML(app, `
-    <div class="view">
-      <div class="done-msg"><div class="big">🎉</div>
-        <div style="font-weight:650;color:var(--ink)">Review complete</div>
-        <div style="margin-top:4px">${queue.length} card${queue.length === 1 ? "" : "s"} reviewed.</div>
-      </div>
-      <button class="btn btn-primary btn-block" data-action="return-focus">Done</button>
-    </div>`);
+  const reviewed = reviewedIds.size || queue.length;
   syncNow().catch(() => {}); // push grades + pull changes after a session
+
+  const paint = (cta) =>
+    setHTML(app, `
+      <div class="view">
+        <div class="done-msg"><div class="big">🎉</div>
+          <div style="font-weight:650;color:var(--ink)">Review complete</div>
+          <div style="margin-top:4px">${reviewed} card${reviewed === 1 ? "" : "s"} reviewed.</div>
+        </div>
+        ${cta}
+        <button class="btn btn-${cta ? "ghost" : "primary"} btn-block" data-action="return-focus">Done</button>
+      </div>`);
+
+  paint("");
+
+  // Recognition (flashcards) then recall under pressure (quiz) is the natural
+  // next step — offer it, but only when the whole queue came from one set.
+  const ids = [...new Set(queue.map((i) => i.sessionId))];
+  if (ids.length !== 1) return;
+  const { studySets } = await bundle();
+  const set = setFor(ids[0], studySets);
+  if (!set?.quiz?.length) return;
+  const n = quickQuizLen(set); // must match what the button actually launches
+  paint(
+    `<div class="help" style="margin:0 0 10px;text-align:center">You've seen the answers — now try recalling them cold.</div>
+     <button class="btn btn-primary btn-block" data-action="quiz-after-review" data-id="${esc(ids[0])}">Take a quick quiz · ${n} question${n === 1 ? "" : "s"}</button>`
+  );
 }
 
 // ================================================================ QUIZ (focus)
@@ -852,8 +969,40 @@ let quizSet = null,
   quizIdx = 0,
   quizScore = 0;
 
-function startQuiz(studySet, ret) {
-  quizSet = studySet;
+/** Default quiz length: ~10% of a big set, the whole thing for a small one. */
+function quickQuizLen(studySet) {
+  const total = studySet.flashcards?.length || 0;
+  const available = studySet.quiz?.length || 0;
+  if (total < 20) return available;
+  return Math.max(1, Math.min(available, Math.round(total * 0.1)));
+}
+
+/** Fisher-Yates on a copy. */
+function shuffled(arr) {
+  const a = arr.slice();
+  for (let i = a.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [a[i], a[j]] = [a[j], a[i]];
+  }
+  return a;
+}
+
+/**
+ * Randomize question order AND option order for one sitting. The stored quiz is
+ * untouched — models tend to park the correct answer in the same slot, so
+ * without this the answer key is learnable instead of the material.
+ */
+function shuffleQuiz(questions) {
+  return shuffled(questions).map((q) => {
+    const order = shuffled(q.options.map((_, i) => i));
+    return { ...q, options: order.map((i) => q.options[i]), answer: order.indexOf(q.answer) };
+  });
+}
+
+function startQuiz(studySet, ret, limit) {
+  // Shuffle first, then slice — a Quick quiz draws a different sample each time.
+  const qs = shuffleQuiz(studySet.quiz || []);
+  quizSet = { quiz: limit > 0 ? qs.slice(0, limit) : qs };
   quizIdx = 0;
   quizScore = 0;
   focusReturn = ret;
@@ -998,6 +1147,7 @@ function renderImport() {
         <button class="btn btn-primary" style="flex:1" data-action="import-save">Import</button>
       </div>
     </div>`);
+  topOfView();
 }
 function previewImport() {
   const cards = importCards();
@@ -1050,6 +1200,7 @@ function renderTeams() {
       </div>
       <button class="btn btn-ghost btn-block" disabled>Create a team</button>
     </div>`);
+  topOfView();
 }
 
 async function renderYou() {
@@ -1116,6 +1267,7 @@ async function renderYou() {
       </div>
       <input type="file" id="backupFile" accept="application/json,.json" class="hidden" />
     </div>`);
+  topOfView();
 }
 
 // --- account actions ---------------------------------------------------------
@@ -1240,7 +1392,25 @@ document.addEventListener("click", (e) => {
       })();
       break;
     case "picker-save": saveExamSelection(); break;
-    case "start-quiz": startQuiz(detail.studySet, "set:" + detail.session.id); break;
+    case "quiz-len":
+      app.querySelectorAll(".qlen").forEach((b) => {
+        const on = b === t;
+        b.classList.toggle("on", on);
+        b.setAttribute("aria-pressed", String(on));
+      });
+      app.querySelector('[data-action="start-quiz"]').dataset.n = t.dataset.n;
+      break;
+    case "start-quiz":
+      startQuiz(detail.studySet, "set:" + detail.session.id, Number(t.dataset.n) || 0);
+      break;
+    case "quiz-after-review":
+      (async () => {
+        const id = t.dataset.id;
+        const { studySets } = await bundle();
+        const set = setFor(id, studySets);
+        if (set?.quiz?.length) startQuiz(set, "set:" + id, quickQuizLen(set));
+      })();
+      break;
     case "quiz-opt": answerQuiz(Number(t.dataset.i)); break;
     case "quiz-next": quizIdx++; paintQuizQ(); break;
     case "import-preview": previewImport(); break;
@@ -1270,9 +1440,13 @@ async function startGlobalReview() {
 async function startSetReview(sessionId) {
   const { studySets } = await bundle();
   const set = setFor(sessionId, studySets);
-  const items = (set?.flashcards || []).filter((c) => isDue(c)).map((card) => ({ sessionId, card, examDate: set.examDate }));
+  // Due cards first; if none are due yet, fall through to studying ahead
+  // (still applies SM-2 normally) so the button always does something.
+  const due = (set?.flashcards || []).filter((c) => isDue(c));
+  const pool = due.length ? due : set?.flashcards || [];
+  const items = pool.map((card) => ({ sessionId, card, examDate: set?.examDate }));
   items.sort((a, b) => byDue(a.card, b.card));
-  if (!items.length) return toast("Nothing due in this set.");
+  if (!items.length) return toast("No cards in this set.");
   startReview(items, "set:" + sessionId);
 }
 
@@ -1454,6 +1628,7 @@ function renderAuthGate() {
       </div>
       <div class="help" style="text-align:center">Your sets sync across devices through your account.</div>
     </div>`);
+  topOfView();
 }
 
 // init — account required: gate first launch until signed in, then sync.

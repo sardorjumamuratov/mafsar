@@ -24,6 +24,7 @@
         sessions: [
           { id: "sess1", source: "chatgpt", sourceLabel: "ChatGPT", title: "Torts", url: "", capturedAt: NOW - 86400000, messages: [{ role: "user", text: "negligence?" }] },
           { id: "sess2", source: "quizlet", sourceLabel: "Imported", title: "Bio ch3", url: "", capturedAt: NOW - 172800000, messages: [], importedCount: 2 },
+          { id: "sess3", source: "claude", sourceLabel: "Claude", title: "Pharmacology (big set)", url: "", capturedAt: NOW - 259200000, messages: [{ role: "user", text: "beta blockers?" }] },
         ],
         studySets: [
           {
@@ -41,6 +42,21 @@
               { id: "c3", front: "Mitochondria", back: "Powerhouse of the cell", easiness: 2.5, interval: 0, repetitions: 0, dueDate: NOW, updatedAt: "2026-08-13T09:00:00.000Z", deleted: false },
             ],
             quiz: [],
+          },
+          // 30 cards + 30 questions: exercises the quiz-length picker, which only
+          // appears at 20+ cards.
+          {
+            id: "set3", sessionId: "sess3", title: "Pharmacology (big set)", createdAt: NOW - 259200000, updatedAt: "2026-08-12T09:00:00.000Z", deleted: false,
+            flashcards: Array.from({ length: 30 }, (_, i) => ({
+              id: "bc" + i, front: "Big card " + (i + 1), back: "Answer " + (i + 1),
+              easiness: 2.5, interval: 0, repetitions: i < 6 ? 3 : 0, dueDate: NOW,
+              updatedAt: "2026-08-12T09:00:00.000Z", deleted: false,
+            })),
+            quiz: Array.from({ length: 30 }, (_, i) => ({
+              id: "bq" + i, q: "Big question " + (i + 1),
+              options: ["Right " + (i + 1), "Wrong A", "Wrong B", "Wrong C"], answer: 0,
+              explain: "Because " + (i + 1), updatedAt: "2026-08-12T09:00:00.000Z", deleted: false,
+            })),
           },
         ],
         activity: {},

@@ -49,6 +49,20 @@ async function generateForSession(session) {
  */
 async function saveGeneratedStudySet(session, generated) {
   const existing = await getStudySetForSession(session.id);
+  // A regenerated card whose front matches an old card is the same concept —
+  // keep its SM-2 schedule (easiness/interval/reps/dueDate) so review history
+  // survives a regen. New fronts start fresh; dropped fronts just vanish.
+  const byFront = new Map(
+    (existing?.flashcards || [])
+      .filter((c) => !c.deleted)
+      .map((c) => [String(c.front).trim().toLowerCase(), c])
+  );
+  const flashcards = generated.flashcards.map((c) => {
+    const old = byFront.get(String(c.front).trim().toLowerCase());
+    return old
+      ? { ...c, easiness: old.easiness, interval: old.interval, repetitions: old.repetitions, dueDate: old.dueDate }
+      : c;
+  });
   return saveStudySet({
     sessionId: session.id,
     title: existing?.title ?? session.title,
@@ -56,7 +70,7 @@ async function saveGeneratedStudySet(session, generated) {
     examDate: existing?.examDate ?? null,
     summary: existing?.summary,
     createdAt: existing?.createdAt ?? Date.now(),
-    flashcards: generated.flashcards,
+    flashcards,
     quiz: generated.quiz,
   });
 }
