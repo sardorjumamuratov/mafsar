@@ -38,7 +38,12 @@ export function review(card, grade, now = Date.now(), examDate) {
   if (easiness < 1.3) easiness = 1.3;
 
   let dueDate = now + interval * DAY_MS;
-  if (examDate && examDate > now) dueDate = Math.min(dueDate, examDate);
+  if (examDate && examDate > now) {
+    // Resurface before the exam, not at the exam minute: cap at half a day
+    // before it (a morning-of cram window). Never earlier than ~10 minutes out.
+    const latest = Math.max(examDate - DAY_MS / 2, now + 10 * 60 * 1000);
+    dueDate = Math.min(dueDate, latest);
+  }
   return { easiness: Number(easiness.toFixed(2)), interval, repetitions, dueDate };
 }
 
@@ -52,10 +57,17 @@ export function byDue(a, b) {
   return (a.dueDate ?? 0) - (b.dueDate ?? 0);
 }
 
-/** Mastery bucket for a card, derived from SM-2 repetitions. */
+/**
+ * Mastery bucket for a card. "Mastered" = survived the 1-day jump and is now
+ * sitting on a 6+ day interval (reps >= 2) — reachable within about a week,
+ * unlike the old reps >= 3 rule whose 1d→6d→15d spacing meant three weeks
+ * minimum. That made Home's "% mastered" and exam readiness read 0% no matter
+ * how well the user was doing close to an exam.
+ */
 export function masteryOf(card) {
   const reps = card.repetitions ?? 0;
-  if (reps >= 3) return "mastered";
+  const interval = card.interval ?? 0;
+  if (reps >= 3 || (reps >= 2 && interval >= 6)) return "mastered";
   if (reps >= 1) return "learning";
   return "new";
 }

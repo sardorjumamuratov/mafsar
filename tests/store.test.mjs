@@ -114,4 +114,34 @@ await test("updateCard stamps updatedAt on card and set", async () => {
   assert.ok(raw.studySets[0].updatedAt > before, "set stamped");
 });
 
-console.log(`\n${passed} tests passed`);
+console.log("SRS persistence round-trip (grade → storage → re-read)");
+
+await test("updateCard persists a graded schedule that isDue() agrees with", async () => {
+  const { review, isDue } = await import("../src/storage/srs.js");
+  const session = await store.addSession({ source: "chatgpt", title: "T", messages: [] });
+  const now = Date.now();
+  const card = { id: "c1", front: "Q", back: "A", easiness: 2.5, interval: 0, repetitions: 0, dueDate: now };
+  await store.saveStudySet({ sessionId: session.id, title: "T", flashcards: [card], quiz: [] });
+
+  // Grade "Good": dueDate moves to +1 day, so the card must stop being due.
+  const upd = review(card, 4, now);
+  await store.updateCard(session.id, "c1", upd);
+  const reread = (await store.getStudySetForSession(session.id)).flashcards[0];
+  assert.equal(reread.dueDate, upd.dueDate, "dueDate survived the storage round-trip");
+  assert.equal(reread.repetitions, 1);
+  assert.equal(reread.interval, 1);
+  assert.equal(isDue(reread, now), false, "graded card is not due at grading time");
+  assert.equal(isDue(reread, now + 25 * 60 * 60 * 1000), true, "becomes due a day later");
+
+  // Grade "Again" the next day: schedule resets, and (panel-level) requeue
+  // relies on the stored card still being findable by id.
+  const lapse = review(reread, 0, now + 26 * 60 * 60 * 1000);
+  await store.updateCard(session.id, "c1", lapse);
+  const after = (await store.getStudySetForSession(session.id)).flashcards[0];
+  assert.equal(after.repetitions, 0, "lapse persisted");
+  assert.equal(after.dueDate, lapse.dueDate);
+});
+
+
+console.log(`
+${passed} tests passed`);
