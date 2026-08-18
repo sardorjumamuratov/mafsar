@@ -33,6 +33,13 @@ interface Provider {
   extractError(d: any, status: number): string;
 }
 
+/**
+ * A full set is up to 40 flashcards plus one quiz question each (4 options and
+ * an explanation apiece) — roughly 8k tokens of JSON. 4096 truncated it
+ * mid-object, which surfaced as a parse failure rather than a short set.
+ */
+const MAX_OUTPUT_TOKENS = 16384;
+
 const PROVIDERS: Record<string, Provider> = {
   gemini: {
     defaultModel: "gemini-2.0-flash",
@@ -43,7 +50,11 @@ const PROVIDERS: Record<string, Provider> = {
         body: {
           system_instruction: { parts: [{ text: system }] },
           contents: [{ role: "user", parts: [{ text: user }] }],
-          generationConfig: { temperature: 0.4, responseMimeType: "application/json" },
+          generationConfig: {
+            temperature: 0.4,
+            responseMimeType: "application/json",
+            maxOutputTokens: MAX_OUTPUT_TOKENS,
+          },
         },
       };
     },
@@ -61,6 +72,7 @@ const PROVIDERS: Record<string, Provider> = {
         body: {
           model,
           temperature: 0.4,
+          max_completion_tokens: MAX_OUTPUT_TOKENS,
           response_format: { type: "json_object" },
           messages: [
             { role: "system", content: system },
@@ -82,7 +94,7 @@ const PROVIDERS: Record<string, Provider> = {
           "x-api-key": apiKey,
           "anthropic-version": "2023-06-01",
         },
-        body: { model, max_tokens: 4096, system, messages: [{ role: "user", content: user }] },
+        body: { model, max_tokens: MAX_OUTPUT_TOKENS, system, messages: [{ role: "user", content: user }] },
       };
     },
     extractText: (d) => (d?.content || []).filter((b: any) => b.type === "text").map((b: any) => b.text).join(""),
@@ -124,8 +136,15 @@ durable, factual knowledge the user should remember and produce study material.
 Rules:
 - Focus on concepts, definitions, cause/effect, and facts worth remembering.
 - Ignore chit-chat, navigation, ads, boilerplate, meta-conversation, and hedging.
-- Flashcards: a short prompt on the front, a concise answer on the back.
+- Flashcards: a short prompt on the front, a concise answer on the back. Write as many as
+  the material genuinely supports, up to 40 — do not pad with trivia to hit a number.
+- Quiz: write one question per flashcard, covering that same fact, in the same order, up
+  to 40 questions. The user picks how many to sit, so a full set of questions matters.
 - Quiz: 4 options each, exactly one correct; "answer" is the 0-based index.
+- Vary which index is correct across questions — do not put the answer in the same slot
+  every time.
+- Distractors must be plausible and drawn from the same subject as the answer. Never use
+  filler like "none of the above" or answers of obviously different length or specificity.
 - Keep everything grounded in the provided text. Do not invent facts not present.
 
 Respond with ONLY valid JSON, no markdown fences, matching exactly:

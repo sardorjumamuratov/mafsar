@@ -18,6 +18,16 @@ export function shouldWrite(stored: Row | undefined, incoming: Row): boolean {
   return incoming.updated_at > stored.updated_at;
 }
 
+/**
+ * Every upsert below carries `WHERE <table>.user_id = excluded.user_id`.
+ * Row ids are client-generated, and the primary key is the id alone, so
+ * without that guard an authenticated user could overwrite another user's
+ * row by pushing a colliding id — the ownership check in the preceding
+ * SELECT passes vacuously (it finds nothing for *this* user) and the
+ * ON CONFLICT branch then edits the other user's row in place. With the
+ * guard the conflicting write is a no-op. A composite (id, user_id) primary
+ * key would express this in the schema, but that needs a data migration.
+ */
 export async function applySync(db: DB, userId: string, body: SyncBody): Promise<void> {
   for (const s of body.sets) {
     const stored = await one<Row>(
@@ -30,7 +40,8 @@ export async function applySync(db: DB, userId: string, body: SyncBody): Promise
        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
        ON CONFLICT(id) DO UPDATE SET title=excluded.title, source=excluded.source,
          source_label=excluded.source_label, mode=excluded.mode, exam_date=excluded.exam_date,
-         updated_at=excluded.updated_at, deleted=excluded.deleted`,
+         updated_at=excluded.updated_at, deleted=excluded.deleted
+       WHERE sets.user_id = excluded.user_id`,
       [s.id, userId, s.title, s.source ?? null, s.sourceLabel ?? null,
        s.mode ?? "general", s.examDate ?? null, s.createdAt, s.updatedAt, s.deleted ? 1 : 0]
     );
@@ -54,7 +65,8 @@ export async function applySync(db: DB, userId: string, body: SyncBody): Promise
        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
        ON CONFLICT(id) DO UPDATE SET front=excluded.front, back=excluded.back,
          easiness=excluded.easiness, interval=excluded.interval, repetitions=excluded.repetitions,
-         due_date=excluded.due_date, updated_at=excluded.updated_at, deleted=excluded.deleted`,
+         due_date=excluded.due_date, updated_at=excluded.updated_at, deleted=excluded.deleted
+       WHERE cards.user_id = excluded.user_id`,
       [c.id, c.setId, userId, c.front, c.back, c.easiness ?? 2.5, c.interval ?? 0,
        c.repetitions ?? 0, c.dueDate ?? null, c.updatedAt, c.deleted ? 1 : 0]
     );
@@ -75,7 +87,8 @@ export async function applySync(db: DB, userId: string, body: SyncBody): Promise
       `INSERT INTO quiz (id, set_id, user_id, question, options_json, answer, explain, updated_at, deleted)
        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
        ON CONFLICT(id) DO UPDATE SET question=excluded.question, options_json=excluded.options_json,
-         answer=excluded.answer, explain=excluded.explain, updated_at=excluded.updated_at, deleted=excluded.deleted`,
+         answer=excluded.answer, explain=excluded.explain, updated_at=excluded.updated_at, deleted=excluded.deleted
+       WHERE quiz.user_id = excluded.user_id`,
       [q.id, q.setId, userId, q.q, JSON.stringify(q.options), q.answer,
        q.explain ?? null, q.updatedAt, q.deleted ? 1 : 0]
     );
@@ -118,7 +131,11 @@ export async function changesSince(db: DB, userId: string, since?: string) {
   )).map((r) => ({
     id: r.id, setId: r.set_id, front: r.front, back: r.back,
     easiness: r.easiness, interval: r.interval, repetitions: r.repetitions,
-    dueDate: r.due_date, updatedAt: r.updated_at, deleted: !!r.deleted,
+    // due_date is declared TEXT but the client sends epoch ms, so libSQL hands
+    // back "1799999999999.0". Coerce, or the client's isDue/byDue silently
+    // rely on string→number coercion.
+    dueDate: r.due_date == null ? null : Number(r.due_date),
+    updatedAt: r.updated_at, deleted: !!r.deleted,
   }));
   const quiz = (await all<any>(
     db, "SELECT * FROM quiz WHERE user_id = ? AND updated_at > ?", [userId, sinceEffective]
