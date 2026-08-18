@@ -34,11 +34,20 @@ interface Provider {
 }
 
 /**
- * A full set is up to 40 flashcards plus one quiz question each (4 options and
- * an explanation apiece) — roughly 8k tokens of JSON. 4096 truncated it
- * mid-object, which surfaced as a parse failure rather than a short set.
+ * Output budget, and the number of study items we ask for.
+ *
+ * These are env-tunable because the ceiling is the provider plan, not the
+ * model. Groq's free tier bills prompt + max_completion_tokens against an
+ * 8000 tokens-per-minute limit, so asking for 16384 made every request fail
+ * with "Request too large" — worse than the short sets it was meant to fix.
+ * The defaults fit that free tier alongside a large capture (the extension
+ * caps captured text at 24000 characters, ~6k tokens).
+ *
+ * On a paid plan, raise both to unlock full-length sets, no code change:
+ *   LLM_MAX_TOKENS=16384  LLM_MAX_ITEMS=40
  */
-const MAX_OUTPUT_TOKENS = 16384;
+const MAX_OUTPUT_TOKENS = Number(process.env.LLM_MAX_TOKENS) || 4096;
+const MAX_ITEMS = Number(process.env.LLM_MAX_ITEMS) || 15;
 
 const PROVIDERS: Record<string, Provider> = {
   gemini: {
@@ -137,9 +146,9 @@ Rules:
 - Focus on concepts, definitions, cause/effect, and facts worth remembering.
 - Ignore chit-chat, navigation, ads, boilerplate, meta-conversation, and hedging.
 - Flashcards: a short prompt on the front, a concise answer on the back. Write as many as
-  the material genuinely supports, up to 40 — do not pad with trivia to hit a number.
+  the material genuinely supports, up to ${MAX_ITEMS} — do not pad with trivia to hit a number.
 - Quiz: write one question per flashcard, covering that same fact, in the same order, up
-  to 40 questions. The user picks how many to sit, so a full set of questions matters.
+  to ${MAX_ITEMS} questions. The user picks how many to sit, so a full set of questions matters.
 - Quiz: 4 options each, exactly one correct; "answer" is the 0-based index.
 - Vary which index is correct across questions — do not put the answer in the same slot
   every time.

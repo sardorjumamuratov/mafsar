@@ -70,14 +70,16 @@ describe("provider adapters", () => {
     expect(out.flashcards[0].front).toBe("F");
   });
 
-  // Guards the truncation fix: a 40-card set plus a question each is ~8k
-  // tokens of JSON. At the old 4096 cap the response was cut mid-object and
-  // surfaced as a parse failure, not as a short set.
+  // Every provider must actually send an output budget. Too low truncates the
+  // JSON mid-object (a parse failure, not a short set); too high is rejected
+  // outright by plans that bill max_completion_tokens against a rate limit —
+  // Groq's free tier counts it toward 8000 TPM. So the value is a deployment
+  // decision, and the test pins that it is sent, not a magic number.
   it.each([
     ["groq", "max_completion_tokens", (b: any) => b.max_completion_tokens],
     ["anthropic", "max_tokens", (b: any) => b.max_tokens],
     ["gemini", "maxOutputTokens", (b: any) => b.generationConfig.maxOutputTokens],
-  ])("%s requests a large enough output budget (%s)", async (provider, _field, read) => {
+  ])("%s sends an output budget (%s)", async (provider, _field, read) => {
     process.env.LLM_PROVIDER = provider;
     const payload =
       provider === "gemini"
@@ -89,7 +91,11 @@ describe("provider adapters", () => {
 
     await generateStudySet([{ role: "user", text: "hello" }]);
 
-    expect(read(JSON.parse(spy.mock.calls[0][1].body as string))).toBeGreaterThanOrEqual(16384);
+    const budget = read(JSON.parse(spy.mock.calls[0][1].body as string));
+    expect(budget).toBeGreaterThan(0);
+    // Default must stay inside Groq's free-tier 8000 TPM alongside a large
+    // capture (~6k prompt tokens), or every request 400s.
+    expect(budget).toBeLessThanOrEqual(8000);
   });
 });
 
