@@ -38,12 +38,12 @@ interface Provider {
  *
  * These are env-tunable because the ceiling is the provider plan, not the
  * model. Groq's free tier bills prompt + max_completion_tokens against an
- * 8000 tokens-per-minute limit, so asking for 16384 made every request fail
- * with "Request too large" — worse than the short sets it was meant to fix.
- * The defaults fit that free tier alongside a large capture (the extension
- * caps captured text at 24000 characters, ~6k tokens).
+ * 8000 tokens-per-minute limit, so asking for 16384 there made every request
+ * fail with "Request too large" — worse than the short sets it was meant to
+ * fix. The defaults stay conservative enough for that case.
  *
- * On a paid plan, raise both to unlock full-length sets, no code change:
+ * Providers that bill purely per token (OpenRouter) have no such cliff, so
+ * raise both to unlock full-length sets, no code change:
  *   LLM_MAX_TOKENS=16384  LLM_MAX_ITEMS=40
  */
 const MAX_OUTPUT_TOKENS = Number(process.env.LLM_MAX_TOKENS) || 4096;
@@ -82,6 +82,43 @@ const PROVIDERS: Record<string, Provider> = {
           model,
           temperature: 0.4,
           max_completion_tokens: MAX_OUTPUT_TOKENS,
+          response_format: { type: "json_object" },
+          messages: [
+            { role: "system", content: system },
+            { role: "user", content: user },
+          ],
+        },
+      };
+    },
+    extractText: (d) => d?.choices?.[0]?.message?.content || "",
+    extractError: (d, status) => d?.error?.message || `HTTP ${status}`,
+  },
+  openrouter: {
+    // OpenRouter is OpenAI-compatible, so this mirrors the groq adapter.
+    //
+    // Model choice is about JSON reliability, not price. qwen3.5-flash is 25x
+    // cheaper and returned a bare float ("-1.0", finish_reason "stop") on
+    // every structured request we made — valid JSON, wrong type, unusable.
+    // gemini-3.5-flash-lite produced correct output on every attempt at
+    // ~$0.0006 a call. Override per-deployment with LLM_MODEL.
+    //
+    // response_format stays on regardless: several candidates prefix a
+    // "Thinking Process:" monologue without it and never close the JSON.
+    defaultModel: "google/gemini-3.5-flash-lite",
+    buildRequest({ apiKey, model, system, user }) {
+      return {
+        url: "https://openrouter.ai/api/v1/chat/completions",
+        headers: {
+          "content-type": "application/json",
+          authorization: `Bearer ${apiKey}`,
+          // Attribution shown on OpenRouter's dashboard; optional but free.
+          "HTTP-Referer": "https://mafsar-production.up.railway.app",
+          "X-Title": "Mafsar",
+        },
+        body: {
+          model,
+          temperature: 0.4,
+          max_tokens: MAX_OUTPUT_TOKENS,
           response_format: { type: "json_object" },
           messages: [
             { role: "system", content: system },

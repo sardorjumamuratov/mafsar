@@ -53,6 +53,24 @@ describe("provider adapters", () => {
     expect(out.quiz[0].options).toHaveLength(4);
   });
 
+  it("openrouter: posts OpenAI-shaped completions and always requests JSON mode", async () => {
+    process.env.LLM_PROVIDER = "openrouter";
+    const spy = captureFetch(JSON.stringify({ choices: [{ message: { content: STUDY_JSON } }] }));
+
+    const out = await generateStudySet([{ role: "user", text: "hello" }]);
+
+    const [url, init] = spy.mock.calls[0];
+    expect(url).toBe("https://openrouter.ai/api/v1/chat/completions");
+    expect((init.headers as Record<string, string>).authorization).toBe("Bearer test-key");
+    const body = JSON.parse(init.body as string);
+    expect(body.model).toBe("google/gemini-3.5-flash-lite");
+    // Load-bearing, not cosmetic: without response_format the default model
+    // prefixes a "Thinking Process:" monologue, runs out of budget, and never
+    // closes the JSON — unparseable on every attempt.
+    expect(body.response_format).toEqual({ type: "json_object" });
+    expect(out.flashcards).toHaveLength(1);
+  });
+
   it("anthropic: sends x-api-key + version and reads only text blocks", async () => {
     process.env.LLM_PROVIDER = "anthropic";
     const spy = captureFetch(
@@ -77,6 +95,7 @@ describe("provider adapters", () => {
   // decision, and the test pins that it is sent, not a magic number.
   it.each([
     ["groq", "max_completion_tokens", (b: any) => b.max_completion_tokens],
+    ["openrouter", "max_tokens", (b: any) => b.max_tokens],
     ["anthropic", "max_tokens", (b: any) => b.max_tokens],
     ["gemini", "maxOutputTokens", (b: any) => b.generationConfig.maxOutputTokens],
   ])("%s sends an output budget (%s)", async (provider, _field, read) => {
@@ -84,9 +103,9 @@ describe("provider adapters", () => {
     const payload =
       provider === "gemini"
         ? JSON.stringify({ candidates: [{ content: { parts: [{ text: STUDY_JSON }] } }] })
-        : provider === "groq"
-        ? JSON.stringify({ choices: [{ message: { content: STUDY_JSON } }] })
-        : JSON.stringify({ content: [{ type: "text", text: STUDY_JSON }] });
+        : provider === "anthropic"
+        ? JSON.stringify({ content: [{ type: "text", text: STUDY_JSON }] })
+        : JSON.stringify({ choices: [{ message: { content: STUDY_JSON } }] });
     const spy = captureFetch(payload);
 
     await generateStudySet([{ role: "user", text: "hello" }]);
