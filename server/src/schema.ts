@@ -99,3 +99,20 @@ export const blurbSchema = z.object({
   title: z.string().default(""),
   cardFronts: z.array(z.string()).min(1),
 });
+
+// Coding mode. The 4000-char bound on `code` is the same hard cap the panel
+// enforces — re-checked here because the client is never trusted, and because
+// an unbounded body is a token-cost and grading-quality problem.
+export const codingTaskSchema = z.object({
+  concept: z.string().min(1),
+  reference: z.string().min(1),
+  language: z.string().max(20).optional(),
+});
+
+export const codingGradeSchema = z.object({
+  task: z.string().min(1),
+  rubric: z.array(z.string().min(1)).min(1).max(4),
+  language: z.string().max(20).default("text"),
+  expectedLines: z.number().int().min(1).max(200).default(15),
+  code: z.string().min(1).max(4000),
+});

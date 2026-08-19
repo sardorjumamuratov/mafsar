@@ -4,10 +4,10 @@ import type { DB } from "./db.js";
 import {
   register, login, requireAuth, signAccessToken, signRefreshToken,
 } from "./auth.js";
-import { syncSchema, registerSchema, loginSchema, generateSchema, gradeSchema, hypotheticalSchema, summarizeSchema, blurbSchema } from "./schema.js";
+import { syncSchema, registerSchema, loginSchema, generateSchema, gradeSchema, hypotheticalSchema, summarizeSchema, blurbSchema, codingTaskSchema, codingGradeSchema } from "./schema.js";
 import { applySync, changesSince } from "./sync.js";
 import { nowISO, one } from "./db.js";
-import { generateStudySet, gradeAnswer, generateHypothetical, summarizeConversation, setBlurb } from "./llm.js";
+import { generateStudySet, gradeAnswer, generateHypothetical, summarizeConversation, setBlurb, generateCodingTask, gradeCode } from "./llm.js";
 import { PRIVACY_HTML } from "./privacy.js";
 
 export function createApp(db: DB) {
@@ -118,6 +118,20 @@ export function createApp(db: DB) {
   app.post("/v1/blurb", async (c) => {
     const body = blurbSchema.parse(await c.req.json());
     return c.json(await setBlurb(body.title, body.cardFronts));
+  });
+
+  // Coding mode: one small task from a card's concept, then rubric grading of the
+  // submitted code. Separate routes rather than extending /v1/hypothetical and
+  // /v1/grade — the response shapes differ substantially, and those two are already
+  // used by the Apply and Type-answers flows.
+  app.post("/v1/coding-task", async (c) => {
+    const body = codingTaskSchema.parse(await c.req.json());
+    return c.json(await generateCodingTask(body.concept, body.reference, body.language));
+  });
+
+  app.post("/v1/coding-grade", async (c) => {
+    const body = codingGradeSchema.parse(await c.req.json());
+    return c.json(await gradeCode(body));
   });
 
   // --- Phase 3: analytics — TODO ---

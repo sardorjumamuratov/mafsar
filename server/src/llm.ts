@@ -329,3 +329,140 @@ export async function setBlurb(title: string, cardFronts: string[]) {
   if (!blurb) throw new Error("Model returned an empty blurb.");
   return { blurb: blurb.split(/\s+/).slice(0, 8).join(" ") };
 }
+
+// --- coding mode ---------------------------------------------------------------
+// Practice loop for code: a card's concept becomes one small task, the user writes
+// code, and it is graded against a rubric. Scope is controlled by the starter stub,
+// not by a length rule — a raw line cap rejects correct code and is wrong across
+// languages (Java needs roughly 3x the lines of Python for the same idea).
+
+/** Hard ceiling on a submission. Also enforced in schema.ts — never trust the client. */
+export const MAX_CODE_CHARS = 4000;
+
+const CODING_TASK_PROMPT = `You are a programming-practice generator. You get one concept from the
+user's own study material (a flashcard front/back pair) and must write ONE tiny coding exercise
+that makes them apply it.
+
+Rules:
+- The task must be SMALL — solvable in about 8-25 lines. One idea, one class or one function.
+  Never ask for a whole program, a CLI, tests, error handling, or persistence.
+- "starter" is a stub the user fills in: the signature/class shell plus a comment marking where
+  their code goes. This is what keeps the task small, so make it specific and complete.
+- "expectedLines" is your honest estimate of a good solution's length, counting the starter.
+- "language" is inferred from the concept — a lowercase identifier such as "java", "python",
+  "javascript", "sql". If the concept names no language, choose the one it most obviously implies.
+- "scenario" is 1-3 sentences: what to build and what it must guarantee. Concrete, not abstract.
+- "rubric" is 2-4 SHORT, individually checkable requirements — each one thing a correct solution
+  must do. These are shown to the user as a checklist, so phrase them as observable properties
+  ("balance cannot be assigned from outside the class"), never as vague goals ("good design").
+
+Respond with ONLY valid JSON:
+{ "scenario": string, "language": string, "starter": string, "expectedLines": number, "rubric": [string] }`;
+
+const CODING_GRADE_PROMPT = `You are a fair, concise code reviewer grading a small practice exercise.
+You get the task, the rubric it must satisfy, the language, and the student's code.
+
+Rules:
+- Judge each rubric requirement independently and report it as met or not met. "note" is at most
+  one sentence saying why — quote the relevant line when it helps.
+- Judge only what the rubric asks. Do not require patterns, naming, tests, or error handling the
+  task never asked for, and do not invent extra requirements.
+- Working code that satisfies every requirement is correct even if you would have written it
+  differently.
+- "conciseness" is one sentence about length relative to what the task needed. If the solution is
+  far longer than expected, say plainly what was unnecessary. If it is about right, say so briefly.
+  Length alone never makes a correct solution incorrect.
+- "feedback" is 1-3 sentences: what was right, then the single most useful improvement.
+
+Respond with ONLY valid JSON:
+{ "correct": boolean, "score": number 0-100, "meets": [{ "requirement": string, "met": boolean, "note": string }],
+  "conciseness": string, "feedback": string }`;
+
+export interface CodingTask {
+  scenario: string;
+  language: string;
+  starter: string;
+  expectedLines: number;
+  rubric: string[];
+}
+
+export async function generateCodingTask(concept: string, reference: string, language?: string) {
+  const hint = language ? `\n\nUse this language: ${language}` : "";
+  const user = `Concept (flashcard front):\n${concept}\n\nReference (flashcard back):\n${reference}${hint}\n\nWrite the exercise now.`;
+  const parsed = await callJson(CODING_TASK_PROMPT, user);
+
+  const rubric = (Array.isArray(parsed.rubric) ? parsed.rubric : [])
+    .map((r: any) => String(r).trim())
+    .filter(Boolean)
+    .slice(0, 4);
+  if (!parsed.scenario || !rubric.length) throw new Error("Model returned an incomplete exercise.");
+
+  return {
+    scenario: String(parsed.scenario),
+    // Keep the language a bare identifier: it is rendered as a label and used as a
+    // prompt hint, and models like to answer "Java (17+)".
+    language: String(parsed.language || language || "text").toLowerCase().replace(/[^a-z0-9+#-]/g, "").slice(0, 20) || "text",
+    starter: String(parsed.starter || ""),
+    // Clamp to the "bite-sized" promise even if the model overreaches.
+    expectedLines: Math.max(3, Math.min(60, Math.round(Number(parsed.expectedLines) || 15))),
+    rubric,
+  } satisfies CodingTask;
+}
+
+/** Non-blank, non-comment-only lines — what "how long is this" should mean. */
+export function codeLineCount(code: string): number {
+  return code
+    .split(/\r?\n/)
+    .filter((l) => {
+      const t = l.trim();
+      return t && !/^(\/\/|#|--|\/\*|\*\/|\*)/.test(t);
+    }).length;
+}
+
+export async function gradeCode(input: {
+  task: string;
+  rubric: string[];
+  language: string;
+  expectedLines: number;
+  code: string;
+}) {
+  // The counts are computed here, not asked of the model — it only supplies judgment.
+  const actual = codeLineCount(input.code);
+  const user = [
+    `Task:\n${input.task}`,
+    `Language: ${input.language}`,
+    `Rubric (judge each one):\n${input.rubric.map((r, i) => `${i + 1}. ${r}`).join("\n")}`,
+    `Expected length: about ${input.expectedLines} lines. This submission: ${actual} lines.`,
+    `Student's code:\n\`\`\`\n${input.code}\n\`\`\``,
+    "Grade it now.",
+  ].join("\n\n");
+
+  const parsed = await callJson(CODING_GRADE_PROMPT, user);
+  const score = Math.max(0, Math.min(100, Math.round(Number(parsed.score) || 0)));
+
+  // Align the checklist to the rubric we sent: the model may drop, reorder, or
+  // invent entries, and the UI renders one row per requirement.
+  const byText = new Map(
+    (Array.isArray(parsed.meets) ? parsed.meets : []).map((m: any) => [String(m?.requirement || "").trim(), m])
+  );
+  const meets = input.rubric.map((requirement, i) => {
+    const m: any = byText.get(requirement) ?? (Array.isArray(parsed.meets) ? parsed.meets[i] : null);
+    return {
+      requirement,
+      met: !!(m && m.met),
+      note: String(m?.note || ""),
+    };
+  });
+
+  return {
+    score,
+    correct: typeof parsed.correct === "boolean" ? parsed.correct : meets.every((m) => m.met),
+    meets,
+    conciseness: {
+      expected: input.expectedLines,
+      actual,
+      note: String(parsed.conciseness || ""),
+    },
+    feedback: String(parsed.feedback || ""),
+  };
+}
