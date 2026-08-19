@@ -25,6 +25,7 @@
           { id: "sess1", source: "chatgpt", sourceLabel: "ChatGPT", title: "Torts", url: "", capturedAt: NOW - 86400000, messages: [{ role: "user", text: "negligence?" }] },
           { id: "sess2", source: "quizlet", sourceLabel: "Imported", title: "Bio ch3", url: "", capturedAt: NOW - 172800000, messages: [], importedCount: 2 },
           { id: "sess3", source: "claude", sourceLabel: "Claude", title: "Pharmacology (big set)", url: "", capturedAt: NOW - 259200000, messages: [{ role: "user", text: "beta blockers?" }] },
+          { id: "sess4", source: "chatgpt", sourceLabel: "ChatGPT", title: "Java OOP", url: "", capturedAt: NOW - 3600000, messages: [{ role: "user", text: "encapsulation?" }] },
         ],
         studySets: [
           {
@@ -57,6 +58,16 @@
               options: ["Right " + (i + 1), "Wrong A", "Wrong B", "Wrong C"], answer: 0,
               explain: "Because " + (i + 1), updatedAt: "2026-08-12T09:00:00.000Z", deleted: false,
             })),
+          },
+          // mode:"coding" — review swaps the Apply button for Solve in code.
+          {
+            id: "set4", sessionId: "sess4", title: "Java OOP", mode: "coding",
+            createdAt: NOW - 3600000, updatedAt: "2026-08-19T09:00:00.000Z", deleted: false,
+            flashcards: [
+              { id: "jc1", front: "Encapsulation", back: "Hide state behind private fields; expose controlled access via methods.", easiness: 2.5, interval: 0, repetitions: 0, dueDate: NOW, updatedAt: "2026-08-19T09:00:00.000Z", deleted: false },
+              { id: "jc2", front: "Polymorphism", back: "Treat different subclasses uniformly through a shared supertype.", easiness: 2.5, interval: 0, repetitions: 0, dueDate: NOW, updatedAt: "2026-08-19T09:00:00.000Z", deleted: false },
+            ],
+            quiz: [],
           },
         ],
         activity: {},
@@ -96,7 +107,25 @@
         runtime: {
           lastError: null,
           sendMessage(msg, cb) {
-            setTimeout(() => cb && cb({ ok: false, error: "harness: no service worker" }), 0);
+            const fake = {
+              GENERATE_CODING_TASK: () => ({ ok: true, task: {
+                scenario: "Implement a BankAccount that never allows a negative balance.",
+                language: "java",
+                starter: "public class BankAccount {\n    private double balance;\n\n    public void deposit(double amount) {\n        // TODO\n    }\n}",
+                expectedLines: 12,
+                rubric: ["balance is private", "deposit rejects negative amounts"],
+              } }),
+              GRADE_CODING: () => ({ ok: true, grading: {
+                correct: true, score: 92,
+                meets: [
+                  { requirement: "balance is private", met: true, note: 'Declared as "private double balance".' },
+                  { requirement: "deposit rejects negative amounts", met: false, note: "No guard on the amount." },
+                ],
+                conciseness: { expected: 12, actual: 30, note: "Longer than the task needed." },
+                feedback: "Field encapsulation is right; add a guard in deposit.",
+              } }),
+            }[msg && msg.type];
+            setTimeout(() => cb && cb(fake ? fake() : { ok: false, error: "harness: no service worker" }), 0);
           },
           openOptionsPage() {},
           getURL: (p) => p,

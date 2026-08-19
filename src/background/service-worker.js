@@ -18,6 +18,8 @@ import {
   backendHypothetical,
   backendSummarize,
   backendBlurb,
+  backendCodingTask,
+  backendCodingGrade,
 } from "../sync/api.js";
 
 /** Generate a study set for a captured session via the backend. */
@@ -327,6 +329,27 @@ async function handle(msg) {
         question: String(msg.question || ""),
         reference: String(msg.reference || ""),
         answer: String(msg.answer || ""),
+      });
+      return { grading };
+    }
+
+    // Coding mode: a small task from a concept, then rubric grading of the code.
+    case "GENERATE_CODING_TASK": {
+      const task = await backendCodingTask({
+        concept: String(msg.concept || ""),
+        reference: String(msg.reference || ""),
+        language: msg.language || undefined,
+      });
+      return { task };
+    }
+
+    case "GRADE_CODING": {
+      const grading = await backendCodingGrade({
+        task: String(msg.task || ""),
+        rubric: Array.isArray(msg.rubric) ? msg.rubric.map(String) : [],
+        language: String(msg.language || "text"),
+        expectedLines: Number(msg.expectedLines) || 15,
+        code: String(msg.code || ""),
       });
       return { grading };
     }

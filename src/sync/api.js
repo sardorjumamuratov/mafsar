@@ -40,3 +40,13 @@ export function backendSummarize(messages) {
 export function backendBlurb(title, cardFronts) {
   return post("/v1/blurb", { title, cardFronts });
 }
+
+/** { concept, reference, language? } -> { scenario, language, starter, expectedLines, rubric } */
+export function backendCodingTask({ concept, reference, language }) {
+  return post("/v1/coding-task", { concept, reference, language });
+}
+
+/** Rubric-graded code -> { correct, score, meets, conciseness, feedback } */
+export function backendCodingGrade({ task, rubric, language, expectedLines, code }) {
+  return post("/v1/coding-grade", { task, rubric, language, expectedLines, code });
+}

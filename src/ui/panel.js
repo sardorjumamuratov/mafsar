@@ -23,6 +23,7 @@ import {
 import { initSchedule, review, isDue, byDue, masteryOf } from "../storage/srs.js";
 import { examReadiness, nextExam, weakTopics } from "../storage/readiness.js";
 import { quizLengths } from "./quiz-lengths.js";
+import { codeSize, MAX_CODE_CHARS } from "../storage/coding.js";
 import { getAuth, register, login, logout } from "../sync/auth.js";
 import { syncNow } from "../sync/sync.js";
 
@@ -609,6 +610,24 @@ function paintDetail() {
                </ul>`
         }
       </div>
+      <div class="block" style="display:flex;flex-direction:column;gap:9px">
+        <div class="t-label">Study mode</div>
+        <div class="modes" role="group" aria-label="Study mode">
+          ${[
+            ["general", "General", "Flashcards, quiz, written answers"],
+            ["coding", "Coding", "Review swaps in small coding tasks"],
+          ]
+            .map(
+              ([id, label, hint]) =>
+                `<button class="modebtn${(studySet.mode || "general") === id ? " on" : ""}"
+                   data-action="set-mode" data-id="${esc(session.id)}" data-mode="${id}"
+                   aria-pressed="${(studySet.mode || "general") === id}">
+                   <span class="l">${label}</span><span class="h">${hint}</span>
+                 </button>`
+            )
+            .join("")}
+        </div>
+      </div>
       <button class="btn btn-ghost btn-block" data-action="delete-set" data-id="${esc(session.id)}">Delete set</button>`;
   }
 
@@ -733,7 +752,11 @@ function revealCard() {
       <button class="grade good" data-action="grade" data-g="4"><span class="g">Good</span><span class="iv">${gradePreview(card, 4, queue[qIdx].examDate)}d</span></button>
       <button class="grade good" data-action="grade" data-g="5"><span class="g">Easy</span><span class="iv">${gradePreview(card, 5, queue[qIdx].examDate)}d</span></button>
     </div>
-    <button class="btn btn-ghost btn-block" data-action="apply-card" style="margin-top:10px">🎯 Apply it — fresh scenario</button>`);
+    ${
+      queue[qIdx].mode === "coding"
+        ? `<button class="btn btn-ghost btn-block" data-action="code-card" style="margin-top:10px">⌨️ Solve in code</button>`
+        : `<button class="btn btn-ghost btn-block" data-action="apply-card" style="margin-top:10px">🎯 Apply it — fresh scenario</button>`
+    }`);
 }
 
 async function gradeCard(g) {
@@ -854,6 +877,169 @@ function paintGraded(grading, nextAction) {
     body.querySelector(".sa-input")?.remove();
     body.querySelector('[data-action="apply-check"]')?.remove();
     body.querySelector('[data-action="typed-check"]')?.remove();
+    body.appendChild(box);
+  }
+}
+
+// --- Coding mode: a small task from the concept, written and graded in-panel --
+// Mirrors the Apply quartet above. The task's starter stub is what keeps the
+// exercise small; length is only ever a system cap (see storage/coding.js).
+let codeState = null; // { item, task }
+
+async function startCodingTask() {
+  const item = queue[qIdx];
+  if (!item || !item.card.back) return paintReviewCard();
+  codeState = { item };
+  setHTML(app, `
+    <div class="rev-top">${XBTN}<div class="bar"><i style="width:${Math.round((qIdx / queue.length) * 100)}%"></i></div>
+      <span class="rev-count tnum">${qIdx + 1} / ${queue.length}</span></div>
+    <div class="rev-body">
+      <div class="t-label">Solve in code</div>
+      <div style="display:flex;align-items:center;gap:10px;margin-top:8px">
+        <span class="spinner" style="border-color:var(--border);border-top-color:var(--primary)"></span>
+        <span style="font-size:13px;color:var(--muted)">Writing a small exercise…</span>
+      </div>
+    </div>`);
+  try {
+    const r = await send({
+      type: "GENERATE_CODING_TASK",
+      concept: item.card.front,
+      reference: item.card.back,
+    });
+    codeState.task = r.task;
+    paintCodeEditor();
+  } catch (e) {
+    toast(e.message);
+    qIdx++;
+    paintReviewCard();
+  }
+}
+
+function paintCodeEditor() {
+  const { task } = codeState;
+  setHTML(app, `
+    <div class="rev-top">${XBTN}<div class="bar"><i style="width:${Math.round((qIdx / queue.length) * 100)}%"></i></div>
+      <span class="rev-count tnum">${qIdx + 1} / ${queue.length}</span></div>
+    <div class="rev-body">
+      <div class="t-label">Solve in code · ${esc(task.language)}</div>
+      <div class="hypothetical">${esc(task.scenario)}</div>
+      <div class="checklist" aria-label="Requirements">
+        ${task.rubric.map((r) => `<div class="ck"><span class="box"></span><span>${esc(r)}</span></div>`).join("")}
+      </div>
+      <textarea id="codeInput" class="code-input" spellcheck="false" autocapitalize="off"
+        autocomplete="off" rows="10" aria-describedby="codeMeta">${esc(task.starter)}</textarea>
+      <div class="code-meta" id="codeMeta">
+        <span class="target">About ${task.expectedLines} lines</span>
+        <span class="count tnum" id="codeCount"></span>
+      </div>
+      <button class="btn btn-primary btn-block" data-action="code-check">Submit for review</button>
+    </div>`);
+
+  const ta = document.getElementById("codeInput");
+  // Tab indents instead of leaving the field — in a code box the browser
+  // default is the wrong behavior. Shift+Tab still escapes for keyboard users.
+  ta.addEventListener("keydown", (e) => {
+    if (e.key !== "Tab" || e.shiftKey) return;
+    e.preventDefault();
+    const { selectionStart: a, selectionEnd: b, value } = ta;
+    ta.value = value.slice(0, a) + "  " + value.slice(b);
+    ta.selectionStart = ta.selectionEnd = a + 2;
+    paintCodeCount();
+  });
+  ta.addEventListener("input", paintCodeCount);
+  paintCodeCount();
+  ta.focus();
+  ta.selectionStart = ta.selectionEnd = ta.value.length;
+}
+
+/** Live counter. The cap disables submit; the target never does. */
+function paintCodeCount() {
+  const ta = document.getElementById("codeInput");
+  const out = document.getElementById("codeCount");
+  const btn = app.querySelector('[data-action="code-check"]');
+  if (!ta || !out || !btn) return;
+  const s = codeSize(ta.value, codeState.task.expectedLines);
+
+  out.textContent = s.overCap
+    ? `${s.chars} / ${s.cap} characters — too long to submit`
+    : `${s.lines} line${s.lines === 1 ? "" : "s"}${s.verbose ? " · longer than needed" : ""}`;
+  out.classList.toggle("over", s.overCap);
+  out.classList.toggle("warn", !s.overCap && s.verbose);
+  btn.disabled = s.overCap || s.empty;
+}
+
+async function checkCode() {
+  const ta = document.getElementById("codeInput");
+  const { item, task } = codeState;
+  const s = codeSize(ta?.value, task.expectedLines);
+  if (s.empty) return toast("Write some code first.");
+  if (s.overCap) return toast(`Submissions are capped at ${MAX_CODE_CHARS} characters.`);
+
+  const btn = app.querySelector('[data-action="code-check"]');
+  btn.disabled = true;
+  btn.textContent = "Reviewing…";
+  try {
+    const r = await send({
+      type: "GRADE_CODING",
+      task: task.scenario,
+      rubric: task.rubric,
+      language: task.language,
+      expectedLines: task.expectedLines,
+      code: ta.value,
+    });
+    await Promise.all([
+      bumpActivity(1),
+      appendReviewLog({
+        id: uid(), cardId: item.card.id, sessionId: item.sessionId,
+        grade: r.grading.correct ? 4 : 1, prevInterval: 0, newInterval: 0,
+        reviewedAt: new Date().toISOString(),
+      }),
+    ]);
+    paintCodeGraded(r.grading);
+  } catch (e) {
+    toast(e.message);
+    btn.disabled = false;
+    btn.textContent = "Submit for review";
+  }
+}
+
+/**
+ * Per-requirement checklist rather than one number: for code the useful signal
+ * is WHICH requirement failed. Conciseness is reported, never punished on its
+ * own — a correct-but-long solution still reads as correct.
+ */
+function paintCodeGraded(g) {
+  const box = document.createElement("div");
+  box.className = "graded";
+  setHTML(box, `
+    <div class="score-row">
+      <div class="score tnum ${g.correct ? "ok" : "no"}">${g.score}</div>
+      <div><b style="color:${g.correct ? "var(--success)" : "var(--danger)"}">${g.correct ? "Passes" : "Not yet"}</b>
+        <div class="feedback">${esc(g.feedback)}</div></div>
+    </div>
+    <div class="checklist graded-ck">
+      ${(g.meets || [])
+        .map(
+          (m) =>
+            `<div class="ck ${m.met ? "met" : "unmet"}"><span class="box">${m.met ? "✓" : "✕"}</span>
+               <span><b>${esc(m.requirement)}</b>${m.note ? `<span class="note">${esc(m.note)}</span>` : ""}</span></div>`
+        )
+        .join("")}
+    </div>
+    ${
+      g.conciseness
+        ? `<div class="conciseness"><b>${g.conciseness.actual} lines</b> · about ${g.conciseness.expected} expected${
+            g.conciseness.note ? ` — ${esc(g.conciseness.note)}` : ""
+          }</div>`
+        : ""
+    }
+    <button class="btn btn-primary btn-block" data-action="code-next">Continue</button>`);
+  const body = app.querySelector(".rev-body");
+  if (body) {
+    body.querySelector(".code-input")?.remove();
+    body.querySelector(".code-meta")?.remove();
+    body.querySelector(".checklist")?.remove();
+    body.querySelector('[data-action="code-check"]')?.remove();
     body.appendChild(box);
   }
 }
@@ -1344,6 +1530,20 @@ document.addEventListener("click", (e) => {
     case "flip": revealCard(); break;
     case "grade": gradeCard(Number(t.dataset.g)); break;
     case "apply-card": startApply(); break;
+    case "set-mode":
+      (async () => {
+        const { studySets } = await bundle();
+        const set = setFor(t.dataset.id, studySets);
+        if (!set || (set.mode || "general") === t.dataset.mode) return;
+        set.mode = t.dataset.mode;
+        await saveStudySet(set);
+        toast(t.dataset.mode === "coding" ? "Coding mode on — review now asks for code." : "General mode on.");
+        renderSetDetail(t.dataset.id, "summary");
+      })();
+      break;
+    case "code-card": startCodingTask(); break;
+    case "code-check": checkCode(); break;
+    case "code-next": qIdx++; paintReviewCard(); break;
     case "apply-check": checkApply(); break;
     case "apply-next": qIdx++; paintReviewCard(); break;
     case "start-typed": startTypedPractice(id); break;
@@ -1424,7 +1624,7 @@ async function startGlobalReview() {
   const { studySets } = await bundle();
   const items = [];
   studySets.forEach((set) =>
-    (set.flashcards || []).forEach((card) => isDue(card) && items.push({ sessionId: set.sessionId, card, examDate: set.examDate }))
+    (set.flashcards || []).forEach((card) => isDue(card) && items.push({ sessionId: set.sessionId, card, examDate: set.examDate, mode: set.mode }))
   );
   items.sort((a, b) => byDue(a.card, b.card));
   if (!items.length) return toast("Nothing due right now 🎉");
@@ -1437,7 +1637,7 @@ async function startSetReview(sessionId) {
   // (still applies SM-2 normally) so the button always does something.
   const due = (set?.flashcards || []).filter((c) => isDue(c));
   const pool = due.length ? due : set?.flashcards || [];
-  const items = pool.map((card) => ({ sessionId, card, examDate: set?.examDate }));
+  const items = pool.map((card) => ({ sessionId, card, examDate: set?.examDate, mode: set?.mode }));
   items.sort((a, b) => byDue(a.card, b.card));
   if (!items.length) return toast("No cards in this set.");
   startReview(items, "set:" + sessionId);
