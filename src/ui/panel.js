@@ -22,6 +22,7 @@ import {
 } from "../storage/store.js";
 import { initSchedule, review, isDue, byDue, masteryOf } from "../storage/srs.js";
 import { examReadiness, nextExam, weakTopics } from "../storage/readiness.js";
+import { quizLengths } from "./quiz-lengths.js";
 import { getAuth, register, login, logout } from "../sync/auth.js";
 import { syncNow } from "../sync/sync.js";
 
@@ -552,17 +553,9 @@ function paintDetail() {
       <button class="btn btn-ghost btn-block" data-action="export-tsv" data-id="${esc(session.id)}">⇩ Export to Anki/CSV</button> -->`;
   } else if (tab === "quiz") {
     const available = studySet.quiz?.length || 0;
-    // Length is a share of the SET, capped by the questions we actually have.
-    // Under 20 cards a picker is noise — just sit the whole thing. Quick is
-    // preselected: a short quiz you finish beats a long one you abandon.
-    const lengths = (s.total >= 20 ? [[0.1, "Quick"], [0.5, "Half"], [1, "Full"]] : [[1, "Full"]])
-      .map(([pct, label]) => {
-        const n = Math.max(1, Math.min(available, Math.round(s.total * pct)));
-        // Sets generated before quizzes scaled with card count have far fewer
-        // questions than cards, so a share can land on "all of them" — say so.
-        return [n === available ? "Full" : label, n];
-      })
-      .filter(([, n], i, all) => all.findIndex(([, m]) => m === n) === i); // collapse ties
+    // Quick is a fixed 5, Half is half the set rounded to the nearest 5,
+    // Full is everything — capped by stored questions. See quiz-lengths.js.
+    const lengths = quizLengths(s.total, available);
 
     body = available
       ? `<div class="block" style="text-align:center">

@@ -69,6 +69,10 @@
           ? { accessToken: "harness", refreshToken: "harness", user: { email: "harness@example.com" }, lastSync: null }
           : null,
       };
+      // ?theme=dark flips the panel's [data-theme="dark"] token override.
+      if (new URLSearchParams(location.search).get("theme") === "dark") {
+        document.documentElement.dataset.theme = "dark";
+      }
       DATA.activity[new Date(NOW - 86400000).toISOString().slice(0, 10)] = 3;
 
       function clone(v) { return v === undefined ? undefined : JSON.parse(JSON.stringify(v)); }
@@ -115,6 +119,6 @@
       <button data-nav="teams" title="Teams">Teams</button>
       <button data-nav="you" title="You">You</button>
     </nav>
-    <script type="module" src="../../src/ui/panel.js?v=bust3"></script>
+    <script type="module" src="../../src/ui/panel.js?v=bust4"></script>
   </body>
 </html>
