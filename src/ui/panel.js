@@ -546,6 +546,7 @@ function paintDetail() {
             : '<div class="empty">No flashcards.</div>'
         }
       </div>
+      <button class="btn btn-ghost btn-block" data-action="start-coding" data-id="${esc(session.id)}">⌨️ Coding exercises</button>
       <div style="display:flex;gap:10px">
         <button class="btn btn-ghost" style="flex:1" data-action="add-card" data-id="${esc(session.id)}">＋ Card</button>
         <button class="btn btn-ghost" style="flex:1" data-action="start-typed" data-id="${esc(session.id)}">✍️ Type answers</button>
@@ -609,24 +610,6 @@ function paintDetail() {
                  ${(studySet.flashcards || []).slice(0, 8).map((c) => `<li>${esc(c.front)}</li>`).join("") || "<li>No cards</li>"}
                </ul>`
         }
-      </div>
-      <div class="block" style="display:flex;flex-direction:column;gap:9px">
-        <div class="t-label">Study mode</div>
-        <div class="modes" role="group" aria-label="Study mode">
-          ${[
-            ["general", "General", "Flashcards, quiz, written answers"],
-            ["coding", "Coding", "Review swaps in small coding tasks"],
-          ]
-            .map(
-              ([id, label, hint]) =>
-                `<button class="modebtn${(studySet.mode || "general") === id ? " on" : ""}"
-                   data-action="set-mode" data-id="${esc(session.id)}" data-mode="${id}"
-                   aria-pressed="${(studySet.mode || "general") === id}">
-                   <span class="l">${label}</span><span class="h">${hint}</span>
-                 </button>`
-            )
-            .join("")}
-        </div>
       </div>
       <button class="btn btn-ghost btn-block" data-action="delete-set" data-id="${esc(session.id)}">Delete set</button>`;
   }
@@ -752,11 +735,7 @@ function revealCard() {
       <button class="grade good" data-action="grade" data-g="4"><span class="g">Good</span><span class="iv">${gradePreview(card, 4, queue[qIdx].examDate)}d</span></button>
       <button class="grade good" data-action="grade" data-g="5"><span class="g">Easy</span><span class="iv">${gradePreview(card, 5, queue[qIdx].examDate)}d</span></button>
     </div>
-    ${
-      queue[qIdx].mode === "coding"
-        ? `<button class="btn btn-ghost btn-block" data-action="code-card" style="margin-top:10px">⌨️ Solve in code</button>`
-        : `<button class="btn btn-ghost btn-block" data-action="apply-card" style="margin-top:10px">🎯 Apply it — fresh scenario</button>`
-    }`);
+    <button class="btn btn-ghost btn-block" data-action="apply-card" style="margin-top:10px">🎯 Apply it — fresh scenario</button>`);
 }
 
 async function gradeCard(g) {
@@ -881,45 +860,80 @@ function paintGraded(grading, nextAction) {
   }
 }
 
-// --- Coding mode: a small task from the concept, written and graded in-panel --
-// Mirrors the Apply quartet above. The task's starter stub is what keeps the
-// exercise small; length is only ever a system cap (see storage/coding.js).
-let codeState = null; // { item, task }
+// --- Coding practice: a standalone session started from the set ------------
+// A peer of typed practice, NOT part of the review queue — each exercise is
+// an LLM round trip plus real writing time, so sessions are short (5) and
+// never block grading. The starter stub keeps exercises small; length is only
+// ever a system cap (see storage/coding.js).
+let codingState = null; // { sessionId, items, idx, task }
 
-async function startCodingTask() {
-  const item = queue[qIdx];
-  if (!item || !item.card.back) return paintReviewCard();
-  codeState = { item };
+async function startCodingPractice(sessionId) {
+  const { studySets } = await bundle();
+  const set = setFor(sessionId, studySets);
+  const cards = (set?.flashcards || []).filter((c) => c.back);
+  if (!cards.length) return toast("No cards to code against.");
+  const due = cards.filter((c) => isDue(c));
+  const items = (due.length ? due : cards).slice(0, 5).map((card) => ({ sessionId, card }));
+  codingState = { sessionId, items, idx: 0, task: null };
+  focusReturn = "set:" + sessionId;
+  showChrome(false);
+  paintCodingQ();
+}
+
+function paintCodingQ() {
+  const { items, idx } = codingState;
+  if (idx >= items.length) {
+    setHTML(app, `
+      <div class="view">
+        <div class="done-msg"><div class="big">⌨️</div>
+          <div style="font-weight:650;color:var(--ink)">Coding practice complete</div>
+          <div style="margin-top:4px">${items.length} exercise${items.length === 1 ? "" : "s"} graded.</div>
+        </div>
+        <button class="btn btn-primary btn-block" data-action="return-focus">Done</button>
+      </div>`);
+    return;
+  }
+  const { card } = items[idx];
   setHTML(app, `
-    <div class="rev-top">${XBTN}<div class="bar"><i style="width:${Math.round((qIdx / queue.length) * 100)}%"></i></div>
-      <span class="rev-count tnum">${qIdx + 1} / ${queue.length}</span></div>
+    <div class="rev-top">${XBTN}<div class="bar"><i style="width:${Math.round((idx / items.length) * 100)}%"></i></div>
+      <span class="rev-count tnum">${idx + 1} / ${items.length}</span></div>
     <div class="rev-body">
       <div class="t-label">Solve in code</div>
       <div style="display:flex;align-items:center;gap:10px;margin-top:8px">
         <span class="spinner" style="border-color:var(--border);border-top-color:var(--primary)"></span>
-        <span style="font-size:13px;color:var(--muted)">Writing a small exercise…</span>
+        <span style="font-size:13px;color:var(--muted)">Writing a small exercise from “${esc(card.front)}”…</span>
       </div>
     </div>`);
+  requestCodingTask();
+}
+
+// A token per sitting: a slow LLM response must not paint over a session the
+// user restarted or left (goReturn nulls codingState).
+async function requestCodingTask() {
+  const { items, idx } = codingState;
+  const token = (codingState.token = {});
   try {
     const r = await send({
       type: "GENERATE_CODING_TASK",
-      concept: item.card.front,
-      reference: item.card.back,
+      concept: items[idx].card.front,
+      reference: items[idx].card.back,
     });
-    codeState.task = r.task;
+    if (!codingState || codingState.token !== token) return;
+    codingState.task = r.task;
     paintCodeEditor();
   } catch (e) {
+    if (!codingState || codingState.token !== token) return;
     toast(e.message);
-    qIdx++;
-    paintReviewCard();
+    codingState.idx++;
+    paintCodingQ();
   }
 }
 
 function paintCodeEditor() {
-  const { task } = codeState;
+  const { task, items, idx } = codingState;
   setHTML(app, `
-    <div class="rev-top">${XBTN}<div class="bar"><i style="width:${Math.round((qIdx / queue.length) * 100)}%"></i></div>
-      <span class="rev-count tnum">${qIdx + 1} / ${queue.length}</span></div>
+    <div class="rev-top">${XBTN}<div class="bar"><i style="width:${Math.round((idx / items.length) * 100)}%"></i></div>
+      <span class="rev-count tnum">${idx + 1} / ${items.length}</span></div>
     <div class="rev-body">
       <div class="t-label">Solve in code · ${esc(task.language)}</div>
       <div class="hypothetical">${esc(task.scenario)}</div>
@@ -958,7 +972,7 @@ function paintCodeCount() {
   const out = document.getElementById("codeCount");
   const btn = app.querySelector('[data-action="code-check"]');
   if (!ta || !out || !btn) return;
-  const s = codeSize(ta.value, codeState.task.expectedLines);
+  const s = codeSize(ta.value, codingState.task.expectedLines);
 
   out.textContent = s.overCap
     ? `${s.chars} / ${s.cap} characters — too long to submit`
@@ -969,8 +983,10 @@ function paintCodeCount() {
 }
 
 async function checkCode() {
+  if (!codingState?.task) return toast("Session ended.");
   const ta = document.getElementById("codeInput");
-  const { item, task } = codeState;
+  const { items, idx, task, sessionId } = codingState;
+  const { card } = items[idx];
   const s = codeSize(ta?.value, task.expectedLines);
   if (s.empty) return toast("Write some code first.");
   if (s.overCap) return toast(`Submissions are capped at ${MAX_CODE_CHARS} characters.`);
@@ -990,7 +1006,7 @@ async function checkCode() {
     await Promise.all([
       bumpActivity(1),
       appendReviewLog({
-        id: uid(), cardId: item.card.id, sessionId: item.sessionId,
+        id: uid(), cardId: card.id, sessionId,
         grade: r.grading.correct ? 4 : 1, prevInterval: 0, newInterval: 0,
         reviewedAt: new Date().toISOString(),
       }),
@@ -1530,20 +1546,9 @@ document.addEventListener("click", (e) => {
     case "flip": revealCard(); break;
     case "grade": gradeCard(Number(t.dataset.g)); break;
     case "apply-card": startApply(); break;
-    case "set-mode":
-      (async () => {
-        const { studySets } = await bundle();
-        const set = setFor(t.dataset.id, studySets);
-        if (!set || (set.mode || "general") === t.dataset.mode) return;
-        set.mode = t.dataset.mode;
-        await saveStudySet(set);
-        toast(t.dataset.mode === "coding" ? "Coding mode on — review now asks for code." : "General mode on.");
-        renderSetDetail(t.dataset.id, "summary");
-      })();
-      break;
-    case "code-card": startCodingTask(); break;
+    case "start-coding": startCodingPractice(id); break;
     case "code-check": checkCode(); break;
-    case "code-next": qIdx++; paintReviewCard(); break;
+    case "code-next": codingState.idx++; paintCodingQ(); break;
     case "apply-check": checkApply(); break;
     case "apply-next": qIdx++; paintReviewCard(); break;
     case "start-typed": startTypedPractice(id); break;
@@ -1615,6 +1620,7 @@ document.addEventListener("click", (e) => {
 });
 
 function goReturn() {
+  codingState = null;
   const ret = focusReturn;
   if (typeof ret === "string" && ret.startsWith("set:")) renderSetDetail(ret.slice(4));
   else renderHome();
@@ -1624,7 +1630,7 @@ async function startGlobalReview() {
   const { studySets } = await bundle();
   const items = [];
   studySets.forEach((set) =>
-    (set.flashcards || []).forEach((card) => isDue(card) && items.push({ sessionId: set.sessionId, card, examDate: set.examDate, mode: set.mode }))
+    (set.flashcards || []).forEach((card) => isDue(card) && items.push({ sessionId: set.sessionId, card, examDate: set.examDate }))
   );
   items.sort((a, b) => byDue(a.card, b.card));
   if (!items.length) return toast("Nothing due right now 🎉");
@@ -1637,7 +1643,7 @@ async function startSetReview(sessionId) {
   // (still applies SM-2 normally) so the button always does something.
   const due = (set?.flashcards || []).filter((c) => isDue(c));
   const pool = due.length ? due : set?.flashcards || [];
-  const items = pool.map((card) => ({ sessionId, card, examDate: set?.examDate, mode: set?.mode }));
+  const items = pool.map((card) => ({ sessionId, card, examDate: set?.examDate }));
   items.sort((a, b) => byDue(a.card, b.card));
   if (!items.length) return toast("No cards in this set.");
   startReview(items, "set:" + sessionId);

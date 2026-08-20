@@ -78,4 +78,64 @@ test("SM-2 schedules survive a regenerate (service worker)", () => {
   assert.ok(sw.includes("summary: existing?.summary"), "summary preserved");
 });
 
+
+console.log("coding practice decoupling (standalone session)");
+
+const codingStart = src.indexOf("// --- Coding practice: a standalone session started from the set");
+const codingEnd = src.indexOf("// --- Typed-answer practice over a set's cards");
+const codingBlock = src.slice(codingStart, codingEnd);
+
+test("the coding block never touches the review queue", () => {
+  assert.ok(codingStart !== -1 && codingEnd !== -1, "coding block found");
+  for (const banned of ["queue[qIdx]", "queue.length", "qIdx++", "paintReviewCard"]) {
+    assert.ok(!codingBlock.includes(banned), `coding block must not contain ${banned}`);
+  }
+});
+
+test("session shape mirrors typed practice (5 items, focusReturn, showChrome)", () => {
+  assert.ok(codingBlock.includes("startCodingPractice(sessionId)"));
+  assert.ok(codingBlock.includes("slice(0, 5)"), "coding sessions are 5 exercises");
+  assert.ok(codingBlock.includes('focusReturn = "set:" + sessionId'));
+  assert.ok(codingBlock.includes("showChrome(false)"));
+  assert.ok(codingBlock.includes("paintCodingQ();"));
+});
+
+test("progress chrome counts the session, not the queue", () => {
+  const bars = codingBlock.match(/\$\{idx \+ 1\} \/ \$\{items\.length\}/g) || [];
+  assert.ok(bars.length >= 2, "editor + spinner screens use idx / items.length");
+  assert.ok(codingBlock.includes("(idx / items.length) * 100"));
+});
+
+test("code-next advances codingState, never qIdx", () => {
+  assert.ok(src.includes('case "code-next": codingState.idx++; paintCodingQ(); break;'));
+  assert.ok(!src.includes('case "code-next": qIdx++'));
+});
+
+test("a slow LLM response cannot paint over a left/restarted session", () => {
+  assert.ok(codingBlock.includes("codingState.token !== token"), "stale-response token guard");
+  assert.ok(src.includes("function goReturn() {\n  codingState = null;"), "leaving the focus view ends the sitting");
+});
+
+test("the review flow shows Apply unconditionally again", () => {
+  assert.ok(src.includes('data-action="apply-card"'));
+  assert.ok(!src.includes('queue[qIdx].mode === "coding"'));
+  assert.ok(!src.includes('data-action="code-card"'));
+});
+
+test("the mode selector is gone; the entry point is the set page button", () => {
+  assert.ok(!src.includes('data-action="set-mode"'));
+  assert.ok(!src.includes("modebtn"));
+  assert.ok(src.includes('data-action="start-coding"'));
+  assert.ok(src.includes("⌨️ Coding exercises"));
+  // full-width (btn-block) and above the ＋ Card / ✍️ row in source order
+  const btnAt = src.indexOf('data-action="start-coding"');
+  const rowAt = src.indexOf('data-action="add-card"');
+  assert.ok(btnAt < rowAt, "Coding exercises sits above the two-button row");
+});
+
+test("review queue items no longer carry a mode field", () => {
+  assert.ok(!src.includes("mode: set.mode"));
+  assert.ok(!src.includes("mode: set?.mode"));
+});
+
 console.log(`\n${passed} tests passed`);
