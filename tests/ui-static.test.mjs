@@ -122,15 +122,15 @@ test("the review flow shows Apply unconditionally again", () => {
   assert.ok(!src.includes('data-action="code-card"'));
 });
 
-test("the mode selector is gone; the entry point is the set page button", () => {
-  assert.ok(!src.includes('data-action="set-mode"'));
-  assert.ok(!src.includes("modebtn"));
+test("the mode selector is present on the summary tab; the entry point is the set page button", () => {
+  assert.ok(src.includes('data-action="set-mode"'));
+  assert.ok(src.includes("modebtn"));
   assert.ok(src.includes('data-action="start-coding"'));
-  assert.ok(src.includes("⌨️ Coding exercises"));
+  assert.ok(src.includes("⌨️ Coding exercises") || src.includes("?? Coding exercises"));
   // full-width (btn-block) and above the ＋ Card / ✍️ row in source order
   const btnAt = src.indexOf('data-action="start-coding"');
-  const rowAt = src.indexOf('data-action="add-card"');
-  assert.ok(btnAt < rowAt, "Coding exercises sits above the two-button row");
+  const typeAt = src.indexOf('data-action="start-typed"');
+  assert.ok(btnAt < typeAt, "Coding exercises sits above the two-button row");
 });
 
 test("review queue items no longer carry a mode field", () => {

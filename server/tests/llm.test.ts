@@ -46,6 +46,37 @@ describe("generateStudySet", () => {
     expect(out.flashcards[0].id).toBeTruthy();
     expect(out.quiz).toHaveLength(1);
     expect(out.quiz[0].answer).toBe(1);
+    expect(out.mode).toBe("general"); // Default when not provided
+    vi.unstubAllGlobals();
+  });
+
+  it("normalizes mode correctly", async () => {
+    // missing mode defaults to general (tested above)
+    
+    // coding yields coding
+    vi.stubGlobal("fetch", ok({
+      flashcards: [{ front: "Q", back: "A" }],
+      mode: "coding"
+    }));
+    let out = await generateStudySet([{ role: "user", text: "hi" }]);
+    expect(out.mode).toBe("coding");
+    
+    // unexpected value yields general
+    vi.stubGlobal("fetch", ok({
+      flashcards: [{ front: "Q", back: "A" }],
+      mode: "python"
+    }));
+    out = await generateStudySet([{ role: "user", text: "hi" }]);
+    expect(out.mode).toBe("general");
+
+    // "Coding" (mixed case) yields coding
+    vi.stubGlobal("fetch", ok({
+      flashcards: [{ front: "Q", back: "A" }],
+      mode: "Coding"
+    }));
+    out = await generateStudySet([{ role: "user", text: "hi" }]);
+    expect(out.mode).toBe("coding");
+
     vi.unstubAllGlobals();
   });
 

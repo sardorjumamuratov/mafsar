@@ -68,7 +68,7 @@ async function saveGeneratedStudySet(session, generated) {
   return saveStudySet({
     sessionId: session.id,
     title: existing?.title ?? session.title,
-    mode: existing?.mode,
+    mode: existing?.mode ?? generated.mode,
     examDate: existing?.examDate ?? null,
     summary: existing?.summary,
     createdAt: existing?.createdAt ?? Date.now(),

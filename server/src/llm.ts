@@ -192,11 +192,13 @@ Rules:
 - Distractors must be plausible and drawn from the same subject as the answer. Never use
   filler like "none of the above" or answers of obviously different length or specificity.
 - Keep everything grounded in the provided text. Do not invent facts not present.
+- Set "mode" to "coding" only when the material is about programming or software — a language, an API, an algorithm, a data structure, a framework, SQL, shell — such that a student could practise it by writing code. Everything else is "general". Material that merely mentions technology (a history of the internet, the ethics of AI, a product management article) is "general".
 
 Respond with ONLY valid JSON, no markdown fences, matching exactly:
 {
   "flashcards": [{ "front": string, "back": string }],
-  "quiz": [{ "q": string, "options": [string, string, string, string], "answer": number, "explain": string }]
+  "quiz": [{ "q": string, "options": [string, string, string, string], "answer": number, "explain": string }],
+  "mode": "coding" | "general"
 }`;
 
 const GRADE_PROMPT = `You are a fair, concise exam grader. You get a question, the reference
@@ -287,7 +289,8 @@ export async function generateStudySet(messages: { role: string; text: string }[
         answer: Math.max(0, Math.min(q.options.length - 1, Number(q.answer) || 0)),
         explain: q.explain ? String(q.explain) : "",
       }));
-    if (flashcards.length || quiz.length) return { flashcards, quiz };
+    const mode = String(parsed.mode).toLowerCase() === "coding" ? "coding" : "general";
+    if (flashcards.length || quiz.length) return { flashcards, quiz, mode };
     lastErr = new Error("Model returned no usable cards.");
   }
   throw new Error(`Generation failed: ${lastErr instanceof Error ? lastErr.message : "unknown"}`);

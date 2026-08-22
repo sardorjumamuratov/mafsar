@@ -1,0 +1,717 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Mafsar — Remember what AI teaches you</title>
+<meta name="description" content="Mafsar captures what you learn from ChatGPT, Claude and Gemini and turns it into flashcards, quizzes and spaced-repetition reviews, so it comes back before you forget it.">
+<link rel="icon" href="assets/icon512.png" type="image/png">
+
+<!-- ───────────────────────────────────────────────────────────────
+     STORE LINKS — swap these in when the listings are approved,
+     then delete the `is-pending` class on the two store chips.
+     Chrome  : https://chromewebstore.google.com/detail/<ID>
+     Firefox : https://addons.mozilla.org/firefox/addon/<SLUG>/
+     ─────────────────────────────────────────────────────────────── -->
+
+<style>
+/* ============================================================
+   Mafsar — landing
+   Palette and serif inherited from the extension's own design
+   tokens (src/ui/panel.css) so the site and product read as one
+   thing. Neutrals are biased green rather than grey; the warm
+   ember is spent in exactly one place — the forgetting curve.
+   ============================================================ */
+
+:root {
+  --ground:      #eef2f1;
+  --ground-deep: #e4eae8;
+  --surface:     #ffffff;
+  --ink:         #0d1917;
+  --muted:       #52655f;
+  --faint:       #7d8f89;
+  --line:        #dae3e0;
+  --teal:        #0b6e77;
+  --teal-deep:   #064c53;
+  --teal-soft:   #dfeced;
+  --ember:       #b06a22;
+  --shadow-lg:   0 1px 2px rgba(13, 25, 23, .04), 0 24px 60px -32px rgba(13, 25, 23, .30);
+  --shadow-sm:   0 1px 2px rgba(13, 25, 23, .05), 0 8px 24px -18px rgba(13, 25, 23, .25);
+
+  --serif: ui-serif, "Iowan Old Style", "Palatino Linotype", Palatino, Georgia, serif;
+  --sans:  system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  --mono:  ui-monospace, "SF Mono", "Cascadia Mono", Menlo, Consolas, monospace;
+
+  --s1: .5rem;  --s2: .75rem; --s3: 1rem;   --s4: 1.5rem;
+  --s5: 2rem;   --s6: 3rem;   --s7: 4.5rem; --s8: 7rem;
+
+  --maxw: 68rem;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --ground:      #0a1210;
+    --ground-deep: #070d0c;
+    --surface:     #121b19;
+    --ink:         #e7efec;
+    --muted:       #93a5a0;
+    --faint:       #6b7d78;
+    --line:        #223029;
+    --line:        #22302c;
+    --teal:        #35b7b4;
+    --teal-deep:   #58d4cd;
+    --teal-soft:   #102e2e;
+    --ember:       #dc9a4d;
+    --shadow-lg:   0 1px 2px rgba(0,0,0,.5), 0 28px 64px -34px rgba(0,0,0,.9);
+    --shadow-sm:   0 1px 2px rgba(0,0,0,.5), 0 10px 26px -20px rgba(0,0,0,.8);
+  }
+}
+:root[data-theme="dark"] {
+  --ground:      #0a1210;
+  --ground-deep: #070d0c;
+  --surface:     #121b19;
+  --ink:         #e7efec;
+  --muted:       #93a5a0;
+  --faint:       #6b7d78;
+  --line:        #22302c;
+  --teal:        #35b7b4;
+  --teal-deep:   #58d4cd;
+  --teal-soft:   #102e2e;
+  --ember:       #dc9a4d;
+  --shadow-lg:   0 1px 2px rgba(0,0,0,.5), 0 28px 64px -34px rgba(0,0,0,.9);
+  --shadow-sm:   0 1px 2px rgba(0,0,0,.5), 0 10px 26px -20px rgba(0,0,0,.8);
+}
+
+* { box-sizing: border-box; }
+
+html { scroll-behavior: smooth; }
+@media (prefers-reduced-motion: reduce) { html { scroll-behavior: auto; } }
+
+body {
+  margin: 0;
+  background: var(--ground);
+  color: var(--ink);
+  font-family: var(--sans);
+  font-size: 1.0625rem;
+  line-height: 1.65;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+.wrap { width: 100%; max-width: var(--maxw); margin: 0 auto; padding-inline: var(--s4); }
+
+/* --- type ------------------------------------------------------ */
+h1, h2, h3 { font-family: var(--serif); font-weight: 600; margin: 0; text-wrap: balance; }
+h1 {
+  font-size: clamp(2.6rem, 6.2vw, 4.15rem);
+  line-height: 1.03;
+  letter-spacing: -.027em;
+}
+h2 {
+  font-size: clamp(1.85rem, 3.6vw, 2.6rem);
+  line-height: 1.12;
+  letter-spacing: -.021em;
+}
+h3 { font-size: 1.1875rem; line-height: 1.3; letter-spacing: -.012em; }
+p  { margin: 0; }
+
+/* Monospace carries every number and label. The product is built on
+   schedules and intervals; the type should say so. */
+.eyebrow {
+  font-family: var(--mono);
+  font-size: .7rem;
+  letter-spacing: .17em;
+  text-transform: uppercase;
+  color: var(--teal);
+  margin: 0;
+}
+.lead { font-size: clamp(1.075rem, 1.6vw, 1.235rem); line-height: 1.6; color: var(--muted); max-width: 34em; }
+
+a { color: var(--teal); text-underline-offset: 3px; text-decoration-thickness: 1px; }
+a:focus-visible, button:focus-visible { outline: 2px solid var(--teal); outline-offset: 3px; border-radius: 3px; }
+
+/* --- header ---------------------------------------------------- */
+.site-head {
+  position: sticky; top: 0; z-index: 20;
+  background: color-mix(in srgb, var(--ground) 88%, transparent);
+  backdrop-filter: saturate(1.5) blur(10px);
+  border-bottom: 1px solid transparent;
+  transition: border-color .2s;
+}
+.site-head.stuck { border-bottom-color: var(--line); }
+.head-row { display: flex; align-items: center; justify-content: space-between; gap: var(--s3); height: 64px; }
+.brand { display: inline-flex; align-items: center; gap: .6rem; text-decoration: none; color: var(--ink); }
+.brand img { width: 26px; height: 26px; border-radius: 6px; }
+.brand span { font-family: var(--serif); font-size: 1.2rem; font-weight: 600; letter-spacing: -.015em; }
+
+.theme-toggle {
+  display: inline-flex; align-items: center; gap: .45rem;
+  font-family: var(--mono); font-size: .68rem; letter-spacing: .12em; text-transform: uppercase;
+  color: var(--muted); background: transparent;
+  border: 1px solid var(--line); border-radius: 999px;
+  padding: .42rem .75rem; cursor: pointer;
+  transition: border-color .15s, color .15s;
+}
+.theme-toggle:hover { border-color: var(--teal); color: var(--teal); }
+.theme-toggle svg { width: 13px; height: 13px; fill: none; stroke: currentColor; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; }
+.t-dark { display: none; }
+:root[data-theme="dark"] .t-dark { display: inline; }
+:root[data-theme="dark"] .t-light { display: none; }
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) .t-dark { display: inline; }
+  :root:not([data-theme="light"]) .t-light { display: none; }
+}
+
+/* --- hero ------------------------------------------------------ */
+.hero { padding-block: clamp(var(--s6), 8vw, var(--s8)) var(--s7); }
+.hero-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.05fr) minmax(0, .95fr);
+  gap: clamp(var(--s5), 5vw, var(--s7));
+  align-items: center;
+}
+.hero-copy { display: flex; flex-direction: column; gap: var(--s4); min-width: 0; }
+.hero-claim {
+  font-size: 1.0625rem; line-height: 1.6; color: var(--ink);
+  max-width: 32em;
+  padding-left: var(--s3);
+  border-left: 2px solid var(--teal);
+}
+
+.cta-row { display: flex; flex-wrap: wrap; gap: var(--s2); }
+.btn {
+  display: inline-flex; align-items: center; justify-content: center; gap: .5rem;
+  font: inherit; font-size: .96rem; font-weight: 600;
+  padding: .78rem 1.35rem; border-radius: 10px;
+  text-decoration: none; cursor: pointer; border: 1px solid transparent;
+  transition: transform .12s ease, background .15s, border-color .15s;
+}
+.btn:active { transform: translateY(1px); }
+.btn-solid { background: var(--teal); color: #fff; }
+.btn-solid:hover { background: var(--teal-deep); }
+:root[data-theme="dark"] .btn-solid { color: #06201f; }
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .btn-solid { color: #06201f; } }
+.btn-quiet { background: transparent; color: var(--ink); border-color: var(--line); }
+.btn-quiet:hover { border-color: var(--teal); color: var(--teal); }
+
+.store-row { display: flex; flex-wrap: wrap; gap: var(--s2); align-items: center; }
+.chip {
+  display: inline-flex; align-items: center; gap: .45rem;
+  font-family: var(--mono); font-size: .68rem; letter-spacing: .08em; text-transform: uppercase;
+  color: var(--faint); border: 1px dashed var(--line); border-radius: 999px;
+  padding: .38rem .7rem;
+}
+.chip svg { width: 13px; height: 13px; fill: currentColor; opacity: .8; }
+.chip.is-pending::after {
+  content: "pending";
+  font-size: .6rem; letter-spacing: .1em;
+  color: var(--ember);
+  border: 1px solid currentColor; border-radius: 999px;
+  padding: 0 .35em;
+}
+
+/* --- the panel frame: screenshots are a real 380px side panel --- */
+.panel-frame {
+  width: 100%; max-width: 380px; margin-inline: auto;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  box-shadow: var(--shadow-lg);
+  overflow: hidden;
+}
+.panel-bar {
+  display: flex; align-items: center; gap: .5rem;
+  padding: .55rem .8rem;
+  border-bottom: 1px solid var(--line);
+  background: var(--ground-deep);
+}
+.panel-bar img { width: 15px; height: 15px; border-radius: 4px; }
+.panel-bar span {
+  font-family: var(--mono); font-size: .64rem; letter-spacing: .12em;
+  text-transform: uppercase; color: var(--faint);
+}
+/* Sizing only — no `display` here. An element-level rule like
+   `.panel-frame img.shot` outranks `.img-dark`, which would show both
+   screenshots stacked. The theme-swap classes below own display outright. */
+.panel-frame img.shot,
+.step .shot-hold img { width: 100%; height: auto; }
+
+.img-light { display: block; }
+.img-dark  { display: none; }
+:root[data-theme="dark"] .img-dark  { display: block; }
+:root[data-theme="dark"] .img-light { display: none; }
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) .img-dark  { display: block; }
+  :root:not([data-theme="light"]) .img-light { display: none; }
+}
+
+/* --- forgetting curve ------------------------------------------ */
+.curve-band {
+  border-block: 1px solid var(--line);
+  background: var(--ground-deep);
+  padding-block: var(--s6);
+}
+.curve-grid {
+  display: grid; grid-template-columns: minmax(0, 20rem) minmax(0, 1fr);
+  gap: clamp(var(--s4), 4vw, var(--s6)); align-items: center;
+}
+.curve-copy { display: flex; flex-direction: column; gap: var(--s2); }
+.curve-copy p { color: var(--muted); font-size: .98rem; }
+.curve-legend { display: flex; flex-wrap: wrap; gap: var(--s3); margin-top: var(--s1); }
+.legend-item {
+  display: inline-flex; align-items: center; gap: .45rem;
+  font-family: var(--mono); font-size: .66rem; letter-spacing: .1em; text-transform: uppercase;
+  color: var(--muted);
+}
+.swatch { width: 14px; height: 2px; border-radius: 2px; }
+.swatch.decay { background: var(--ember); }
+.swatch.review { background: var(--teal); }
+#curve { display: block; width: 100%; height: auto; }
+
+/* --- steps: a real sequence, so the numbering earns its place --- */
+.steps { padding-block: var(--s7); }
+.section-head { display: flex; flex-direction: column; gap: var(--s2); margin-bottom: var(--s6); max-width: 40em; }
+.steps-list { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: clamp(var(--s4), 3vw, var(--s5)); }
+.step { display: flex; flex-direction: column; gap: var(--s2); min-width: 0; }
+.step-tag { display: flex; align-items: baseline; gap: .55rem; }
+.step-tag b {
+  font-family: var(--mono); font-variant-numeric: tabular-nums;
+  font-size: .7rem; letter-spacing: .1em; font-weight: 500;
+  color: var(--teal);
+  border: 1px solid var(--teal); border-radius: 999px;
+  padding: .1rem .5rem;
+}
+.step p { color: var(--muted); font-size: .96rem; }
+.step .shot-hold {
+  margin-top: var(--s2);
+  border: 1px solid var(--line); border-radius: 12px;
+  background: var(--surface); box-shadow: var(--shadow-sm);
+  overflow: hidden;
+  /* Panels are tall; show the top of each without letterboxing. */
+  max-height: 260px;
+}
+
+/* --- features -------------------------------------------------- */
+.features { padding-block: var(--s7); border-top: 1px solid var(--line); }
+.story { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: clamp(var(--s4), 4vw, var(--s6)); }
+.story article { display: flex; flex-direction: column; gap: var(--s2); }
+.story h3 { color: var(--ink); }
+.story p { color: var(--muted); font-size: .99rem; }
+.story strong { color: var(--ink); font-weight: 600; }
+
+.more {
+  margin-top: var(--s7);
+  display: grid; grid-template-columns: repeat(auto-fit, minmax(15rem, 1fr));
+  gap: 0;
+  border-top: 1px solid var(--line);
+}
+.more div {
+  padding: var(--s4) var(--s4) var(--s4) 0;
+  border-bottom: 1px solid var(--line);
+  display: flex; flex-direction: column; gap: .3rem;
+}
+.more h4 {
+  margin: 0; font-family: var(--sans); font-size: .92rem; font-weight: 640;
+  letter-spacing: -.005em; color: var(--ink);
+}
+.more p { font-size: .89rem; color: var(--muted); line-height: 1.55; }
+
+/* --- privacy --------------------------------------------------- */
+.privacy { padding-block: var(--s7); border-top: 1px solid var(--line); }
+.privacy-grid { display: grid; grid-template-columns: minmax(0, 22rem) minmax(0, 1fr); gap: clamp(var(--s4), 5vw, var(--s7)); }
+.privacy-copy { display: flex; flex-direction: column; gap: var(--s3); }
+.privacy-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; }
+.privacy-list li {
+  padding: var(--s4) 0;
+  border-top: 1px solid var(--line);
+  font-size: .99rem; color: var(--muted); line-height: 1.6;
+}
+.privacy-list li:last-child { border-bottom: 1px solid var(--line); }
+.privacy-list strong { display: block; color: var(--ink); font-weight: 640; margin-bottom: .15rem; }
+
+/* --- footer ---------------------------------------------------- */
+.site-foot { border-top: 1px solid var(--line); padding-block: var(--s5); background: var(--ground-deep); }
+.foot-row { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--s3); }
+.foot-row nav { display: flex; flex-wrap: wrap; gap: var(--s4); }
+.foot-row a { color: var(--muted); text-decoration: none; font-size: .9rem; }
+.foot-row a:hover { color: var(--teal); text-decoration: underline; }
+.foot-note { font-family: var(--mono); font-size: .66rem; letter-spacing: .1em; text-transform: uppercase; color: var(--faint); }
+
+/* --- responsive ------------------------------------------------ */
+@media (max-width: 62rem) {
+  .hero-grid, .curve-grid, .privacy-grid { grid-template-columns: minmax(0, 1fr); }
+  .curve-grid { gap: var(--s4); }
+  .steps-list { grid-template-columns: minmax(0, 1fr); }
+  .story { grid-template-columns: minmax(0, 1fr); }
+  .step .shot-hold { max-height: none; }
+}
+@media (max-width: 40rem) {
+  body { font-size: 1rem; }
+  .wrap { padding-inline: var(--s3); }
+  .hero { padding-block: var(--s6) var(--s6); }
+  .btn { flex: 1 1 auto; }
+  .more div { padding-right: 0; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  * { animation: none !important; transition: none !important; }
+}
+</style>
+</head>
+
+<body>
+
+<header class="site-head" id="head">
+  <div class="wrap head-row">
+    <a class="brand" href="/" aria-label="Mafsar home">
+      <img src="assets/logo.svg" alt="" aria-hidden="true">
+      <span>Mafsar</span>
+    </a>
+    <button class="theme-toggle" id="themeToggle" type="button" aria-label="Switch colour theme">
+      <svg viewBox="0 0 24 24" aria-hidden="true" class="t-light"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg>
+      <svg viewBox="0 0 24 24" aria-hidden="true" class="t-dark"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/></svg>
+      <span class="t-light">Light</span><span class="t-dark">Dark</span>
+    </button>
+  </div>
+</header>
+
+<main>
+
+  <!-- Hero -->
+  <section class="hero">
+    <div class="wrap hero-grid">
+      <div class="hero-copy">
+        <p class="eyebrow">Chrome &amp; Firefox extension</p>
+        <h1>Stop forgetting what AI teaches you</h1>
+        <p class="lead">We learn enormous amounts from conversations with ChatGPT, Claude and Gemini — and then forget essentially all of it, because a chat log is not a study tool.</p>
+        <p class="hero-claim">Capture your AI chat learning sessions and turn them into flashcards, quizzes, and spaced-repetition reviews so you don't forget.</p>
+
+        <div class="cta-row">
+          <a class="btn btn-solid" href="https://github.com/sardorjumamuratov/mafsar" target="_blank" rel="noopener">View on GitHub</a>
+          <a class="btn btn-quiet" href="mailto:sardoralien@gmail.com?subject=Mafsar%20Waitlist">Email me when live</a>
+        </div>
+
+        <div class="store-row">
+          <span class="chip is-pending" title="Awaiting store approval">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8 0-1.28.3-2.49.83-3.56L10.5 14v1c0 1.1.9 2 2 2h4.51c-1.39 1.83-3.6 3-6.01 3z"/></svg>
+            Chrome
+          </span>
+          <span class="chip is-pending" title="Awaiting store approval">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm3.36 12.16l-3.36-1.94v-5.22h2v4.06l2.36 1.36-1 1.74z"/></svg>
+            Firefox
+          </span>
+        </div>
+      </div>
+
+      <div class="hero-visual">
+        <div class="panel-frame">
+          <div class="panel-bar">
+            <img src="assets/icon512.png" alt="" aria-hidden="true">
+            <span>Mafsar side panel</span>
+          </div>
+          <img class="shot img-light" src="assets/light-home.png" alt="The Mafsar side panel showing cards due for review today, a study streak and recent sets.">
+          <img class="shot img-dark" src="assets/dark-home.png" alt="The Mafsar side panel in dark mode, showing cards due for review today, a study streak and recent sets.">
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- The thesis, drawn -->
+  <section class="curve-band" aria-labelledby="curve-title">
+    <div class="wrap curve-grid">
+      <div class="curve-copy">
+        <p class="eyebrow">Why it works</p>
+        <h2 id="curve-title">Memory has a shape</h2>
+        <p>Read something once and most of it is gone within days. Review it at widening intervals and each pass decays more slowly than the last — until it simply stays.</p>
+        <p>Mafsar schedules those intervals for you with SM-2, so material comes back the day before you'd have lost it.</p>
+        <div class="curve-legend">
+          <span class="legend-item"><span class="swatch decay"></span>Read once</span>
+          <span class="legend-item"><span class="swatch review"></span>Reviewed on schedule</span>
+        </div>
+      </div>
+      <div>
+        <canvas id="curve" width="760" height="330"
+          role="img"
+          aria-label="A chart comparing memory retention over thirty days. Read once, retention falls to almost nothing within a week. Reviewed on schedule at one day, six days and fifteen days, retention returns to full each time and decays more slowly after every review.">
+        </canvas>
+      </div>
+    </div>
+  </section>
+
+  <!-- Steps -->
+  <section class="steps" aria-labelledby="steps-title">
+    <div class="wrap">
+      <div class="section-head">
+        <p class="eyebrow">How it works</p>
+        <h2 id="steps-title">From a browser tab to long-term memory</h2>
+        <p class="lead">Three steps, and only the first one needs you.</p>
+      </div>
+
+      <div class="steps-list">
+        <article class="step">
+          <div class="step-tag"><b>01</b><h3>Capture</h3></div>
+          <p>Right-click any page → Save to Mafsar. Works on ChatGPT, Claude and Gemini conversations, on any article, or on just the text you select. Existing Quizlet sets can be imported.</p>
+          <div class="shot-hold">
+            <img class="img-light" src="assets/light-set.png" alt="A captured study set listing its flashcards and progress.">
+            <img class="img-dark" src="assets/dark-set.png" alt="A captured study set listing its flashcards and progress, in dark mode.">
+          </div>
+        </article>
+
+        <article class="step">
+          <div class="step-tag"><b>02</b><h3>Generate</h3></div>
+          <p>Flashcards and a multiple-choice quiz are automatically written from your captured content, usually within about ten seconds.</p>
+          <div class="shot-hold">
+            <img class="img-light" src="assets/light-quiz.png" alt="Answering a generated multiple-choice question.">
+            <img class="img-dark" src="assets/dark-quiz.png" alt="Answering a generated multiple-choice question, in dark mode.">
+          </div>
+        </article>
+
+        <article class="step">
+          <div class="step-tag"><b>03</b><h3>Review</h3></div>
+          <p>Cards resurface on a spaced-repetition schedule (SM-2) — right before you'd otherwise forget them.</p>
+          <div class="shot-hold">
+            <img class="img-light" src="assets/light-review.png" alt="Reviewing a flashcard and grading how well it was recalled.">
+            <img class="img-dark" src="assets/dark-review.png" alt="Reviewing a flashcard and grading how well it was recalled, in dark mode.">
+          </div>
+        </article>
+      </div>
+    </div>
+  </section>
+
+  <!-- Features -->
+  <section class="features" aria-labelledby="features-title">
+    <div class="wrap">
+      <div class="section-head">
+        <p class="eyebrow">Beyond flashcards</p>
+        <h2 id="features-title">Built for serious learning</h2>
+        <p class="lead">Mafsar goes beyond basic flashcards to make sure you actually internalise what you capture.</p>
+      </div>
+
+      <div class="story">
+        <article>
+          <h3>Active recall, not just reciting</h3>
+          <p>Type answers in your own words and have them graded against your own material. Or try <strong>“Apply it”</strong> — a fresh scenario for a concept, so you practise using it in context rather than simply recalling a definition.</p>
+        </article>
+        <article>
+          <h3>Spaced repetition that makes sense</h3>
+          <p>Powered by SM-2, but tuned for reality. If you miss a card and answer <strong>“Again”</strong>, it comes back later in the same session instead of hiding until tomorrow. Set an exam date, and Mafsar works backwards into a daily target to keep you on track.</p>
+        </article>
+        <article>
+          <h3>Quizzes that actually test you</h3>
+          <p>Mafsar shuffles both the question order and the answer options every single sitting, so you learn the actual material rather than memorising the position of the right answer.</p>
+        </article>
+        <article>
+          <h3>Coding mode</h3>
+          <p>Master technical concepts with small, focused coding exercises generated from a concept. Your answer is graded against a <strong>per-requirement checklist</strong> rather than a single opaque score, helping you see exactly where you went wrong.</p>
+        </article>
+      </div>
+
+      <div class="more">
+        <div><h4>Auto-generated material</h4><p>Flashcards and multiple-choice quizzes are built automatically from any captured content.</p></div>
+        <div><h4>Flexible quizzes</h4><p>Pick your quiz length — jump into a quick run or tackle the full set at once.</p></div>
+        <div><h4>TL;DR summaries</h4><p>Get instant summaries and key points extracted from your long AI conversations.</p></div>
+        <div><h4>“Needs work”</h4><p>A dedicated view that automatically surfaces the specific concepts you keep missing.</p></div>
+        <div><h4>Daily habits</h4><p>Stay consistent with daily study reminders and a streak counter.</p></div>
+        <div><h4>Offline &amp; sync</h4><p>Works fully offline. Sign in to sync your progress seamlessly across devices.</p></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Privacy -->
+  <section class="privacy" aria-labelledby="privacy-title">
+    <div class="wrap privacy-grid">
+      <div class="privacy-copy">
+        <p class="eyebrow">Privacy</p>
+        <h2 id="privacy-title">Privacy is not boilerplate</h2>
+        <p class="lead">When an extension reads web pages, you should know exactly what it's doing. Mafsar is designed to protect your data by default.</p>
+        <p><a href="https://mafsar-production.up.railway.app/privacy" target="_blank" rel="noopener">Read the full privacy policy →</a></p>
+      </div>
+      <ul class="privacy-list">
+        <li><strong>No background monitoring.</strong> Mafsar only ever reads content you explicitly capture by clicking or right-clicking. It does not monitor your browsing or read pages in the background.</li>
+        <li><strong>Zero tracking.</strong> There are no analytics and no tracking scripts in the extension at all.</li>
+        <li><strong>Your data isn't the product.</strong> Your captured text is used solely to generate your study material — never for advertising, never to train models.</li>
+        <li><strong>Local first.</strong> It works fully offline using local browser storage. An account is only needed for automatic generation and cross-device sync.</li>
+      </ul>
+    </div>
+  </section>
+
+</main>
+
+<footer class="site-foot">
+  <div class="wrap foot-row">
+    <nav aria-label="Footer">
+      <a href="https://github.com/sardorjumamuratov/mafsar" target="_blank" rel="noopener">GitHub</a>
+      <a href="mailto:sardoralien@gmail.com">Support</a>
+      <a href="https://mafsar-production.up.railway.app/privacy" target="_blank" rel="noopener">Privacy policy</a>
+    </nav>
+    <p class="foot-note">Built for people who keep forgetting</p>
+  </div>
+</footer>
+
+<script>
+(() => {
+  "use strict";
+
+  // --- theme -----------------------------------------------------
+  const root = document.documentElement;
+  const toggle = document.getElementById("themeToggle");
+  const stored = (() => { try { return localStorage.getItem("mafsar-theme"); } catch { return null; } })();
+  if (stored === "dark" || stored === "light") root.dataset.theme = stored;
+
+  const isDark = () =>
+    root.dataset.theme === "dark" ||
+    (!root.dataset.theme && matchMedia("(prefers-color-scheme: dark)").matches);
+
+  toggle.addEventListener("click", () => {
+    root.dataset.theme = isDark() ? "light" : "dark";
+    try { localStorage.setItem("mafsar-theme", root.dataset.theme); } catch { /* private mode */ }
+    draw();
+  });
+  matchMedia("(prefers-color-scheme: dark)").addEventListener("change", () => { if (!root.dataset.theme) draw(); });
+
+  // --- sticky header hairline ------------------------------------
+  const head = document.getElementById("head");
+  const onScroll = () => head.classList.toggle("stuck", window.scrollY > 8);
+  addEventListener("scroll", onScroll, { passive: true });
+  onScroll();
+
+  // --- the forgetting curve --------------------------------------
+  // Retention decays exponentially: R = e^(-t/S). Each review restores
+  // R to 1 and increases S, so the next decay is shallower — which is
+  // the whole argument for spaced repetition, and the reason the
+  // review marks sit at SM-2's real first intervals.
+  const canvas = document.getElementById("curve");
+  const ctx = canvas.getContext("2d");
+  const DAYS = 30;
+  const REVIEWS = [1, 6, 15];          // SM-2's opening intervals
+  const STRENGTH = [1.1, 4.2, 10, 24]; // S after each successive review
+  const reduce = matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+  const token = (name) => getComputedStyle(root).getPropertyValue(name).trim();
+
+  function retentionReviewed(t) {
+    let seg = 0;
+    while (seg < REVIEWS.length && t >= REVIEWS[seg]) seg++;
+    const last = seg === 0 ? 0 : REVIEWS[seg - 1];
+    return Math.exp(-(t - last) / STRENGTH[seg]);
+  }
+  const retentionOnce = (t) => Math.exp(-t / STRENGTH[0]);
+
+  function draw(progress = 1) {
+    const cssW = canvas.clientWidth || 760;
+    const dpr = Math.min(devicePixelRatio || 1, 2);
+    const h = Math.round(cssW * 0.43);
+    canvas.width = cssW * dpr;
+    canvas.height = h * dpr;
+    canvas.style.height = h + "px";
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    ctx.clearRect(0, 0, cssW, h);
+
+    const padL = 14, padR = 16, padT = 16, padB = 30;
+    const w = cssW - padL - padR;
+    const gh = h - padT - padB;
+    const X = (t) => padL + (t / DAYS) * w;
+    const Y = (r) => padT + (1 - r) * gh;
+
+    const line = token("--line");
+    const faint = token("--faint");
+    const teal = token("--teal");
+    const ember = token("--ember");
+
+    // baseline
+    ctx.strokeStyle = line;
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(padL, Y(0) + .5);
+    ctx.lineTo(padL + w, Y(0) + .5);
+    ctx.stroke();
+
+    const plot = (fn, colour, dashed) => {
+      ctx.save();
+      ctx.strokeStyle = colour;
+      ctx.lineWidth = 2;
+      ctx.lineJoin = "round";
+      ctx.lineCap = "round";
+      if (dashed) ctx.setLineDash([4, 4]);
+      ctx.beginPath();
+      const end = DAYS * progress;
+      for (let t = 0; t <= end; t += 0.1) {
+        const x = X(t), y = Y(fn(t));
+        t === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
+      }
+      ctx.stroke();
+      ctx.restore();
+    };
+
+    plot(retentionOnce, ember, true);
+    plot(retentionReviewed, teal, false);
+
+    // review marks + interval labels
+    ctx.font = "500 11px " + token("--mono").split(",")[0];
+    ctx.textAlign = "center";
+    REVIEWS.forEach((day, i) => {
+      if (day > DAYS * progress) return;
+      const x = X(day);
+      ctx.strokeStyle = line;
+      ctx.setLineDash([2, 3]);
+      ctx.beginPath();
+      ctx.moveTo(x, padT);
+      ctx.lineTo(x, Y(0));
+      ctx.stroke();
+      ctx.setLineDash([]);
+
+      ctx.fillStyle = token("--surface");
+      ctx.beginPath(); ctx.arc(x, Y(1), 4.5, 0, Math.PI * 2); ctx.fill();
+      ctx.strokeStyle = teal; ctx.lineWidth = 2;
+      ctx.beginPath(); ctx.arc(x, Y(1), 4.5, 0, Math.PI * 2); ctx.stroke();
+
+      // Keep the label inside the plot: the first review sits 1/30th along,
+      // so a centred label would otherwise hang off the left edge.
+      const label = ["1 day", "6 days", "15 days"][i];
+      const half = ctx.measureText(label).width / 2;
+      ctx.fillStyle = faint;
+      ctx.fillText(label, Math.min(Math.max(x, padL + half), padL + w - half), Y(0) + 18);
+    });
+
+    // No "day 0" marker — it would collide with the 1-day review label, and
+    // the left edge reads as the start without being told.
+    ctx.textAlign = "right";
+    ctx.fillStyle = faint;
+    ctx.fillText("day 30", padL + w, Y(0) + 18);
+  }
+
+  // Draw once when it scrolls into view; animate unless motion is reduced.
+  // A hidden tab pauses requestAnimationFrame, so animating there would leave
+  // the chart permanently blank for anyone who opens the page in a background
+  // tab. Draw the finished state instead and let visibilitychange animate it
+  // if they arrive later.
+  let played = false;
+  const run = () => {
+    if (played) return;
+    if (reduce || document.hidden) { draw(1); played = !document.hidden; return; }
+    played = true;
+    const t0 = performance.now();
+    const step = (now) => {
+      const p = Math.min((now - t0) / 1400, 1);
+      draw(p * p * (3 - 2 * p)); // smoothstep
+      if (p < 1) requestAnimationFrame(step);
+    };
+    requestAnimationFrame(step);
+  };
+  document.addEventListener("visibilitychange", () => { if (!document.hidden) run(); });
+
+  draw(reduce ? 1 : 0);
+  new IntersectionObserver((entries, obs) => {
+    if (entries.some((e) => e.isIntersecting)) { run(); obs.disconnect(); }
+  }, { threshold: .25 }).observe(canvas);
+
+  let resizeTimer;
+  addEventListener("resize", () => {
+    clearTimeout(resizeTimer);
+    resizeTimer = setTimeout(() => draw(played ? 1 : 0), 120);
+  });
+})();
+</script>
+
+</body>
+</html>

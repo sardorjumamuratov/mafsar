@@ -546,7 +546,7 @@ function paintDetail() {
             : '<div class="empty">No flashcards.</div>'
         }
       </div>
-      <button class="btn btn-ghost btn-block" data-action="start-coding" data-id="${esc(session.id)}">⌨️ Coding exercises</button>
+      ${studySet.mode === "coding" ? `<button class="btn btn-ghost btn-block" data-action="start-coding" data-id="${esc(session.id)}">⌨️ Coding exercises</button>` : ""}
       <div style="display:flex;gap:10px">
         <button class="btn btn-ghost" style="flex:1" data-action="add-card" data-id="${esc(session.id)}">＋ Card</button>
         <button class="btn btn-ghost" style="flex:1" data-action="start-typed" data-id="${esc(session.id)}">✍️ Type answers</button>
@@ -610,6 +610,24 @@ function paintDetail() {
                  ${(studySet.flashcards || []).slice(0, 8).map((c) => `<li>${esc(c.front)}</li>`).join("") || "<li>No cards</li>"}
                </ul>`
         }
+      </div>
+      <div class="block" style="display:flex;flex-direction:column;gap:9px">
+        <div class="t-label">Study mode</div>
+        <div class="modes" role="group" aria-label="Study mode">
+          ${[
+            ["general", "General", "Flashcards, quiz, written answers"],
+            ["coding", "Coding", "Review swaps in small coding tasks"],
+          ]
+            .map(
+              ([id, label, hint]) =>
+                `<button class="modebtn${(studySet.mode || "general") === id ? " on" : ""}"
+                   data-action="set-mode" data-id="${esc(session.id)}" data-mode="${id}"
+                   aria-pressed="${(studySet.mode || "general") === id}">
+                   <span class="l">${label}</span><span class="h">${hint}</span>
+                 </button>`
+            )
+            .join("")}
+        </div>
       </div>
       <button class="btn btn-ghost btn-block" data-action="delete-set" data-id="${esc(session.id)}">Delete set</button>`;
   }
@@ -1546,6 +1564,17 @@ document.addEventListener("click", (e) => {
     case "flip": revealCard(); break;
     case "grade": gradeCard(Number(t.dataset.g)); break;
     case "apply-card": startApply(); break;
+    case "set-mode":
+      (async () => {
+        const { studySets } = await bundle();
+        const set = setFor(t.dataset.id, studySets);
+        if (!set || (set.mode || "general") === t.dataset.mode) return;
+        set.mode = t.dataset.mode;
+        await saveStudySet(set);
+        toast(t.dataset.mode === "coding" ? "Coding mode on — review now asks for code." : "General mode on.");
+        renderSetDetail(t.dataset.id, "summary");
+      })();
+      break;
     case "start-coding": startCodingPractice(id); break;
     case "code-check": checkCode(); break;
     case "code-next": codingState.idx++; paintCodingQ(); break;
