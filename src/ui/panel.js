@@ -133,7 +133,7 @@ function greeting() {
 function sourceLabel(session) {
   return (
     session.sourceLabel ||
-    { chatgpt: "ChatGPT", claude: "Claude", gemini: "Gemini", quizlet: "Quizlet" }[session.source] ||
+    { chatgpt: "ChatGPT", claude: "Claude", gemini: "Gemini", quizlet: "Quizlet", shared: "Shared" }[session.source] ||
     "Chat"
   );
 }
@@ -294,10 +294,7 @@ async function renderHome() {
         <div><div class="h-sub">${greeting()}</div><div class="h-title">Ready to review</div></div>
         <div style="display:flex;gap:8px;align-items:center">
           <span class="streak">${FLAME}${streak}</span>
-          <button class="iconbtn" data-action="settings" aria-label="Settings">
-            <svg class="ic" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19 12a7 7 0 0 0-.1-1l2-1.5-2-3.4-2.3 1a7 7 0 0 0-1.7-1L14.5 2h-4l-.4 2.6a7 7 0 0 0-1.7 1l-2.3-1-2 3.4L4.1 11a7 7 0 0 0 0 2l-2 1.5 2 3.4 2.3-1a7 7 0 0 0 1.7 1l.4 2.6h4l.4-2.6a7 7 0 0 0 1.7-1l2.3 1 2-3.4-2-1.5c.1-.3.1-.7.1-1z"/></svg>
-          </button>
-        </div>
+                  </div>
       </div>
 
       ${heroHtml}
@@ -412,8 +409,65 @@ async function saveExamSelection() {
     if (picked && set.examDate !== date) await setExamDate(set.sessionId, date);
     if (!picked && set.examDate) await setExamDate(set.sessionId, null);
   }
-  toast("Exam saved — cards will resurface before it");
+  toast("Exam date set. Cards will resurface before it.");
   renderHome();
+}
+
+/** Summary-tab share block. The code is cached on the set (local-only). */
+function shareBlockHtml(studySet, sessionId) {
+  if (!studySet.shareCode) {
+    return `<button class="btn btn-ghost btn-block" data-action="share-create" data-id="${esc(sessionId)}">Share this set</button>`;
+  }
+  return `<div class="share-code-row">
+      <code class="share-code tnum">${esc(studySet.shareCode)}</code>
+      <button class="btn btn-ghost btn-sm" data-action="share-copy" data-code="${esc(studySet.shareCode)}">Copy</button>
+      <button class="linkbtn" data-action="share-revoke" data-id="${esc(sessionId)}">Stop sharing</button>
+    </div>`;
+}
+
+async function createShareFor(sessionId) {
+  toast("Creating code…");
+  try {
+    const r = await send({ type: "SHARE_CREATE", setId: sessionId });
+    const { studySets } = await bundle();
+    const set = setFor(sessionId, studySets);
+    if (set) {
+      set.shareCode = r.code; // local cache; re-sharing returns the same code
+      await saveStudySet(set);
+    }
+    // In-place repaint — the user is mid-view on the Summary tab.
+    const out = document.getElementById("shareOut");
+    if (out) setHTML(out, shareBlockHtml(set || { shareCode: r.code }, sessionId));
+    toast("Share code ready");
+  } catch (e) {
+    toast(e.message);
+  }
+}
+
+async function copyShareCode(code) {
+  try {
+    await navigator.clipboard.writeText(code);
+    toast("Code copied");
+  } catch {
+    toast("Copy failed — the code is " + code);
+  }
+}
+
+async function revokeShareFor(sessionId) {
+  const { studySets } = await bundle();
+  const set = setFor(sessionId, studySets);
+  if (!set?.shareCode) return;
+  if (!confirm("Stop sharing this set? People who already added it keep their copy; the code stops working.")) return;
+  try {
+    await send({ type: "SHARE_REVOKE", code: set.shareCode });
+    delete set.shareCode;
+    await saveStudySet(set);
+    const out = document.getElementById("shareOut");
+    if (out) setHTML(out, shareBlockHtml(set, sessionId));
+    toast("Sharing stopped");
+  } catch (e) {
+    toast(e.message);
+  }
 }
 
 function setRow(session, s) {
@@ -629,6 +683,16 @@ function paintDetail() {
             .join("")}
         </div>
       </div>
+
+      ${
+        studySet
+          ? `<div class="block" style="display:flex;flex-direction:column;gap:9px">
+               <div class="t-label">Share</div>
+               <div class="help" style="margin:0">Send someone a copy of these cards with a short code. Their copy and progress are theirs — edits don't travel.</div>
+               <div id="shareOut">${shareBlockHtml(studySet, session.id)}</div>
+             </div>`
+          : ""
+      }
       <button class="btn btn-ghost btn-block" data-action="delete-set" data-id="${esc(session.id)}">Delete set</button>`;
   }
 
@@ -695,7 +759,7 @@ async function makeSet(sessionId) {
   topOfView();
   try {
     await send({ type: "GENERATE_STUDY_SET", sessionId });
-    toast("Study set ready!");
+    toast("Your flashcards are ready");
     syncNow().catch(() => {}); // background sync — silent if offline/signed out
     renderSetDetail(sessionId, "cards");
   } catch (e) {
@@ -889,7 +953,7 @@ async function startCodingPractice(sessionId) {
   const { studySets } = await bundle();
   const set = setFor(sessionId, studySets);
   const cards = (set?.flashcards || []).filter((c) => c.back);
-  if (!cards.length) return toast("No cards to code against.");
+  if (!cards.length) return toast("This set has no cards to practise with yet.");
   const due = cards.filter((c) => isDue(c));
   const items = (due.length ? due : cards).slice(0, 5).map((card) => ({ sessionId, card }));
   codingState = { sessionId, items, idx: 0, task: null };
@@ -1001,13 +1065,13 @@ function paintCodeCount() {
 }
 
 async function checkCode() {
-  if (!codingState?.task) return toast("Session ended.");
+  if (!codingState?.task) return toast("Practice stopped.");
   const ta = document.getElementById("codeInput");
   const { items, idx, task, sessionId } = codingState;
   const { card } = items[idx];
   const s = codeSize(ta?.value, task.expectedLines);
   if (s.empty) return toast("Write some code first.");
-  if (s.overCap) return toast(`Submissions are capped at ${MAX_CODE_CHARS} characters.`);
+  if (s.overCap) return toast(`That\'s too long — keep it under ${MAX_CODE_CHARS} characters.`);
 
   const btn = app.querySelector('[data-action="code-check"]');
   btn.disabled = true;
@@ -1085,7 +1149,7 @@ async function startTypedPractice(sessionId) {
   const { studySets } = await bundle();
   const set = setFor(sessionId, studySets);
   const cards = (set?.flashcards || []).filter((c) => c.back);
-  if (!cards.length) return toast("No cards to practice.");
+  if (!cards.length) return toast("This set has no cards yet.");
   const due = cards.filter((c) => isDue(c));
   const items = (due.length ? due : cards).slice(0, 10).map((card) => ({ sessionId, card }));
   typedState = { sessionId, items, idx: 0 };
@@ -1379,7 +1443,7 @@ function previewImport() {
 }
 async function doImport() {
   const cards = importCards();
-  if (!cards.length) return toast("Nothing to import — check separators.");
+  if (!cards.length) return toast("Couldn't read that. Check there\'s one card per line.");
   const title = document.getElementById("importTitle").value.trim() || "Imported flashcards";
   const now = Date.now();
   const flashcards = cards.map((c) => ({ id: uid(), front: c.front, back: c.back, ...initSchedule(now) }));
@@ -1398,22 +1462,94 @@ async function doImport() {
 }
 
 // ================================================================ TEAMS / YOU (placeholders)
-function renderTeams() {
+// --- Shared tab: the receiving side of a share -------------------------------
+// A share code copies someone's cards into YOUR sets: fresh ids, fresh
+// schedule, your progress. No live link back to the sender.
+let sharedPreview = null; // { code, title, cards, quiz }
+
+function renderShared() {
   setNav("teams");
   showChrome(true);
+  sharedPreview = null;
   setHTML(app, `
     <div class="view">
-      <div class="ahd"><div class="h-title">Team learning</div></div>
-      <div class="block tint" style="text-align:center;padding:22px 16px">
-        <div style="font-size:26px">👥</div>
-        <div style="font-weight:650;margin-top:8px">Study together — coming soon</div>
-        <div style="font-size:12.5px;color:var(--muted);margin-top:6px;line-height:1.55">
-          Shared sets, team progress, and streak boards arrive with cloud sync. They need an account so
-          your sets can follow you across devices.</div>
-      </div>
-      <button class="btn btn-ghost btn-block" disabled>Create a team</button>
+      <div class="ahd"><div class="h-title">Add a shared set</div></div>
+      <div class="help" style="margin:0">Have a code from another Mafsar user? Enter it to add a copy of
+        their cards to your sets. Your progress is your own — nothing syncs back.</div>
+      <div class="field"><label>Share code</label>
+        <input id="shareCode" type="text" placeholder="e.g. 7KX2M9QRTA" autocomplete="off" autocapitalize="characters" /></div>
+      <button class="btn btn-primary btn-block" data-action="share-lookup">Look up code</button>
+      <div id="sharePreview"></div>
     </div>`);
   topOfView();
+}
+
+async function lookupShare() {
+  const raw = document.getElementById("shareCode")?.value || "";
+  const code = raw.trim().toUpperCase();
+  if (!code) return toast("Enter a code first.");
+  const out = document.getElementById("sharePreview");
+  if (out) setHTML(out, '<div style="font-size:13px;color:var(--muted)">Looking up…</div>');
+  try {
+    const payload = await send({ type: "SHARE_FETCH", code });
+    // Already added? Sessions keep the code they imported with, so a re-entry
+    // is caught before a duplicate set appears.
+    const { sessions } = await bundle();
+    if (sessions.some((s) => s.shareCode === code)) {
+      sharedPreview = null;
+      if (out) setHTML(out, "");
+      return toast("You already added this set.");
+    }
+    sharedPreview = { code, ...payload };
+    paintSharePreview(out);
+  } catch (e) {
+    sharedPreview = null;
+    if (out) setHTML(out, "");
+    // The server words revoked and unknown the same way on purpose; offline
+    // reads differently because the fix is different.
+    if (/fetch|network|Failed/i.test(e.message)) toast("Can't reach the server — check your connection.");
+    else if (/Unknown or revoked/i.test(e.message)) toast("That code isn't valid — revoked, or check for typos.");
+    else toast(e.message);
+  }
+}
+
+function paintSharePreview(out) {
+  const target = out || document.getElementById("sharePreview");
+  if (!target || !sharedPreview) return;
+  const { title, cards, quiz } = sharedPreview;
+  setHTML(target, `
+    <div class="block" style="display:flex;flex-direction:column;gap:9px">
+      <div class="t-label">Found</div>
+      <div style="font-weight:650;color:var(--ink);line-height:1.3">${esc(title)}</div>
+      <div style="font-size:12.5px;color:var(--muted)">Copy with ${cards.length} card${cards.length === 1 ? "" : "s"}${quiz?.length ? ` and ${quiz.length} quiz question${quiz.length === 1 ? "" : "s"}` : ""} — added fresh, reviews start from scratch.</div>
+      <button class="btn btn-primary btn-block" data-action="share-import">Add to my sets</button>
+    </div>`);
+}
+
+async function importSharedSet() {
+  if (!sharedPreview) return;
+  const { code, title, cards, quiz } = sharedPreview;
+  const now = Date.now();
+  // New ids everywhere: rows are keyed by id, so reusing the sender's would
+  // collide with theirs (or a second import). Schedules start fresh.
+  const flashcards = cards.map((c) => ({
+    id: uid(), front: String(c.front), back: String(c.back ?? ""),
+    updatedAt: new Date(now).toISOString(), ...initSchedule(now),
+  }));
+  const quizQs = (quiz || []).map((q) => ({
+    id: uid(), q: String(q.q), options: (q.options || []).map(String),
+    answer: Math.max(0, Number(q.answer) || 0), explain: String(q.explain ?? ""),
+    updatedAt: new Date(now).toISOString(),
+  }));
+  const session = await addSession({
+    source: "shared", sourceLabel: "Shared", title, url: "",
+    capturedAt: now, messages: [], shareCode: code, importedCount: flashcards.length,
+  });
+  await saveStudySet({ sessionId: session.id, title, createdAt: now, flashcards, quiz: quizQs });
+  syncNow().catch(() => {});
+  toast(`Added ${flashcards.length} cards`);
+  sharedPreview = null;
+  renderSetDetail(session.id, "cards");
 }
 
 async function renderYou() {
@@ -1437,17 +1573,14 @@ async function renderYou() {
            <div style="min-width:0">
              <div style="font-size:13px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(auth.user.email)}</div>
              <div style="font-size:11.5px;color:var(--muted)">${
-               auth.lastSync ? "Last synced " + new Date(auth.lastSync).toLocaleString() : "Never synced"
+               auth.lastSync ? "Last synced " + new Date(auth.lastSync).toLocaleString() : "Not backed up yet"
              }</div>
            </div>
          </div>
-         <div style="display:flex;gap:10px">
-           <button class="btn btn-primary" style="flex:1" data-action="sync-now">⟳ Sync now</button>
-           <button class="btn btn-ghost" style="flex:1" data-action="auth-signout">Sign out</button>
-         </div>
+         <button class="btn btn-ghost btn-block" data-action="auth-signout">Sign out</button>
        </div>`
     : `<div class="block" style="display:flex;flex-direction:column;gap:10px">
-         <div style="font-weight:600;font-size:13px">Cloud sync</div>
+         <div style="font-weight:600;font-size:13px">Back up and sync</div>
          <div style="font-size:12px;color:var(--muted);line-height:1.5">Sign in to sync your sets across devices. Everything works offline without an account.</div>
          <div class="field"><label>Email</label><input id="youEmail" type="email" placeholder="you@example.com" autocomplete="email" /></div>
          <div class="field"><label>Password</label><input id="youPass" type="password" placeholder="8+ characters" autocomplete="new-password" /></div>
@@ -1461,7 +1594,7 @@ async function renderYou() {
     <div class="view">
       <div class="ahd"><div class="wordmark">Maf<b>sar</b></div></div>
       <div class="block" style="text-align:center;padding:20px">
-        <div style="font-size:13px;color:var(--muted)">${auth?.user ? "Syncing to the cloud" : "Studying locally on this device"}</div>
+        <div style="font-size:13px;color:var(--muted)">${auth?.user ? "Your sets are backed up" : "Everything stays on this device"}</div>
         <div style="display:flex;justify-content:center;gap:8px;margin-top:12px">
           <span class="streak">${FLAME}${streak}-day streak</span>
         </div>
@@ -1472,8 +1605,7 @@ async function renderYou() {
         <div class="stat"><div class="v tnum">${studySets.length}</div><div class="k">Sets</div></div>
       </div>
       ${accountHtml}
-      <button class="btn btn-ghost btn-block" data-action="settings">Settings · reminders</button>
-      <div class="listhd"><span class="t-label">Backup</span></div>
+            <div class="listhd"><span class="t-label">Backup</span></div>
       <div style="display:flex;gap:10px">
         <button class="btn btn-ghost" style="flex:1" data-action="export-backup">⇩ Export JSON</button>
         <button class="btn btn-ghost" style="flex:1" data-action="import-backup">⇪ Restore</button>
@@ -1493,10 +1625,10 @@ async function authSubmit(kind) {
   toast(kind === "register" ? "Creating account…" : "Signing in…");
   try {
     const user = kind === "register" ? await register(email, password) : await login(email, password);
-    toast(`Signed in as ${user.email} — syncing…`);
+    toast("Signed in");
     try {
       const r = await syncNow();
-      if (!r.skipped) toast(`Synced · ${r.pulled} item(s) from cloud`);
+      if (!r.skipped) toast(r.pulled === 0 ? "Up to date" : "Updated from your other devices");
     } catch { /* offline is fine */ }
     // From the first-launch gate go Home; from the You tab stay on You.
     wasSignedIn ? renderYou() : renderHome();
@@ -1505,24 +1637,13 @@ async function authSubmit(kind) {
   }
 }
 
-async function manualSync() {
-  toast("Syncing…");
-  try {
-    const r = await syncNow();
-    if (r.skipped) return toast("Sign in to sync.");
-    toast(r.pulled || r.pushed ? `Synced · ${r.pushed} up, ${r.pulled} down` : "Up to date");
-    renderHome();
-  } catch (e) {
-    toast(e.message);
-    renderYou();
-  }
-}
+
 
 // ================================================================ capture current tab
 async function captureCurrent() {
   toast("Capturing…");
   const tab = await queryActiveTab();
-  if (!tab?.id) return toast("No active tab.");
+  if (!tab?.id) return toast("Open a page to capture first.");
   // Try the site adapter first (clean capture on AI-chat sites)…
   const resp = await sendToTab(tab.id, { type: "CAPTURE_ACTIVE" });
   let r;
@@ -1533,8 +1654,8 @@ async function captureCurrent() {
       // …otherwise fall back to universal page-text capture on any site.
       r = await send({ type: "CAPTURE_UNIVERSAL" });
     }
-    if (r.generated) toast(`Saved · ${r.cards} cards generated`);
-    else toast("Saved — generation failed; open the set to retry");
+    if (r.generated) toast(`${r.cards} flashcards ready`);
+    else toast("Saved, but we couldn\'t make flashcards. Open the set to try again.");
     renderHome();
   } catch (e) {
     toast(e.message);
@@ -1548,7 +1669,6 @@ document.addEventListener("click", (e) => {
   const a = t.dataset.action;
   const id = t.dataset.id;
   switch (a) {
-    case "settings": chrome.runtime.openOptionsPage(); break;
     case "open-import": renderImport(); break;
     case "nav-home": renderHome(); break;
     case "nav-sets": renderSets(); break;
@@ -1576,6 +1696,11 @@ document.addEventListener("click", (e) => {
       })();
       break;
     case "start-coding": startCodingPractice(id); break;
+    case "share-create": createShareFor(id); break;
+    case "share-copy": copyShareCode(t.dataset.code); break;
+    case "share-revoke": revokeShareFor(t.dataset.id); break;
+    case "share-lookup": lookupShare(); break;
+    case "share-import": importSharedSet(); break;
     case "code-check": checkCode(); break;
     case "code-next": codingState.idx++; paintCodingQ(); break;
     case "apply-check": checkApply(); break;
@@ -1604,11 +1729,10 @@ document.addEventListener("click", (e) => {
     case "auth-register": authSubmit("register"); break;
     case "auth-signout":
       logout().then(() => {
-        toast("Signed out — data stays on this device");
+        toast("Signed out. Your sets stay on this device.");
         renderYou();
       });
       break;
-    case "sync-now": manualSync(); break;
     case "exam-pick": openExamPicker(); break;
     case "exam-clear":
       (async () => {
@@ -1662,7 +1786,7 @@ async function startGlobalReview() {
     (set.flashcards || []).forEach((card) => isDue(card) && items.push({ sessionId: set.sessionId, card, examDate: set.examDate }))
   );
   items.sort((a, b) => byDue(a.card, b.card));
-  if (!items.length) return toast("Nothing due right now 🎉");
+  if (!items.length) return toast("Nothing due right now — you're all caught up");
   startReview(items, "home");
 }
 async function startSetReview(sessionId) {
@@ -1674,7 +1798,7 @@ async function startSetReview(sessionId) {
   const pool = due.length ? due : set?.flashcards || [];
   const items = pool.map((card) => ({ sessionId, card, examDate: set?.examDate }));
   items.sort((a, b) => byDue(a.card, b.card));
-  if (!items.length) return toast("No cards in this set.");
+  if (!items.length) return toast("This set has no cards yet.");
   startReview(items, "set:" + sessionId);
 }
 
@@ -1699,7 +1823,7 @@ function paintAddCard() {
 async function saveNewCard(sessionId) {
   const front = document.getElementById("newFront")?.value.trim();
   const back = document.getElementById("newBack")?.value.trim();
-  if (!front) return toast("The front is required.");
+  if (!front) return toast("Add a question first.");
   await addCard(sessionId, front, back || "");
   toast("Card added");
   renderSetDetail(sessionId, "cards");
@@ -1707,7 +1831,7 @@ async function saveNewCard(sessionId) {
 async function saveCardEdit(sessionId, cardId) {
   const front = document.getElementById("editFront")?.value.trim();
   const back = document.getElementById("editBack")?.value.trim();
-  if (!front) return toast("The front is required.");
+  if (!front) return toast("Add a question first.");
   await updateCard(sessionId, cardId, { front, back: back || "" });
   toast("Card saved");
 }
@@ -1724,7 +1848,7 @@ function downloadFile(filename, text, type = "text/plain") {
 async function exportSetTsv(sessionId) {
   const { studySets } = await bundle();
   const set = setFor(sessionId, studySets);
-  if (!set?.flashcards?.length) return toast("No cards to export.");
+  if (!set?.flashcards?.length) return toast("This set has no cards yet.");
   const tsv = set.flashcards
     .map((c) => `${c.front.replace(/\t/g, " ").replace(/\r?\n/g, " ")}\t${(c.back || "").replace(/\t/g, " ").replace(/\r?\n/g, " ")}`)
     .join("\n");
@@ -1769,7 +1893,7 @@ document.addEventListener("change", (e) => {
   if (t.id === "examDate" && t.dataset.session) {
     const ms = t.value ? new Date(`${t.value}T23:59:59`).getTime() : null;
     setExamDate(t.dataset.session, ms).then(() => {
-      toast(ms ? "Exam date set — cards will resurface before it" : "Exam date cleared");
+      toast(ms ? "Exam date set. Cards will resurface before it." : "Exam date cleared");
       renderSetDetail(t.dataset.session, "cards");
     });
   } else if (t.id === "homeExamDate") {
@@ -1833,7 +1957,7 @@ nav.addEventListener("click", (e) => {
   if (n === "review") return startGlobalReview();
   if (n === "home") renderHome();
   else if (n === "sets") renderSets();
-  else if (n === "teams") renderTeams();
+  else if (n === "teams") renderShared();
   else if (n === "you") renderYou();
 });
 

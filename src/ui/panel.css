@@ -1330,3 +1330,22 @@ body {
   font-size: 11px;
   line-height: 1.4;
 }
+
+/* --- share code (Summary tab) --- */
+.share-code-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.share-code {
+  flex: 1;
+  min-width: 0;
+  padding: 8px 10px;
+  font-size: 14px;
+  letter-spacing: 0.08em;
+  background: var(--surface-2, var(--surface));
+  border: 1px dashed var(--border);
+  border-radius: var(--r-sm);
+  color: var(--ink);
+  user-select: all;
+}

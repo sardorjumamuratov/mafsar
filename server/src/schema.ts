@@ -116,3 +116,7 @@ export const codingGradeSchema = z.object({
   expectedLines: z.number().int().min(1).max(200).default(15),
   code: z.string().min(1).max(4000),
 });
+
+// Sharing. A share is a read-only copy handoff: one code per set, revocable.
+export const shareCreateSchema = z.object({ setId: z.string().min(1) });
+export const shareRevokeSchema = z.object({ code: z.string().min(1) });

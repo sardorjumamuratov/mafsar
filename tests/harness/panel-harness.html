@@ -115,6 +115,12 @@
                 expectedLines: 12,
                 rubric: ["balance is private", "deposit rejects negative amounts"],
               } }),
+              SHARE_CREATE: () => ({ ok: true, code: '7KX2M9QRTA' }),
+              SHARE_FETCH: () => ({ ok: true, title: 'Torts basics (shared)', cards: [
+                { front: 'Duty of care', back: 'Obligation to avoid foreseeable harm' },
+                { front: 'Res ipsa loquitur', back: 'The thing speaks for itself' },
+              ], quiz: [{ q: 'Element linking breach to harm?', options: ['Causation','Duty','Damages','Defence'], answer: 0, explain: 'but-for test' }] }),
+              SHARE_REVOKE: () => ({ ok: true }),
               GRADE_CODING: () => ({ ok: true, grading: {
                 correct: true, score: 92,
                 meets: [

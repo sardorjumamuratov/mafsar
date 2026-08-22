@@ -138,4 +138,45 @@ test("review queue items no longer carry a mode field", () => {
   assert.ok(!src.includes("mode: set?.mode"));
 });
 
+
+console.log('share-a-set wiring');
+
+test('Summary tab hosts the share block with copy + revoke', () => {
+  assert.ok(src.includes('id="shareOut">${shareBlockHtml(studySet, session.id)}'), 'share block on Summary tab');
+  assert.ok(src.includes('data-action="share-copy"'));
+  assert.ok(src.includes('data-action="share-revoke"'));
+  assert.ok(src.includes('data-action="share-create"'));
+});
+
+test('receiving side: lookup, duplicate guard, preview, import', () => {
+  assert.ok(src.includes('function renderShared()'));
+  assert.ok(!src.includes('renderTeams'), 'placeholder is gone');
+  assert.ok(src.includes('s.shareCode === code'), 're-entering a used code is blocked');
+  assert.ok(src.includes('data-action="share-import"'));
+});
+
+test('import builds fresh ids and fresh schedules, no sender fields', () => {
+  const fn = src.slice(src.indexOf("async function importSharedSet"), src.indexOf("async function authSubmit"));
+  assert.ok(fn.length > 200, 'import function located');
+  assert.ok(fn.includes('...initSchedule(now)'), 'cards start from scratch');
+  assert.ok(fn.includes('id: uid()'), 'new ids');
+  for (const leak of ['examDate', 'summary', 'blurb', 'easiness']) {
+    assert.ok(!fn.includes(leak), 'import must not carry ' + leak);
+  }
+});
+
+test('share code UI escapes the code', () => {
+  assert.ok(src.includes('class="share-code tnum">${esc(studySet.shareCode)}'));
+  assert.ok(src.includes('data-code="${esc(studySet.shareCode)}"'));
+});
+
+test('nav reads Shared; service worker routes the three messages', () => {
+  const html = readFileSync(new URL("../src/ui/panel.html", import.meta.url), "utf8");
+  assert.ok(html.includes("Shared") && !html.includes("Teams"));
+  const sw = readFileSync(new URL("../src/background/service-worker.js", import.meta.url), "utf8");
+  for (const m of ["SHARE_CREATE", "SHARE_FETCH", "SHARE_REVOKE"]) {
+    assert.ok(sw.includes('case "' + m + '"'), m + " routed");
+  }
+});
+
 console.log(`\n${passed} tests passed`);

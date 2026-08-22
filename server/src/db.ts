@@ -105,6 +105,16 @@ const MIGRATIONS: string[] = [
   );
   CREATE INDEX idx_review_log_user ON review_log(user_id, reviewed_at);
   `,
+  `
+  CREATE TABLE shares (
+    code       TEXT PRIMARY KEY,
+    set_id     TEXT NOT NULL REFERENCES sets(id),
+    user_id    TEXT NOT NULL REFERENCES users(id),
+    created_at TEXT NOT NULL,
+    revoked    INTEGER NOT NULL DEFAULT 0
+  );
+  CREATE INDEX idx_shares_set ON shares(set_id, user_id, revoked);
+  `,
 ];
 
 export async function migrate(db: DB): Promise<void> {

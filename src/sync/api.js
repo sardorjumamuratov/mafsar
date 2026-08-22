@@ -50,3 +50,26 @@ export function backendCodingTask({ concept, reference, language }) {
 export function backendCodingGrade({ task, rubric, language, expectedLines, code }) {
   return post("/v1/coding-grade", { task, rubric, language, expectedLines, code });
 }
+
+/** GET with the account token; share 404s carry a human message. */
+async function get(path) {
+  const res = await authedFetch(path);
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(data.message || data.error || `Request failed (${res.status})`);
+  return data;
+}
+
+/** { setId } -> { code } — share one of your sets as a short code. */
+export function backendShareCreate(setId) {
+  return post("/v1/share", { setId });
+}
+
+/** code -> { title, cards: [{front, back}], quiz: [{q, options, answer, explain}] } */
+export function backendShareFetch(code) {
+  return get("/v1/share/" + encodeURIComponent(code));
+}
+
+/** code -> { ok } — withdraw a share; copies already added are kept. */
+export function backendShareRevoke(code) {
+  return post("/v1/share/revoke", { code });
+}

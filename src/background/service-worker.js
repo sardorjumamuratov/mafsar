@@ -18,6 +18,9 @@ import {
   backendHypothetical,
   backendSummarize,
   backendBlurb,
+  backendShareCreate,
+  backendShareFetch,
+  backendShareRevoke,
   backendCodingTask,
   backendCodingGrade,
 } from "../sync/api.js";
@@ -86,7 +89,6 @@ if (chrome.sidePanel?.setPanelBehavior) {
 }
 
 chrome.runtime.onInstalled.addListener(() => {
-  scheduleReminderAlarm();
   registerContextMenus();
 });
 
@@ -180,51 +182,6 @@ if (chrome.contextMenus?.onClicked) {
       notify(`Saved · ${r.cards} cards from ${r.session.sourceLabel || "page"}`);
     } catch (e) {
       notify(e?.message || "Capture failed.");
-    }
-  });
-}
-
-// --- Daily study reminders ---------------------------------------------------
-// A repeating alarm fires at (or shortly after) the configured time; when it
-// does we check due cards and notify. Rescheduled whenever settings change.
-
-async function scheduleReminderAlarm() {
-  if (!chrome.alarms) return;
-  const settings = await getSettings();
-  if (!settings.reminders || !settings.remindTime) {
-    chrome.alarms.clear("mafsar-reminder");
-    return;
-  }
-  const [h, m] = String(settings.remindTime).split(":").map(Number);
-  const next = new Date();
-  next.setHours(h || 19, m || 0, 0, 0);
-  if (next.getTime() <= Date.now()) next.setDate(next.getDate() + 1);
-  // periodInDays:1 repeats daily at the same wall-clock time.
-  chrome.alarms.create("mafsar-reminder", {
-    when: next.getTime(),
-    periodInDays: 1,
-  });
-}
-
-chrome.storage.onChanged.addListener((changes, area) => {
-  if (area === "local" && changes.settings) scheduleReminderAlarm();
-});
-
-if (chrome.alarms?.onAlarm) {
-  chrome.alarms.onAlarm.addListener(async (alarm) => {
-    if (alarm.name !== "mafsar-reminder") return;
-    const { getStudySets } = await import("../storage/store.js");
-    let due = 0;
-    for (const set of await getStudySets()) {
-      for (const card of set.flashcards || []) if (isDue(card)) due++;
-    }
-    if (due && chrome.notifications) {
-      chrome.notifications.create({
-        type: "basic",
-        iconUrl: chrome.runtime.getURL("icons/icon128.png"),
-        title: "Mafsar",
-        message: `${due} card${due === 1 ? "" : "s"} due — keep your streak alive.`,
-      });
     }
   });
 }
@@ -387,6 +344,21 @@ async function handle(msg) {
       sets.blurb = blurb; // cached on the set (local-only; not synced)
       await saveStudySet(sets);
       return { blurb };
+    }
+
+    // Sharing: a short code hands someone a copy of one set.
+    case "SHARE_CREATE": {
+      const { code } = await backendShareCreate(msg.setId);
+      return { code };
+    }
+
+    case "SHARE_FETCH": {
+      return await backendShareFetch(msg.code);
+    }
+
+    case "SHARE_REVOKE": {
+      await backendShareRevoke(msg.code);
+      return {};
     }
 
     default:
