@@ -4,9 +4,10 @@ import type { DB } from "./db.js";
 import {
   register, login, requireAuth, signAccessToken, signRefreshToken,
 } from "./auth.js";
-import { syncSchema, registerSchema, loginSchema, generateSchema, gradeSchema, hypotheticalSchema, summarizeSchema, blurbSchema, codingTaskSchema, codingGradeSchema, shareCreateSchema, shareRevokeSchema } from "./schema.js";
+import { syncSchema, registerSchema, loginSchema, generateSchema, gradeSchema, hypotheticalSchema, summarizeSchema, blurbSchema, codingTaskSchema, codingGradeSchema, shareCreateSchema, shareRevokeSchema, teamCreateSchema, teamJoinSchema } from "./schema.js";
 import { applySync, changesSince } from "./sync.js";
-import { nowISO, one, all, run } from "./db.js";
+import { nowISO, one, all, run, uid } from "./db.js";
+import { genTeamCode, leaderboardFor, learningFor } from "./teams.js";
 import { randomBytes } from "node:crypto";
 import { generateStudySet, gradeAnswer, generateHypothetical, summarizeConversation, setBlurb, generateCodingTask, gradeCode } from "./llm.js";
 import { PRIVACY_HTML } from "./privacy.js";
@@ -220,9 +221,93 @@ export function createApp(db: DB) {
     return c.json({ ok: true });
   });
 
-  // --- Phase 4: teams + Redis — TODO ---
-  app.post("/v1/teams", (c) =>
-    c.json({ error: "not_implemented", phase: 4, todo: "teams, invites, shared sets, leaderboards" }, 501));
+  // --- Teams: a shared code groups accounts; stats stay server-computed -----
+  // Member emails and set titles are visible to members only, so every route
+  // below re-checks membership against team_members — never the client's word.
+  app.post("/v1/teams", async (c) => {
+    const userId = c.get("userId") as string;
+    const body = teamCreateSchema.parse(await c.req.json());
+    const id = uid();
+    // 6-char code from the same unambiguous alphabet as shares; retry on the
+    // (astronomically unlikely) collision.
+    let code = genTeamCode();
+    while (await one(db, "SELECT 1 AS x FROM teams WHERE code = ?", [code])) code = genTeamCode();
+    await run(
+      db, "INSERT INTO teams (id, name, code, owner_id, created_at) VALUES (?, ?, ?, ?, ?)",
+      [id, body.name, code, userId, nowISO()]
+    );
+    await run(
+      db, "INSERT INTO team_members (team_id, user_id, joined_at) VALUES (?, ?, ?)",
+      [id, userId, nowISO()]
+    );
+    return c.json({ id, name: body.name, code });
+  });
+
+  app.post("/v1/teams/join", async (c) => {
+    const userId = c.get("userId") as string;
+    const body = teamJoinSchema.parse(await c.req.json());
+    const team = await one<{ id: string; name: string; code: string }>(
+      db, "SELECT id, name, code FROM teams WHERE code = ?", [body.code.toUpperCase()]
+    );
+    if (!team) return c.json({ error: "not_found", message: "No team with that code." }, 404);
+    // Idempotent: re-joining an existing membership is a no-op, not an error.
+    await run(
+      db, "INSERT OR IGNORE INTO team_members (team_id, user_id, joined_at) VALUES (?, ?, ?)",
+      [team.id, userId, nowISO()]
+    );
+    return c.json(team);
+  });
+
+  app.get("/v1/teams", async (c) => {
+    const userId = c.get("userId") as string;
+    const teams = await all<{ id: string; name: string; code: string; memberCount: number }>(
+      db,
+      `SELECT t.id, t.name, t.code,
+         (SELECT COUNT(*) FROM team_members mc WHERE mc.team_id = t.id) AS memberCount
+       FROM teams t
+       WHERE t.id IN (SELECT team_id FROM team_members WHERE user_id = ?)
+       ORDER BY t.created_at DESC`,
+      [userId]
+    );
+    return c.json(teams.map((t) => ({ ...t, memberCount: Number(t.memberCount) })));
+  });
+
+  app.get("/v1/teams/:id", async (c) => {
+    const userId = c.get("userId") as string;
+    const id = c.req.param("id");
+    const team = await one<{ id: string; name: string; code: string }>(
+      db, "SELECT id, name, code FROM teams WHERE id = ?", [id]
+    );
+    if (!team) return c.json({ error: "not_found" }, 404);
+    const member = await one(
+      db, "SELECT 1 AS x FROM team_members WHERE team_id = ? AND user_id = ?", [id, userId]
+    );
+    if (!member) return c.json({ error: "forbidden", message: "You're not a member of this team." }, 403);
+    const members = (await all<{ user_id: string; email: string }>(
+      db,
+      `SELECT m.user_id, u.email FROM team_members m JOIN users u ON u.id = m.user_id
+       WHERE m.team_id = ? ORDER BY m.joined_at ASC`,
+      [id]
+    )).map((m) => ({ userId: m.user_id, email: m.email }));
+    return c.json({
+      ...team,
+      members,
+      leaderboard: await leaderboardFor(db, members),
+      learning: await learningFor(db, members),
+    });
+  });
+
+  app.post("/v1/teams/:id/leave", async (c) => {
+    const userId = c.get("userId") as string;
+    const id = c.req.param("id");
+    const team = await one(db, "SELECT 1 AS x FROM teams WHERE id = ?", [id]);
+    if (!team) return c.json({ error: "not_found" }, 404);
+    const n = await run(
+      db, "DELETE FROM team_members WHERE team_id = ? AND user_id = ?", [id, userId]
+    );
+    if (!n) return c.json({ error: "forbidden", message: "You're not a member of this team." }, 403);
+    return c.json({ ok: true });
+  });
 
   // --- Phase 5: payments + notifications — TODO ---
 

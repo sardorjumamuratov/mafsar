@@ -251,11 +251,10 @@ describe("LLM proxy endpoints", () => {
 });
 
 describe("later-phase stubs", () => {
-  it("return documented 501s", async () => {
+  it("return documented 501s (teams is implemented — see teams.test.ts)", async () => {
     const { token } = await newUser("stub@mafsar.dev");
     for (const [method, path] of [
       ["GET", "/v1/insights"],
-      ["POST", "/v1/teams"],
     ] as const) {
       const res = await app.request(path, { method, headers: auth(token), ...(method !== "GET" ? { body: "{}" } : {}) });
       expect(res.status, `${method} ${path}`).toBe(501);

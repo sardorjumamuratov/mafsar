@@ -73,13 +73,13 @@ describe("db + migrations", () => {
       db, "SELECT name FROM sqlite_master WHERE type='table' ORDER BY name"
     );
     const names = tables.map((t) => t.name);
-    for (const t of ["users", "sets", "cards", "quiz", "activity", "review_log", "shares", "migrations"]) {
+    for (const t of ["users", "sets", "cards", "quiz", "activity", "review_log", "shares", "teams", "team_members", "migrations"]) {
       expect(names).toContain(t);
     }
     // Re-running migrations must not throw or duplicate.
     await expect(migrate(db)).resolves.toBeUndefined();
     const rows = await one<{ n: number }>(db, "SELECT COUNT(*) n FROM migrations");
-    expect(Number(rows!.n)).toBe(7); // one per MIGRATIONS entry
+    expect(Number(rows!.n)).toBe(8); // one per MIGRATIONS entry
   });
 
   it("enforces FK integrity for cards", async () => {

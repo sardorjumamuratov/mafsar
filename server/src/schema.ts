@@ -120,3 +120,8 @@ export const codingGradeSchema = z.object({
 // Sharing. A share is a read-only copy handoff: one code per set, revocable.
 export const shareCreateSchema = z.object({ setId: z.string().min(1) });
 export const shareRevokeSchema = z.object({ code: z.string().min(1) });
+
+// Teams. Codes are the join handle (same trust model as share codes); names
+// are shown to members only, so a modest length bound is enough.
+export const teamCreateSchema = z.object({ name: z.string().trim().min(1).max(80) });
+export const teamJoinSchema = z.object({ code: z.string().trim().min(1).max(32) });

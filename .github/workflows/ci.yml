@@ -32,10 +32,14 @@ jobs:
         with:
           node-version: 22
       # Pure-logic suites for the extension (readiness math, SM-2 clamping,
-      # weak-topic ranking, sync mapping, store tombstones/regression).
+      # weak-topic ranking, sync mapping, store tombstones/regression,
+      # share/team link formatting and parsing).
       - run: node tests/client-logic.test.mjs
       - run: node tests/sync-map.test.mjs
       - run: node tests/store.test.mjs
+      - run: node tests/share-link.test.mjs
+      - run: node tests/teams-ui.test.mjs
+      - run: node tests/ui-static.test.mjs
       # Syntax-check every extension source file.
       - run: |
           fail=0

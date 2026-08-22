@@ -115,6 +115,23 @@ const MIGRATIONS: string[] = [
   );
   CREATE INDEX idx_shares_set ON shares(set_id, user_id, revoked);
   `,
+  `
+  CREATE TABLE teams (
+    id         TEXT PRIMARY KEY,
+    name       TEXT NOT NULL,
+    code       TEXT NOT NULL UNIQUE,
+    owner_id   TEXT NOT NULL REFERENCES users(id),
+    created_at TEXT NOT NULL
+  );
+  CREATE INDEX idx_teams_code ON teams(code);
+  CREATE TABLE team_members (
+    team_id    TEXT NOT NULL REFERENCES teams(id),
+    user_id    TEXT NOT NULL REFERENCES users(id),
+    joined_at  TEXT NOT NULL,
+    PRIMARY KEY (team_id, user_id)
+  );
+  CREATE INDEX idx_team_members_user ON team_members(user_id);
+  `,
 ];
 
 export async function migrate(db: DB): Promise<void> {

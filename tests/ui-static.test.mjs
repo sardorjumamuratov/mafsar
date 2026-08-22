@@ -24,7 +24,7 @@ test("topOfView() is defined exactly once and resets #app", () => {
 test("every view renderer resets scroll after painting", () => {
   // Each renderer's setHTML(...) is followed by topOfView().
   const callSites = src.split("topOfView();").length - 1;
-  assert.ok(callSites >= 9, `expected >=9 call sites, found ${callSites}`);
+  assert.ok(callSites >= 11, `expected >=11 call sites, found ${callSites}`);
   // renderSetDetail resets AFTER paintDetail (tab switches covered) — the
   // in-place repaints (paintDetail itself, grading, flipping) must not.
   assert.ok(
@@ -36,9 +36,11 @@ test("every view renderer resets scroll after painting", () => {
 test("in-place repaints never reset scroll", () => {
   // No topOfView call may appear inside paintDetail / paintReviewCard /
   // revealCard / answerQuiz / paintQuizQ bodies — approximated by asserting
-  // the total call-site count matches exactly the nine renderers.
+  // the total call-site count matches exactly the view renderers' exits:
+  // home, exam picker, sets, set detail, make-set, import, teams (two exits:
+  // signed-out early return + normal path), team detail, you, auth gate.
   const callSites = src.split("topOfView();").length - 1;
-  assert.equal(callSites, 9, "exactly the nine view renderers reset scroll");
+  assert.equal(callSites, 11, "exactly the view-renderer exits reset scroll");
 });
 
 console.log("quiz length picker wiring (item 1)");
@@ -141,16 +143,17 @@ test("review queue items no longer carry a mode field", () => {
 
 console.log('share-a-set wiring');
 
-test('Summary tab hosts the share block with copy + revoke', () => {
-  assert.ok(src.includes('id="shareOut">${shareBlockHtml(studySet, session.id)}'), 'share block on Summary tab');
+test('set detail header hosts the share block with copy + revoke (not buried in a tab)', () => {
+  assert.ok(src.includes('data-action="set-share"'), 'header Share link button present');
+  assert.ok(src.includes('id="shareOut"'), 'reveal container on every tab');
   assert.ok(src.includes('data-action="share-copy"'));
   assert.ok(src.includes('data-action="share-revoke"'));
-  assert.ok(src.includes('data-action="share-create"'));
+  assert.ok(src.includes('SHARE_CREATE'), 'share codes created through the service worker');
 });
 
 test('receiving side: lookup, duplicate guard, preview, import', () => {
-  assert.ok(src.includes('function renderShared()'));
-  assert.ok(!src.includes('renderTeams'), 'placeholder is gone');
+  assert.ok(src.includes('function renderTeams()'));
+  assert.ok(!src.includes('function renderShared()'), 'old Shared renderer is gone');
   assert.ok(src.includes('s.shareCode === code'), 're-entering a used code is blocked');
   assert.ok(src.includes('data-action="share-import"'));
 });
@@ -165,18 +168,45 @@ test('import builds fresh ids and fresh schedules, no sender fields', () => {
   }
 });
 
-test('share code UI escapes the code', () => {
-  assert.ok(src.includes('class="share-code tnum">${esc(studySet.shareCode)}'));
-  assert.ok(src.includes('data-code="${esc(studySet.shareCode)}"'));
+test('share/team copy fields escape every interpolated value', () => {
+  assert.ok(src.includes('value="${esc(value)}"'));
+  assert.ok(src.includes('data-code="${esc(value)}"'));
 });
 
-test('nav reads Shared; service worker routes the three messages', () => {
+test('nav reads Teams; service worker routes the share + team messages', () => {
   const html = readFileSync(new URL("../src/ui/panel.html", import.meta.url), "utf8");
-  assert.ok(html.includes("Shared") && !html.includes("Teams"));
+  assert.ok(html.includes("Teams") && !html.includes("Shared"));
   const sw = readFileSync(new URL("../src/background/service-worker.js", import.meta.url), "utf8");
-  for (const m of ["SHARE_CREATE", "SHARE_FETCH", "SHARE_REVOKE"]) {
+  for (const m of ["SHARE_CREATE", "SHARE_FETCH", "SHARE_REVOKE", "TEAM_CREATE", "TEAM_JOIN", "TEAM_LIST", "TEAM_GET", "TEAM_LEAVE"]) {
     assert.ok(sw.includes('case "' + m + '"'), m + " routed");
   }
+});
+
+console.log('teams wiring');
+
+test('teams home: Create a team pinned bottom-right, Join below it with the exact placeholder', () => {
+  assert.ok(src.includes('class="team-actions"'), 'fixed create/join stack');
+  assert.ok(src.includes('data-action="team-create">Create a team</button>'), 'primary Create button');
+  const createAt = src.indexOf('data-action="team-create"');
+  const joinAt = src.indexOf('placeholder="Enter team code"');
+  assert.ok(createAt !== -1 && joinAt !== -1 && createAt < joinAt, 'Join (with placeholder) sits directly below Create');
+  assert.ok(src.includes("Sign in to create a team"), 'signed-out state explains the account requirement');
+});
+
+test('team detail: copyable link + code, leaderboard, who is learning what, leave', () => {
+  assert.ok(src.includes('function renderTeam(id)'));
+  assert.ok(src.includes('teamLinkFor(team.code, LANDING_BASE)'), 'team link built from LANDING_BASE');
+  assert.ok(src.includes('Leaderboard'));
+  assert.ok(src.includes("Who's learning what"));
+  assert.ok(src.includes('data-action="team-leave"'));
+  assert.ok(src.includes('data-action="open-team"'));
+});
+
+test('share link helpers come from the pure module', () => {
+  assert.ok(src.includes('from "./share-link.js"'));
+  assert.ok(src.includes('shareLinkFor(code, LANDING_BASE)'));
+  assert.ok(src.includes('parseShareCode('));
+  assert.ok(src.includes('parseTeamCode('));
 });
 
 console.log(`\n${passed} tests passed`);

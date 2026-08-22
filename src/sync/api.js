@@ -73,3 +73,30 @@ export function backendShareFetch(code) {
 export function backendShareRevoke(code) {
   return post("/v1/share/revoke", { code });
 }
+
+// --- Teams (all calls need the signed-in account token) ------------------------
+
+/** name -> { id, name, code } — creator becomes the first member. */
+export function backendTeamCreate(name) {
+  return post("/v1/teams", { name });
+}
+
+/** code -> { id, name, code } — join (idempotent) or 404 on an unknown code. */
+export function backendTeamJoin(code) {
+  return post("/v1/teams/join", { code });
+}
+
+/** -> [{ id, name, code, memberCount }] — teams the caller belongs to. */
+export async function backendTeamList() {
+  return get("/v1/teams");
+}
+
+/** id -> { id, name, code, members, leaderboard, learning } — members only. */
+export function backendTeamGet(id) {
+  return get("/v1/teams/" + encodeURIComponent(id));
+}
+
+/** id -> { ok } — remove the caller from the team. */
+export function backendTeamLeave(id) {
+  return post(`/v1/teams/${encodeURIComponent(id)}/leave`, {});
+}

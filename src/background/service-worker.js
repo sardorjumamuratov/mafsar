@@ -21,6 +21,11 @@ import {
   backendShareCreate,
   backendShareFetch,
   backendShareRevoke,
+  backendTeamCreate,
+  backendTeamJoin,
+  backendTeamList,
+  backendTeamGet,
+  backendTeamLeave,
   backendCodingTask,
   backendCodingGrade,
 } from "../sync/api.js";
@@ -358,6 +363,32 @@ async function handle(msg) {
 
     case "SHARE_REVOKE": {
       await backendShareRevoke(msg.code);
+      return {};
+    }
+
+    // Teams: create/join/list/inspect/leave, all through the account token.
+    case "TEAM_CREATE": {
+      const team = await backendTeamCreate(String(msg.name || ""));
+      return { team };
+    }
+
+    case "TEAM_JOIN": {
+      const team = await backendTeamJoin(String(msg.code || ""));
+      return { team };
+    }
+
+    case "TEAM_LIST": {
+      const teams = await backendTeamList();
+      return { teams };
+    }
+
+    case "TEAM_GET": {
+      const team = await backendTeamGet(String(msg.id || ""));
+      return { team };
+    }
+
+    case "TEAM_LEAVE": {
+      await backendTeamLeave(String(msg.id || ""));
       return {};
     }
 
