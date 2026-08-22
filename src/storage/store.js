@@ -17,7 +17,7 @@ const KEYS = {
   REVIEW_LOG: "reviewLog",
 };
 
-const DEFAULT_SETTINGS = { provider: "gemini", apiKey: "", model: "", reminders: false, remindTime: "19:00" };
+const DEFAULT_SETTINGS = { provider: "gemini", apiKey: "", model: "" };
 const REVIEW_LOG_CAP = 2000;
 
 function get(key, fallback) {

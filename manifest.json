@@ -3,7 +3,14 @@
   "name": "Mafsar — AI Chat to Quiz",
   "version": "0.1.1",
   "description": "Capture your AI chat learning sessions and turn them into flashcards, quizzes, and spaced-repetition reviews so you don't forget.",
-  "permissions": ["storage", "activeTab", "sidePanel", "scripting", "alarms", "notifications", "contextMenus"],
+  "permissions": [
+    "storage",
+    "activeTab",
+    "sidePanel",
+    "scripting",
+    "notifications",
+    "contextMenus"
+  ],
   "host_permissions": [
     "https://chatgpt.com/*",
     "https://chat.openai.com/*",
@@ -13,7 +20,9 @@
   ],
   "background": {
     "service_worker": "src/background/service-worker.js",
-    "scripts": ["src/background/service-worker.js"],
+    "scripts": [
+      "src/background/service-worker.js"
+    ],
     "type": "module"
   },
   "side_panel": {
@@ -38,7 +47,6 @@
     "48": "icons/icon48.png",
     "128": "icons/icon128.png"
   },
-  "options_page": "src/ui/options.html",
   "content_scripts": [
     {
       "matches": [
@@ -54,13 +62,21 @@
         "src/content/adapters/gemini.js",
         "src/content/capture.js"
       ],
-      "css": ["src/content/capture.css"],
+      "css": [
+        "src/content/capture.css"
+      ],
       "run_at": "document_idle"
     },
     {
-      "matches": ["https://quizlet.com/*"],
-      "js": ["src/content/quizlet-import.js"],
-      "css": ["src/content/capture.css"],
+      "matches": [
+        "https://quizlet.com/*"
+      ],
+      "js": [
+        "src/content/quizlet-import.js"
+      ],
+      "css": [
+        "src/content/capture.css"
+      ],
       "run_at": "document_idle"
     }
   ],
@@ -69,7 +85,11 @@
       "id": "mafsar@sardorjumamuratov",
       "strict_min_version": "142.0",
       "data_collection_permissions": {
-        "required": ["authenticationInfo", "personallyIdentifyingInfo", "websiteContent"],
+        "required": [
+          "authenticationInfo",
+          "personallyIdentifyingInfo",
+          "websiteContent"
+        ],
         "optional": []
       }
     }
