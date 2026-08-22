@@ -78,6 +78,15 @@
         "src/content/capture.css"
       ],
       "run_at": "document_idle"
+    },
+    {
+      "matches": [
+        "https://mafsar-production.up.railway.app/*"
+      ],
+      "js": [
+        "src/content/landing.js"
+      ],
+      "run_at": "document_idle"
     }
   ],
   "browser_specific_settings": {

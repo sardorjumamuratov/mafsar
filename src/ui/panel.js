@@ -20,6 +20,7 @@ import {
   exportAll,
   importAll,
 } from "../storage/store.js";
+import { LANDING_BASE } from "../config.js";
 import { initSchedule, review, isDue, byDue, masteryOf } from "../storage/srs.js";
 import { examReadiness, nextExam, weakTopics } from "../storage/readiness.js";
 import { quizLengths } from "./quiz-lengths.js";
@@ -415,14 +416,7 @@ async function saveExamSelection() {
 
 /** Summary-tab share block. The code is cached on the set (local-only). */
 function shareBlockHtml(studySet, sessionId) {
-  if (!studySet.shareCode) {
-    return `<button class="btn btn-ghost btn-block" data-action="share-create" data-id="${esc(sessionId)}">Share this set</button>`;
-  }
-  return `<div class="share-code-row">
-      <code class="share-code tnum">${esc(studySet.shareCode)}</code>
-      <button class="btn btn-ghost btn-sm" data-action="share-copy" data-code="${esc(studySet.shareCode)}">Copy</button>
-      <button class="linkbtn" data-action="share-revoke" data-id="${esc(sessionId)}">Stop sharing</button>
-    </div>`;
+  return `<button class="btn btn-ghost btn-block" data-action="nav-teams-share" data-id="${esc(sessionId)}">Share this set</button>`;
 }
 
 async function createShareFor(sessionId) {
@@ -432,22 +426,30 @@ async function createShareFor(sessionId) {
     const { studySets } = await bundle();
     const set = setFor(sessionId, studySets);
     if (set) {
-      set.shareCode = r.code; // local cache; re-sharing returns the same code
+      set.shareCode = r.code;
       await saveStudySet(set);
     }
-    // In-place repaint — the user is mid-view on the Summary tab.
-    const out = document.getElementById("shareOut");
-    if (out) setHTML(out, shareBlockHtml(set || { shareCode: r.code }, sessionId));
+    renderShared();
     toast("Share code ready");
   } catch (e) {
-    toast(e.message);
+    toast(e.message || "Couldn't create share link.");
   }
 }
 
-async function copyShareCode(code) {
+async function copyShareCode(code, btn = null) {
   try {
     await navigator.clipboard.writeText(code);
-    toast("Code copied");
+    if (btn) {
+      const originalHtml = btn.innerHTML;
+      btn.innerHTML = `<svg class="ic" viewBox="0 0 24 24"><path d="M5 13l4 4L19 7"/></svg><span class="lbl">Copied</span>`;
+      btn.setAttribute("aria-live", "polite");
+      setTimeout(() => {
+        btn.innerHTML = originalHtml;
+        btn.removeAttribute("aria-live");
+      }, 1500);
+    } else {
+      toast("Code copied");
+    }
   } catch {
     toast("Copy failed — the code is " + code);
   }
@@ -462,8 +464,7 @@ async function revokeShareFor(sessionId) {
     await send({ type: "SHARE_REVOKE", code: set.shareCode });
     delete set.shareCode;
     await saveStudySet(set);
-    const out = document.getElementById("shareOut");
-    if (out) setHTML(out, shareBlockHtml(set, sessionId));
+    renderShared();
     toast("Sharing stopped");
   } catch (e) {
     toast(e.message);
@@ -1466,27 +1467,104 @@ async function doImport() {
 // A share code copies someone's cards into YOUR sets: fresh ids, fresh
 // schedule, your progress. No live link back to the sender.
 let sharedPreview = null; // { code, title, cards, quiz }
+let teamsTab = "add"; // "add" | "share"
+let shareSelectedId = "";
 
-function renderShared() {
+async function renderShared() {
   setNav("teams");
   showChrome(true);
   sharedPreview = null;
+  const { sessions, studySets } = await bundle();
+  
+  const addBody = `
+      <div class="help" style="margin:0">Have a code or link from another Mafsar user? Enter it to add a copy of
+        their cards to your sets. Your progress is your own — nothing syncs back.</div>
+      <div class="field"><label>Share code or link</label>
+        <input id="shareCode" type="text" placeholder="e.g. 7KX2M9QRTA or mafsar.../s/..." autocomplete="off" autocapitalize="off" /></div>
+      <button class="btn btn-primary btn-block" data-action="share-lookup">Look up set</button>
+      <div id="sharePreview"></div>`;
+
+  const withSets = sessions.filter((s) => setFor(s.id, studySets));
+  if (teamsTab === "share" && !shareSelectedId && withSets.length > 0) {
+    shareSelectedId = withSets[0].id;
+  }
+  
+  let shareBody = '';
+  if (teamsTab === "share") {
+    const options = withSets.map(s => 
+      `<option value="${esc(s.id)}" ${shareSelectedId === s.id ? 'selected' : ''}>${esc(s.title || "Untitled")}</option>`
+    ).join("");
+    
+    const selectedSet = setFor(shareSelectedId, studySets);
+    let shareResultHtml = '';
+    
+    if (selectedSet) {
+      if (!selectedSet.shareCode) {
+        shareResultHtml = `<button class="btn btn-ghost btn-block" data-action="share-create" data-id="${esc(shareSelectedId)}">Create share link</button>`;
+      } else {
+        const link = `${LANDING_BASE}/s/${selectedSet.shareCode}`;
+        const code = selectedSet.shareCode;
+        
+        shareResultHtml = `
+          <div class="field">
+            <label>Link <span style="font-weight:normal;color:var(--muted)">— Anyone with the link can add a copy.</span></label>
+            <div style="display:flex;gap:8px">
+              <input type="text" readonly value="${esc(link)}" class="share-readonly" data-action="select-all" style="flex:1" />
+              <button class="btn btn-ghost btn-sm" data-action="share-copy" data-code="${esc(link)}" aria-label="Copy link">
+                <svg class="ic" viewBox="0 0 24 24"><path d="M8 5H6a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-1M8 5a2 2 0 0 0 2 2h2a2 2 0 0 0 2-2M8 5a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2m0 0h2m-2 4h4m-4 4h4"/></svg>
+                <span class="lbl">Copy</span>
+              </button>
+            </div>
+          </div>
+          <div class="field">
+            <label>Code <span style="font-weight:normal;color:var(--muted)">— They paste this in Mafsar → Teams → Add a set.</span></label>
+            <div style="display:flex;gap:8px">
+              <input type="text" readonly value="${esc(code)}" class="share-readonly tnum share-code" style="letter-spacing:0.08em;flex:1" data-action="select-all" />
+              <button class="btn btn-ghost btn-sm" data-action="share-copy" data-code="${esc(code)}" aria-label="Copy code">
+                <svg class="ic" viewBox="0 0 24 24"><path d="M8 5H6a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-1M8 5a2 2 0 0 0 2 2h2a2 2 0 0 0 2-2M8 5a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2m0 0h2m-2 4h4m-4 4h4"/></svg>
+                <span class="lbl">Copy</span>
+              </button>
+            </div>
+          </div>
+          <button class="linkbtn" style="margin-top:4px;align-self:flex-start" data-action="share-revoke" data-id="${esc(shareSelectedId)}">Stop sharing</button>
+          <div style="font-size:12px;color:var(--muted)">Both link and code will stop working.</div>
+        `;
+      }
+    } else {
+        shareResultHtml = `<div class="empty">No sets available to share.</div>`;
+    }
+    
+    shareBody = `
+      <div class="field">
+        <label>Select a set to share</label>
+        <select id="shareSetSelect">
+          ${options}
+        </select>
+      </div>
+      <div id="shareOut" style="display:flex;flex-direction:column;gap:12px">${shareResultHtml}</div>`;
+  }
+
   setHTML(app, `
     <div class="view">
-      <div class="ahd"><div class="h-title">Add a shared set</div></div>
-      <div class="help" style="margin:0">Have a code from another Mafsar user? Enter it to add a copy of
-        their cards to your sets. Your progress is your own — nothing syncs back.</div>
-      <div class="field"><label>Share code</label>
-        <input id="shareCode" type="text" placeholder="e.g. 7KX2M9QRTA" autocomplete="off" autocapitalize="characters" /></div>
-      <button class="btn btn-primary btn-block" data-action="share-lookup">Look up code</button>
-      <div id="sharePreview"></div>
+      <div class="seg" style="margin-bottom: 4px;">
+        <button data-action="teams-tab" data-tab="add" class="${teamsTab === "add" ? "on" : ""}">Add a set</button>
+        <button data-action="teams-tab" data-tab="share" class="${teamsTab === "share" ? "on" : ""}">Share a set</button>
+      </div>
+      ${teamsTab === "add" ? addBody : shareBody}
     </div>`);
   topOfView();
 }
 
 async function lookupShare() {
   const raw = document.getElementById("shareCode")?.value || "";
-  const code = raw.trim().toUpperCase();
+  let code = raw.trim();
+  const urlMatch = code.match(/\/s\/([a-zA-Z0-9]+)/);
+  if (urlMatch) code = urlMatch[1];
+  else if (code.includes("?code=")) {
+    const qMatch = code.match(/\?code=([a-zA-Z0-9]+)/);
+    if (qMatch) code = qMatch[1];
+  }
+  code = code.toUpperCase();
   if (!code) return toast("Enter a code first.");
   const out = document.getElementById("sharePreview");
   if (out) setHTML(out, '<div style="font-size:13px;color:var(--muted)">Looking up…</div>');
@@ -1697,8 +1775,14 @@ document.addEventListener("click", (e) => {
       break;
     case "start-coding": startCodingPractice(id); break;
     case "share-create": createShareFor(id); break;
-    case "share-copy": copyShareCode(t.dataset.code); break;
+    case "share-copy": copyShareCode(t.dataset.code, t); break;
     case "share-revoke": revokeShareFor(t.dataset.id); break;
+    case "nav-teams-share": teamsTab = "share"; shareSelectedId = id; renderShared(); break;
+    case "teams-tab": teamsTab = t.dataset.tab; renderShared(); break;
+    case "select-all":
+      t.select();
+      copyShareCode(t.value, t.nextElementSibling);
+      break;
     case "share-lookup": lookupShare(); break;
     case "share-import": importSharedSet(); break;
     case "code-check": checkCode(); break;
@@ -1912,6 +1996,9 @@ document.addEventListener("change", (e) => {
         openExamPicker();
       }
     })();
+  } else if (t.id === "shareSetSelect") {
+    shareSelectedId = t.value;
+    renderShared();
   } else if (t.id === "pickerDate") {
     if (examDraft) examDraft.date = t.value ? new Date(`${t.value}T23:59:59`).getTime() : null;
   } else if (t.classList?.contains("picker-check")) {
@@ -1957,7 +2044,7 @@ nav.addEventListener("click", (e) => {
   if (n === "review") return startGlobalReview();
   if (n === "home") renderHome();
   else if (n === "sets") renderSets();
-  else if (n === "teams") renderShared();
+  else if (n === "teams") { teamsTab = "add"; renderShared(); }
   else if (n === "you") renderYou();
 });
 

@@ -711,6 +711,59 @@ a:focus-visible, button:focus-visible { outline: 2px solid var(--teal); outline-
     resizeTimer = setTimeout(() => draw(played ? 1 : 0), 120);
   });
 })();
+
+// Handle Share Route
+(async () => {
+  const pathParts = window.location.pathname.split('/s/');
+  const code = (pathParts.length > 1 ? pathParts[1].replace(/\/$/, '') : null) || new URLSearchParams(window.location.search).get('code');
+  if (!code) return; // not a share route
+
+  const main = document.querySelector('main');
+  main.innerHTML = `<section class="hero" style="min-height: 80vh"><div class="wrap"><div style="max-width: 40em; margin: 0 auto; text-align: center;">
+    <h1 style="font-size: 2rem">Loading shared set...</h1>
+  </div></div></section>`;
+
+  try {
+    const res = await fetch(`https://mafsar-production.up.railway.app/v1/share/${code}`);
+    if (!res.ok) throw new Error("Set not found");
+    const data = await res.json();
+    
+    const esc = (s) => String(s ?? "").replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+    
+    main.innerHTML = `
+      <section class="hero" style="min-height: 80vh; display: flex; align-items: center; justify-content: center;">
+        <div class="wrap">
+          <div style="max-width: 28rem; margin: 0 auto; background: var(--surface); padding: 2rem; border-radius: 16px; border: 1px solid var(--line); box-shadow: var(--shadow-sm); text-align: left;">
+            <p class="eyebrow" style="margin-bottom: 0.5rem">Shared Set</p>
+            <h1 style="font-size: 1.8rem; margin-bottom: 0.5rem; line-height: 1.2">${esc(data.title)}</h1>
+            <p style="color: var(--muted); margin-bottom: 1.5rem">${data.cards.length} cards${data.quiz?.length ? ` · ${data.quiz.length} quiz questions` : ''}</p>
+            
+            <div id="ext-installed-view" style="display: none;">
+              <button id="add-to-mafsar-btn" data-code="${esc(code)}" class="btn btn-solid" style="width: 100%; justify-content: center; font-size: 1.05rem; padding: 0.9rem;">Add to Mafsar</button>
+              <p id="add-status" style="text-align: center; margin-top: 1rem; color: var(--muted); font-size: 0.9rem;"></p>
+            </div>
+            
+            <div id="ext-not-installed-view">
+              <div style="background: var(--ground-deep); padding: 1rem; border-radius: 8px; margin-bottom: 1.5rem; text-align: center; border: 1px dashed var(--line);">
+                <p style="font-size: 0.9rem; color: var(--muted); margin-bottom: 0.5rem">Copy this code to add it in the app:</p>
+                <code style="font-family: var(--mono); font-size: 1.4rem; letter-spacing: 0.1em; color: var(--ink); user-select: all;">${esc(code)}</code>
+              </div>
+              <p style="text-align: center; margin-bottom: 1rem; color: var(--muted); font-size: 0.9rem;">Install the extension to add sets instantly.</p>
+              <a href="/" class="btn btn-solid" style="width: 100%; justify-content: center;">Install Mafsar</a>
+            </div>
+          </div>
+        </div>
+      </section>
+    `;
+    
+  } catch (err) {
+    main.innerHTML = `<section class="hero" style="min-height: 80vh; display: flex; align-items: center; justify-content: center;"><div class="wrap"><div style="max-width: 40em; margin: 0 auto; text-align: center;">
+      <h1 style="font-size: 2rem; color: var(--ember);">Set not found</h1>
+      <p style="color: var(--muted); margin-top: 1rem;">The share code is invalid or has been revoked.</p>
+      <a href="/" class="btn btn-quiet" style="margin-top: 2rem">Go to home</a>
+    </div></div></section>`;
+  }
+})();
 </script>
 
 </body>

@@ -361,6 +361,44 @@ async function handle(msg) {
       return {};
     }
 
+    case "LANDING_IMPORT_SHARE": {
+      const code = String(msg.code).toUpperCase();
+      const shared = await backendShareFetch(code);
+      const now = Date.now();
+      const session = await addSession({
+        source: "share",
+        sourceLabel: `Shared: ${code}`,
+        title: shared.title,
+        url: "",
+        capturedAt: now,
+        messages: [],
+        importedCount: shared.cards.length,
+      });
+      const flashcards = shared.cards.map((c) => ({
+        id: uid(),
+        front: String(c.front),
+        back: String(c.back),
+        updatedAt: new Date(now).toISOString(),
+        ...initSchedule(now),
+      }));
+      const quiz = (shared.quiz || []).map((q) => ({
+        id: uid(),
+        q: String(q.q),
+        options: q.options.map(String),
+        answer: Number(q.answer) || 0,
+        explain: String(q.explain || ""),
+        updatedAt: new Date(now).toISOString(),
+      }));
+      await saveStudySet({
+        sessionId: session.id,
+        title: shared.title,
+        createdAt: now,
+        flashcards,
+        quiz,
+      });
+      return { success: true };
+    }
+
     default:
       throw new Error(`Unknown message type: ${msg?.type}`);
   }

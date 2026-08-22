@@ -1332,20 +1332,23 @@ body {
 }
 
 /* --- share code (Summary tab) --- */
-.share-code-row {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-.share-code {
+/* --- share link/code --- */
+.share-readonly {
   flex: 1;
   min-width: 0;
   padding: 8px 10px;
   font-size: 14px;
-  letter-spacing: 0.08em;
   background: var(--surface-2, var(--surface));
-  border: 1px dashed var(--border);
+  border: 1px solid var(--border);
   border-radius: var(--r-sm);
   color: var(--ink);
   user-select: all;
+  outline: none;
+}
+.share-readonly:focus {
+  border-color: var(--primary);
+}
+.share-code {
+  letter-spacing: 0.08em;
+  font-family: ui-monospace, "Cascadia Code", monospace;
 }
