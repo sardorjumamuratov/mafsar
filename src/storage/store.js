@@ -100,7 +100,14 @@ export async function getStudySets() {
   const sets = await get(KEYS.STUDY_SETS, []);
   return sets
     .filter((s) => !s.deleted)
-    .map((s) => ({ ...s, flashcards: (s.flashcards || []).filter((c) => !c.deleted) }));
+    .map((s) => ({
+      ...s,
+      flashcards: (s.flashcards || []).filter((c) => !c.deleted),
+      // Hide tombstoned quiz questions too — the sync layer can mark a single
+      // quiz row deleted (schema + applyServer support it), and a UI getter
+      // that hid deleted cards but not deleted quiz would resurface them.
+      quiz: (s.quiz || []).filter((q) => !q.deleted),
+    }));
 }
 
 export async function getStudySetForSession(sessionId) {
@@ -112,7 +119,11 @@ export async function getStudySetForSession(sessionId) {
 export async function saveStudySet(studySet) {
   const sets = await get(KEYS.STUDY_SETS, []);
   const idx = sets.findIndex((s) => s.sessionId === studySet.sessionId);
-  const record = { id: studySet.id || uid(), updatedAt: nowISO(), ...studySet };
+  // Spread first, then force id + a fresh updatedAt LAST: re-saving a record
+  // that already carries an updatedAt (e.g. the SUMMARIZE/blurb handlers pass
+  // the stored set straight back) must still bump the stamp, or last-write-wins
+  // sync can't tell the row changed.
+  const record = { ...studySet, id: studySet.id || uid(), updatedAt: nowISO() };
   // Stamp any unsynced children so LWW comparisons always have a timestamp.
   for (const c of record.flashcards || []) c.updatedAt ||= record.updatedAt;
   for (const q of record.quiz || []) q.updatedAt ||= record.updatedAt;

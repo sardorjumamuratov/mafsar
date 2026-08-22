@@ -7,13 +7,22 @@ globalThis.chrome = {
   storage: {
     local: {
       get(key, cb) {
-        const keys = Array.isArray(key) ? key : [key];
         const out = {};
-        for (const k of keys) if (DATA[k] !== undefined) out[k] = JSON.parse(JSON.stringify(DATA[k]));
+        if (key == null) {
+          // chrome.storage.local.get(null) returns everything — exportAll uses this.
+          for (const [k, v] of Object.entries(DATA)) out[k] = JSON.parse(JSON.stringify(v));
+        } else {
+          const keys = Array.isArray(key) ? key : [key];
+          for (const k of keys) if (DATA[k] !== undefined) out[k] = JSON.parse(JSON.stringify(DATA[k]));
+        }
         setTimeout(() => cb(out), 0);
       },
       set(obj, cb) {
         for (const [k, v] of Object.entries(obj)) DATA[k] = JSON.parse(JSON.stringify(v));
+        setTimeout(() => cb && cb(), 0);
+      },
+      clear(cb) {
+        for (const k of Object.keys(DATA)) delete DATA[k];
         setTimeout(() => cb && cb(), 0);
       },
     },
@@ -142,6 +151,143 @@ await test("updateCard persists a graded schedule that isDue() agrees with", asy
   assert.equal(after.dueDate, lapse.dueDate);
 });
 
+
+console.log("saveStudySet stamps a fresh updatedAt (the stale-stamp regression)");
+
+await test("re-saving a record that carries updatedAt still bumps the stamp", async () => {
+  const session = await store.addSession({ source: "chatgpt", title: "T", messages: [] });
+  const STALE = "2000-01-01T00:00:00.000Z";
+  // The SUMMARIZE / GET_BLURB handlers pass the stored record (which already
+  // has an updatedAt) straight back to saveStudySet. It must re-stamp, or
+  // last-write-wins sync can't tell the row changed.
+  const saved = await store.saveStudySet({
+    sessionId: session.id, title: "T", updatedAt: STALE, flashcards: [], quiz: [],
+  });
+  assert.notEqual(saved.updatedAt, STALE, "must not carry the input's stale updatedAt");
+  assert.ok(saved.updatedAt > STALE, "a fresh, newer stamp is written");
+  const raw = await store.readRaw(["studySets"]);
+  assert.ok(raw.studySets[0].updatedAt > STALE, "the stored row is stamped too");
+});
+
+await test("saveStudySet defaults a real id even when the input id is undefined", async () => {
+  const session = await store.addSession({ source: "chatgpt", title: "T", messages: [] });
+  const saved = await store.saveStudySet({ sessionId: session.id, id: undefined, title: "T", flashcards: [], quiz: [] });
+  assert.ok(saved.id, "id defaulted, not left undefined");
+});
+
+console.log("getStudySets hides tombstoned quiz questions (parity with flashcards)");
+
+await test("a deleted quiz question is hidden from the UI getter but kept raw", async () => {
+  const session = await store.addSession({ source: "chatgpt", title: "T", messages: [] });
+  await store.saveStudySet({
+    sessionId: session.id, title: "T",
+    flashcards: [{ id: "c1", front: "Q", back: "A", ...initSchedule() }],
+    quiz: [
+      { id: "q1", q: "live?", options: ["a", "b"], answer: 0 },
+      { id: "q2", q: "gone?", options: ["a", "b"], answer: 0, deleted: true },
+    ],
+  });
+  const sets = await store.getStudySets();
+  assert.equal(sets[0].quiz.length, 1, "tombstoned quiz question hidden from UI");
+  assert.equal(sets[0].quiz[0].id, "q1");
+  const raw = await store.readRaw(["studySets"]);
+  assert.equal(raw.studySets[0].quiz.length, 2, "tombstone kept in raw storage for sync");
+});
+
+console.log("settings defaults + merge");
+
+await test("getSettings returns provider defaults; saveSettings merges", async () => {
+  const def = await store.getSettings();
+  assert.equal(def.provider, "gemini");
+  assert.equal(def.apiKey, "");
+  await store.saveSettings({ apiKey: "secret" });
+  const merged = await store.getSettings();
+  assert.equal(merged.apiKey, "secret");
+  assert.equal(merged.provider, "gemini", "unspecified fields keep their defaults");
+});
+
+console.log("activity, streaks, and the 7-day view");
+
+const dk = store.dayKey;
+function keyDaysAgo(n) {
+  const d = new Date();
+  d.setDate(d.getDate() - n);
+  return dk(d);
+}
+
+await test("bumpActivity accumulates today's count", async () => {
+  await store.bumpActivity(2);
+  await store.bumpActivity(3);
+  const activity = await store.getActivity();
+  assert.equal(activity[keyDaysAgo(0)], 5);
+});
+
+await test("computeStreak counts consecutive days, tolerating an empty today", () => {
+  assert.equal(store.computeStreak({}), 0);
+  assert.equal(store.computeStreak({ [keyDaysAgo(0)]: 1, [keyDaysAgo(1)]: 1, [keyDaysAgo(2)]: 1 }), 3);
+  // Nothing yet today, but yesterday and before keep the streak alive.
+  assert.equal(store.computeStreak({ [keyDaysAgo(1)]: 1, [keyDaysAgo(2)]: 1 }), 2);
+  // A one-day gap breaks it.
+  assert.equal(store.computeStreak({ [keyDaysAgo(0)]: 1, [keyDaysAgo(2)]: 1 }), 1);
+});
+
+await test("weekActivity returns 7 oldest-first days ending today", () => {
+  const week = store.weekActivity({ [keyDaysAgo(0)]: 4, [keyDaysAgo(6)]: 1 });
+  assert.equal(week.length, 7);
+  assert.equal(week[6].isToday, true);
+  assert.equal(week[6].key, keyDaysAgo(0));
+  assert.equal(week[6].count, 4);
+  assert.equal(week[0].key, keyDaysAgo(6));
+  assert.equal(week[0].count, 1);
+  assert.equal(week.filter((d) => d.isToday).length, 1, "exactly one day is 'today'");
+});
+
+console.log("review log cap");
+
+await test("appendReviewLog keeps only the newest 2000 entries", async () => {
+  const seed = Array.from({ length: 2000 }, (_, i) => ({ id: "r" + i, cardId: "c", grade: 3, reviewedAt: "2026-01-01T00:00:00.000Z" }));
+  await new Promise((r) => chrome.storage.local.set({ reviewLog: seed }, r));
+  await store.appendReviewLog({ id: "newest", cardId: "c", grade: 5, reviewedAt: "2026-02-01T00:00:00.000Z" });
+  const log = await store.getReviewLog();
+  assert.equal(log.length, 2000, "capped at 2000");
+  assert.equal(log[log.length - 1].id, "newest", "newest retained");
+  assert.equal(log[0].id, "r1", "oldest (r0) dropped");
+});
+
+console.log("addCard");
+
+await test("addCard appends a fresh-scheduled card and stamps the set", async () => {
+  const session = await store.addSession({ source: "chatgpt", title: "T", messages: [] });
+  const set = await store.saveStudySet({ sessionId: session.id, title: "T", flashcards: [], quiz: [] });
+  const card = await store.addCard(session.id, "Front?", "Back.");
+  assert.ok(card.id);
+  assert.equal(card.front, "Front?");
+  assert.equal(card.easiness, 2.5, "starts with a fresh SM-2 schedule");
+  assert.equal(card.repetitions, 0);
+  const sets = await store.getStudySets();
+  assert.equal(sets[0].flashcards.length, 1);
+  assert.ok(sets[0].updatedAt >= set.updatedAt, "set re-stamped on add");
+  assert.equal(await store.addCard("no-such-session", "x", "y"), null, "unknown session returns null");
+});
+
+console.log("backup / restore");
+
+await test("exportAll round-trips through importAll; bad input is rejected", async () => {
+  const session = await store.addSession({ source: "chatgpt", title: "Keep me", messages: [] });
+  await store.saveStudySet({ sessionId: session.id, title: "Keep me", flashcards: [], quiz: [] });
+  const backup = await store.exportAll();
+  assert.ok(Array.isArray(backup.studySets), "export includes studySets");
+
+  // Mutate, then restore from the backup — restore replaces everything.
+  await store.addSession({ source: "chatgpt", title: "Added later", messages: [] });
+  await store.importAll(backup);
+  const sessions = await store.getSessions();
+  assert.equal(sessions.length, 1, "restore replaced current data");
+  assert.equal(sessions[0].title, "Keep me");
+
+  await assert.rejects(() => store.importAll(null), /Mafsar backup/);
+  await assert.rejects(() => store.importAll({ studySets: "nope" }), /Mafsar backup/);
+});
 
 console.log(`
 ${passed} tests passed`);
