@@ -31,7 +31,18 @@ global.fetch = async (url, opts) => {
   }
 };
 
-global.chrome.storage = { local: { get: () => Promise.resolve({}), set: () => Promise.resolve() } };
+// chrome.storage.local is callback-style, not Promise-returning — setAuth()/getAuth()
+// in src/sync/auth.js call get(key, cb) and set(obj, cb) and wait on the callback.
+// A mock that ignores the callback leaves setAuth() pending forever (and, with no
+// timers left to keep the event loop alive, the process exits "successfully" without
+// ever reaching an assertion) — this bit us once already, keep the shape faithful.
+let storageData = {};
+global.chrome.storage = {
+  local: {
+    get: (key, cb) => cb({ [key]: storageData[key] }),
+    set: (obj, cb) => { Object.assign(storageData, obj); if (cb) cb(); },
+  },
+};
 global.API_BASE = "https://mafsar-production.up.railway.app";
 
 import { googleSignIn } from "../src/sync/auth.js";
