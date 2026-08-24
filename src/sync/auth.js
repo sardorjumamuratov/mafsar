@@ -127,3 +127,28 @@ export async function googleSignIn({ onTab, cancelSignal }) {
   }
   throw new Error('Sign-in timed out');
 }
+
+export async function pollBilling({ cancelSignal } = {}) {
+  let attempts = 0;
+  while (attempts < 200) {
+    if (cancelSignal?.aborted) throw new Error('cancelled');
+    await new Promise(r => setTimeout(r, 1500));
+    if (cancelSignal?.aborted) throw new Error('cancelled');
+    
+    attempts++;
+    let pollRes;
+    try {
+      pollRes = await authedFetch('/v1/me');
+    } catch (e) {
+      continue;
+    }
+    
+    if (!pollRes.ok) continue;
+    
+    const data = await pollRes.json();
+    if (data.usage?.limit === null) {
+      return true;
+    }
+  }
+  throw new Error('Checkout timed out');
+}

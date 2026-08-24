@@ -18,6 +18,8 @@ import {
   backendHypothetical,
   backendSummarize,
   backendBlurb,
+  backendBillingCheckout,
+  backendBillingPortal,
   backendShareCreate,
   backendShareFetch,
   backendShareRevoke,
@@ -353,6 +355,16 @@ async function handle(msg) {
       sets.blurb = blurb; // cached on the set (local-only; not synced)
       await saveStudySet(sets);
       return { blurb };
+    }
+
+    // Billing
+    case "BILLING_CHECKOUT": {
+      const { url } = await backendBillingCheckout();
+      return { url };
+    }
+    case "BILLING_PORTAL": {
+      const { url } = await backendBillingPortal();
+      return { url };
     }
 
     // Sharing: a short code hands someone a copy of one set.

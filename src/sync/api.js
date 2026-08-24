@@ -12,8 +12,21 @@ async function post(path, body) {
   const data = await res.json().catch(() => ({}));
   // `message` carries the human-readable reason (e.g. an LLM misconfiguration);
   // `error` is the machine code. Prefer the former so the toast is actionable.
-  if (!res.ok) throw new Error(data.message || data.error || `Request failed (${res.status})`);
+  if (!res.ok) {
+    if (res.status === 402 && data.error === "quota_exceeded") {
+      throw new Error(`You've used all ${data.limit} free generations this month — upgrade on the You tab for unlimited.`);
+    }
+    throw new Error(data.message || data.error || `Request failed (${res.status})`);
+  }
   return data;
+}
+
+export function backendBillingCheckout() {
+  return post("/v1/billing/checkout", {});
+}
+
+export function backendBillingPortal() {
+  return post("/v1/billing/portal", {});
 }
 
 /** messages: [{role, text}] -> { flashcards:[{front,back}], quiz:[{q,options,answer,explain}] } */

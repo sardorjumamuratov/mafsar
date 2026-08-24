@@ -12,6 +12,7 @@ import { nowISO, one, all, run, uid } from "./db.js";
 import { genTeamCode, leaderboardFor, learningFor } from "./teams.js";
 import { generateStudySet, gradeAnswer, generateHypothetical, summarizeConversation, setBlurb, generateCodingTask, gradeCode } from "./llm.js";
 import { PRIVACY_HTML } from "./privacy.js";
+import { billingConfigured, stripeClient, getOrCreateStripeCustomer, applySubscriptionStatus, requireQuota, monthlyUsage } from "./billing.js";
 
 export function createApp(db: DB) {
   const app = new Hono<{ Variables: { userId: string } }>();
@@ -24,7 +25,7 @@ export function createApp(db: DB) {
 
   app.use("/v1/*", async (c, next) => {
     // Auth routes are public; everything else under /v1 requires a token.
-    if (c.req.path.startsWith("/v1/auth/")) return next();
+    if (c.req.path.startsWith("/v1/auth/") || c.req.path.startsWith("/v1/webhooks/")) return next();
     return requireAuth()(c, next);
   });
 
@@ -163,11 +164,13 @@ export function createApp(db: DB) {
 
   app.get("/v1/me", async (c) => {
     const userId = c.get("userId") as string;
-    const user = await one(
-      db, "SELECT id, email, created_at FROM users WHERE id = ?", [userId]
+    const user = await one<{ id: string; email: string; created_at: string; plan: string }>(
+      db, "SELECT id, email, created_at, plan FROM users WHERE id = ?", [userId]
     );
     if (!user) return c.json({ error: "not_found" }, 404);
-    return c.json({ user });
+    const used = await monthlyUsage(db, userId);
+    const limit = Number(process.env.FREE_MONTHLY_GENERATIONS) || 20;
+    return c.json({ user, usage: { used, limit: user?.plan === "pro" ? null : limit } });
   });
 
   app.post("/v1/sync", async (c) => {
@@ -177,6 +180,84 @@ export function createApp(db: DB) {
     const serverTime = nowISO();
     return c.json({ serverTime, ...(await changesSince(db, userId, body.since)) });
   });
+
+  // --- Billing & Subscriptions ---
+  app.post("/v1/billing/checkout", async (c) => {
+    if (!billingConfigured()) return c.json({ error: "billing_unavailable" }, 501);
+    const userId = c.get("userId") as string;
+    const user = await one<{ email: string }>(db, "SELECT email FROM users WHERE id = ?", [userId]);
+    if (!user) return c.json({ error: "not_found" }, 404);
+
+    const stripe = stripeClient();
+    const customer = await getOrCreateStripeCustomer(db, stripe, userId, user.email);
+    const origin = process.env.PUBLIC_BASE_URL || (c.req.header("host") ? `${c.req.header("x-forwarded-proto") || "http"}://${c.req.header("host")}` : "http://localhost:3000");
+
+    const session = await stripe.checkout.sessions.create({
+      mode: "subscription",
+      customer,
+      line_items: [{ price: process.env.STRIPE_PRICE_ID!, quantity: 1 }],
+      success_url: `${origin}/billing/success`,
+      cancel_url: `${origin}/billing/cancel`,
+    });
+
+    return c.json({ url: session.url });
+  });
+
+  app.post("/v1/billing/portal", async (c) => {
+    if (!billingConfigured()) return c.json({ error: "billing_unavailable" }, 501);
+    const userId = c.get("userId") as string;
+    const user = await one<{ stripe_customer_id: string }>(db, "SELECT stripe_customer_id FROM users WHERE id = ?", [userId]);
+    if (!user || !user.stripe_customer_id) return c.json({ error: "no_subscription" }, 404);
+
+    const stripe = stripeClient();
+    const origin = process.env.PUBLIC_BASE_URL || (c.req.header("host") ? `${c.req.header("x-forwarded-proto") || "http"}://${c.req.header("host")}` : "http://localhost:3000");
+
+    const session = await stripe.billingPortal.sessions.create({
+      customer: user.stripe_customer_id,
+      return_url: `${origin}/billing/return`,
+    });
+
+    return c.json({ url: session.url });
+  });
+
+  app.post("/v1/webhooks/stripe", async (c) => {
+    if (!billingConfigured()) return c.json({ error: "billing_unavailable" }, 501);
+    const body = await c.req.text();
+    const sig = c.req.header("stripe-signature") ?? "";
+    const stripe = stripeClient();
+
+    let event;
+    try {
+      event = stripe.webhooks.constructEvent(body, sig, process.env.STRIPE_WEBHOOK_SECRET!);
+    } catch (err: any) {
+      return c.json({ error: "invalid_signature" }, 400);
+    }
+
+    if (event.type === "checkout.session.completed") {
+      const session = event.data.object as any;
+      if (session.customer && session.subscription) {
+        const sub = await stripe.subscriptions.retrieve(session.subscription as string);
+        await applySubscriptionStatus(db, session.customer as string, sub.status);
+      }
+    } else if (event.type === "customer.subscription.updated") {
+      const sub = event.data.object as any;
+      await applySubscriptionStatus(db, sub.customer as string, sub.status);
+    } else if (event.type === "customer.subscription.deleted") {
+      const sub = event.data.object as any;
+      await applySubscriptionStatus(db, sub.customer as string, "canceled");
+    }
+
+    return c.json({});
+  });
+
+  app.get("/billing/success", (c) => c.html(`<style>body { font-family: system-ui; text-align: center; margin-top: 50px; }</style><h2>Thank you!</h2><p>Your subscription is active. You can close this tab and return to Mafsar.</p>`));
+  app.get("/billing/cancel", (c) => c.html(`<style>body { font-family: system-ui; text-align: center; margin-top: 50px; }</style><h2>Checkout cancelled</h2><p>You can close this tab and return to Mafsar.</p>`));
+  app.get("/billing/return", (c) => c.html(`<style>body { font-family: system-ui; text-align: center; margin-top: 50px; }</style><h2>Portal Closed</h2><p>You can close this tab and return to Mafsar.</p>`));
+
+  app.use(
+    ["/v1/generate", "/v1/grade", "/v1/hypothetical", "/v1/summarize", "/v1/blurb", "/v1/coding-task", "/v1/coding-grade"],
+    requireQuota(db)
+  );
 
   // --- Phase 2: LLM proxy (server key, grounded in user-supplied source) ---
   app.post("/v1/generate", async (c) => {

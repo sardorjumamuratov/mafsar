@@ -150,6 +150,16 @@ const MIGRATIONS: string[] = [
     expires_at    TEXT NOT NULL
   );
   CREATE INDEX idx_pending_logins_expires ON pending_logins(expires_at);
+  `,
+  `
+  ALTER TABLE users ADD COLUMN plan TEXT NOT NULL DEFAULT 'free';
+  ALTER TABLE users ADD COLUMN stripe_customer_id TEXT;
+  CREATE TABLE generation_events (
+    id         TEXT PRIMARY KEY,
+    user_id    TEXT NOT NULL REFERENCES users(id),
+    created_at TEXT NOT NULL
+  );
+  CREATE INDEX idx_generation_events_user_time ON generation_events(user_id, created_at);
   `
 ];
 
