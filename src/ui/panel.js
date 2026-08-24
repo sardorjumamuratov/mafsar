@@ -447,7 +447,7 @@ function shareBlockHtml(studySet) {
   if (!code) return "";
   return `<div class="block" style="display:flex;flex-direction:column;gap:12px">
     ${copyRowHtml("Link", shareLinkFor(code, LANDING_BASE), "anyone with it can add a copy")}
-    ${copyRowHtml("Code", code, "entered under Teams → Add a shared set", "share-code tnum")}
+    ${copyRowHtml("Code", code, "entered under Sets → Add a shared set", "share-code tnum")}
     <div>
       <button class="linkbtn" style="align-self:flex-start" data-action="share-revoke" data-id="${esc(studySet.sessionId)}">Stop sharing</button>
       <div style="font-size:12px;color:var(--muted);margin-top:2px">Both link and code will stop working. Copies already added are kept.</div>
@@ -564,7 +564,7 @@ let detail = null; // { session, studySet, summary, tab }
 let editingCardId = null;
 
 async function renderSetDetail(sessionId, tab = "cards") {
-  showChrome(false);
+  showChrome(true);
   const { sessions, studySets } = await bundle();
   const session = sessions.find((s) => s.id === sessionId);
   if (!session) return renderHome();
