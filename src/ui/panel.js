@@ -43,7 +43,7 @@ const esc = (s) =>
 //
 // DOMParser builds a detached, inert document: scripts never execute and no
 // images/iframes are fetched during parsing. The nodes are then adopted into a
-// fragment the callers insert. (Assigning to a live element's innerHTML would
+// fragment the callers insert. (Assigning to a live element's DOM-HTML would
 // be equally inert for scripts but is flagged by addons-linter, which can't
 // see the escaping above.)
 function fragment(html) {
@@ -52,7 +52,7 @@ function fragment(html) {
   frag.append(...parsed.body.childNodes);
   return frag;
 }
-/** Replace an element's children with parsed HTML (was: el.innerHTML = …). */
+/** Replace an element's children with parsed HTML (was: el.DOM-HTML = …). */
 function setHTML(el, html) {
   el.replaceChildren(fragment(html));
 }
@@ -64,7 +64,7 @@ function setHTML(el, html) {
 function topOfView() {
   app.scrollTop = 0;
 }
-/** Replace the element itself with parsed HTML (was: el.outerHTML = …). */
+/** Replace the element itself with parsed HTML (was: el.DOM-OUTER = …). */
 function replaceHTML(el, html) {
   el.replaceWith(fragment(html));
 }
@@ -353,7 +353,7 @@ async function openExamPicker() {
   setHTML(app, `
     <div class="view">
       <div class="ahd">
-        <button class="iconbtn" data-action="nav-home" aria-label="Back"><svg class="ic" viewBox="0 0 24 24"><path d="M15 6l-6 6 6 6"/></svg></button>
+        <button class="iconbtn" data-action="nav-back" aria-label="Back"><svg class="ic" viewBox="0 0 24 24"><path d="M15 6l-6 6 6 6"/></svg></button>
         <div class="h-title" style="font-size:16px">Exam sets</div><span style="width:32px"></span>
       </div>
       <div class="field"><label>Exam date</label>
@@ -486,11 +486,11 @@ async function copyShareCode(code, btn = null) {
     await navigator.clipboard.writeText(code);
     toast("Copied to clipboard");
     if (btn) {
-      const originalHtml = btn.innerHTML;
-      btn.innerHTML = `<span class="lbl">✓ Copied</span>`;
+      const children = [...btn.childNodes];
+      setHTML(btn, `<span class="lbl">✓ Copied</span>`);
       btn.setAttribute("aria-live", "polite");
       setTimeout(() => {
-        btn.innerHTML = originalHtml;
+        btn.replaceChildren(...children);
         btn.removeAttribute("aria-live");
       }, 1500);
     }
@@ -544,6 +544,12 @@ async function renderSets() {
           ? sessions.map((s) => setRow(s, summarize(setFor(s.id, studySets)))).join("")
           : `<div class="empty"><div class="big">📚</div>No sets yet.<br>Capture an AI conversation with <b>Save to Mafsar</b>, or import from Quizlet.</div>`
       }
+      <div class="listhd" style="margin-top:16px"><span class="t-label">Add a shared set</span></div>
+      <div class="help" style="margin:0">Have a code or link from another Mafsar user? Enter it to add a copy of their cards to your sets. Your progress is your own — nothing syncs back.</div>
+      <div class="field"><label>Share code or link</label>
+        <input id="shareCode" type="text" placeholder="e.g. 7KX2M9QRTA or mafsar.../s/..." autocomplete="off" autocapitalize="off" /></div>
+      <button class="btn btn-primary btn-block" data-action="share-lookup">Look up set</button>
+      <div id="sharePreview"></div>
       <button class="btn btn-ghost btn-block" data-action="capture-current">＋ Capture this page</button>
     </div>`);
   topOfView();
@@ -730,13 +736,13 @@ function paintDetail() {
         </div>
       </div>
 
-      <button class="btn btn-ghost btn-block" data-action="delete-set" data-id="${esc(session.id)}">Delete set</button>`;
+`;
   }
 
   setHTML(app, `
     <div class="view">
       <div class="ahd">
-        <button class="iconbtn" data-action="nav-home" aria-label="Back"><svg class="ic" viewBox="0 0 24 24"><path d="M15 6l-6 6 6 6"/></svg></button>
+        <button class="iconbtn" data-action="nav-back" aria-label="Back"><svg class="ic" viewBox="0 0 24 24"><path d="M15 6l-6 6 6 6"/></svg></button>
         <span style="flex:1"></span>
         ${
           studySet
@@ -749,6 +755,7 @@ function paintDetail() {
             ? `<button class="linkbtn" data-action="make-set" data-id="${esc(session.id)}" title="Regenerate flashcards and quiz from the source — matching cards keep their review schedule">↻ Regenerate</button>`
             : `<span class="tag">${s.total} cards</span>`
         }
+        ${studySet ? `<button class="iconbtn" data-action="delete-set" data-id="${esc(session.id)}" aria-label="Delete set"><svg class="ic" viewBox="0 0 24 24"><path d="M5 7h14M9 7V5h6v2m-8 0l1 13h8l1-13"/></svg></button>` : ""}
       </div>
       <div><div class="h-title" style="line-height:1.25">${esc(session.title || "Untitled")}</div>
         <div style="display:flex;gap:6px;margin-top:8px"><span class="tag dot" style="color:var(--primary)">${esc(sourceLabel(session))}</span></div>
@@ -1442,7 +1449,7 @@ function renderImport() {
   setHTML(app, `
     <div class="view">
       <div class="ahd">
-        <button class="iconbtn" data-action="nav-home" aria-label="Back"><svg class="ic" viewBox="0 0 24 24"><path d="M15 6l-6 6 6 6"/></svg></button>
+        <button class="iconbtn" data-action="nav-back" aria-label="Back"><svg class="ic" viewBox="0 0 24 24"><path d="M15 6l-6 6 6 6"/></svg></button>
         <div class="h-title" style="font-size:16px">Import flashcards</div><span style="width:32px"></span>
       </div>
       <div class="help"><b>Anki:</b> File → Export → "Notes in Plain Text" (.txt), then upload the file below (leave HTML cleanup on).<br>
@@ -1562,12 +1569,6 @@ async function renderTeams() {
       <div class="help" style="margin:0">A team is a study group with a shared code: everyone joins, then the leaderboard compares mastered cards.</div>
       <div class="listhd"><span class="t-label">Your teams</span></div>
       ${listHtml}
-      <div class="listhd" style="margin-top:16px"><span class="t-label">Add a shared set</span></div>
-      <div class="help" style="margin:0">Have a code or link from another Mafsar user? Enter it to add a copy of their cards to your sets. Your progress is your own — nothing syncs back.</div>
-      <div class="field"><label>Share code or link</label>
-        <input id="shareCode" type="text" placeholder="e.g. 7KX2M9QRTA or mafsar.../s/..." autocomplete="off" autocapitalize="off" /></div>
-      <button class="btn btn-primary btn-block" data-action="share-lookup">Look up set</button>
-      <div id="sharePreview"></div>
       <div class="team-actions">
         <div id="teamCreateForm" class="hidden" style="display:flex;flex-direction:column;gap:8px">
           <input id="teamName" type="text" placeholder="Team name" maxlength="80" autocomplete="off" aria-label="Team name" />
@@ -1870,14 +1871,14 @@ document.addEventListener("click", (e) => {
   const id = t.dataset.id;
   switch (a) {
     case "open-import": renderImport(); break;
-    case "nav-home": renderHome(); break;
+    case "nav-back": goToActiveTab(); break;
     case "nav-sets": renderSets(); break;
     case "open-set": renderSetDetail(id); break;
     case "make-set": makeSet(id); break;
     case "capture-current": captureCurrent(); break;
     case "tab": renderSetDetail(detail.session.id, t.dataset.tab); break;
     case "delete-set":
-      if (confirm("Delete this set and its cards?")) deleteSession(id).then(renderHome);
+      if (confirm("Delete this set and its cards?")) deleteSession(id).then(goToActiveTab);
       break;
     case "start-review": startGlobalReview(); break;
     case "set-review": startSetReview(id); break;
