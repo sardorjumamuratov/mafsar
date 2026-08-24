@@ -40,7 +40,7 @@ test("in-place repaints never reset scroll", () => {
   // home, exam picker, sets, set detail, make-set, import, teams (two exits:
   // signed-out early return + normal path), team detail, you, auth gate.
   const callSites = src.split("topOfView();").length - 1;
-  assert.equal(callSites, 11, "exactly the view-renderer exits reset scroll");
+  assert.equal(callSites, 12, "exactly the view-renderer exits reset scroll");
 });
 
 console.log("quiz length picker wiring (item 1)");
@@ -184,8 +184,8 @@ test('nav reads Teams; service worker routes the share + team messages', () => {
 
 console.log('teams wiring');
 
-test('teams home: Create a team pinned bottom-right, Join below it with the exact placeholder', () => {
-  assert.ok(src.includes('class="team-actions"'), 'fixed create/join stack');
+test('teams home: Create a team in document flow, Join below it with the exact placeholder', () => {
+  assert.ok(src.includes('class="team-actions"'), 'in-flow create/join block');
   assert.ok(src.includes('data-action="team-create">Create a team</button>'), 'primary Create button');
   const createAt = src.indexOf('data-action="team-create"');
   const joinAt = src.indexOf('placeholder="Enter team code"');

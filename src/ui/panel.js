@@ -1565,43 +1565,53 @@ async function renderTeams() {
         </div>`
         )
         .join("")
-    : `<div class="empty">No teams yet.<br>Create one and share the code with your study group.</div>`;
+    : "";
 
-  setHTML(app, `
-    <div class="view teams-view">
-      <div class="ahd"><div class="h-title">Teams</div></div>
-      <div class="help" style="margin:0">A team is a study group with a shared code: everyone joins, then the leaderboard compares mastered cards.</div>
+  const teamsListBlock = teams.length || loadError ? `
       <div class="listhd"><span class="t-label">Your teams</span></div>
-      ${listHtml}
+      ${listHtml}` : "";
+
+  const teamActionsBlock = `
       <div class="team-actions">
-        <div id="teamCreateForm" class="hidden" style="display:flex;flex-direction:column;gap:8px">
-          <input id="teamName" type="text" placeholder="Team name" maxlength="80" autocomplete="off" aria-label="Team name" />
-          <button class="btn btn-primary" data-action="team-create-save">Create team</button>
-        </div>
         <button class="btn btn-primary" data-action="team-create">Create a team</button>
         <div class="join-row">
           <input id="teamCode" type="text" placeholder="Enter team code" autocomplete="off" autocapitalize="characters" aria-label="Enter team code" />
           <button class="btn btn-ghost" data-action="team-join">Join</button>
         </div>
-      </div>
+      </div>`;
+
+  setHTML(app, `
+    <div class="view teams-view">
+      <div class="ahd"><div class="h-title">Teams</div></div>
+      <div class="help" style="margin:0">A team is a study group with a shared code: everyone joins, then the leaderboard compares mastered cards.</div>
+${teams.length ? teamsListBlock + "\n" + teamActionsBlock : teamActionsBlock + "\n" + teamsListBlock}
     </div>`);
   topOfView();
   document.getElementById("teamCode")?.addEventListener("keydown", (e) => {
     if (e.key === "Enter") joinTeamFromInput();
   });
+}
+
+function renderTeamCreate() {
+  showChrome(false);
+  setHTML(app, `
+    <div class="view">
+      <div class="ahd">
+        <button class="iconbtn" data-action="nav-teams" aria-label="Back"><svg class="ic" viewBox="0 0 24 24"><path d="M15 6l-6 6 6 6"/></svg></button>
+        <div class="h-title" style="font-size:16px">Create a team</div>
+        <span style="width:32px"></span>
+      </div>
+      <div class="help" style="margin:0">Everyone who joins with the code sees the leaderboard and who's studying what. Your own sets stay private either way.</div>
+      <div class="field"><label>Team name</label>
+        <input id="teamName" type="text" placeholder="e.g. MCAT study group" maxlength="80" autocomplete="off" aria-label="Team name" /></div>
+      <button class="btn btn-primary btn-block" data-action="team-create-save">Create team</button>
+    </div>`);
+  topOfView();
+  document.getElementById("teamName")?.focus();
   document.getElementById("teamName")?.addEventListener("keydown", (e) => {
     if (e.key === "Enter") createTeamFromForm();
   });
 }
-
-function toggleTeamCreateForm() {
-  const form = document.getElementById("teamCreateForm");
-  if (!form) return;
-  const show = form.classList.contains("hidden");
-  form.classList.toggle("hidden", !show);
-  if (show) document.getElementById("teamName")?.focus();
-}
-
 async function createTeamFromForm() {
   const name = document.getElementById("teamName")?.value.trim();
   if (!name) return toast("Give the team a name first.");
@@ -1905,7 +1915,7 @@ document.addEventListener("click", (e) => {
     case "share-copy": copyShareCode(t.dataset.code, t); break;
     case "share-revoke": revokeShareFor(t.dataset.id); break;
     case "open-team": renderTeam(id); break;
-    case "team-create": toggleTeamCreateForm(); break;
+    case "team-create": renderTeamCreate(); break;
     case "team-create-save": createTeamFromForm(); break;
     case "team-join": joinTeamFromInput(); break;
     case "team-leave": leaveTeam(id); break;

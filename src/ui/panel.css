@@ -1357,14 +1357,9 @@ body {
 /* Create/Join stay pinned bottom-right above the list; the list scrolls under
    them (teams-view pads the bottom so the last row can clear the stack). */
 .team-actions {
-  position: fixed;
-  right: 14px;
-  bottom: calc(76px + env(safe-area-inset-bottom));
   display: flex;
   flex-direction: column;
   gap: 8px;
-  width: min(252px, 74%);
-  z-index: 30;
 }
 .team-actions .btn,
 .join-row .btn {
@@ -1388,9 +1383,7 @@ body {
   flex: 1;
   min-width: 0;
 }
-.teams-view {
-  padding-bottom: 180px;
-}
+
 /* Copy icon buttons: comfortable keyboard/touch target with a visible ring. */
 .copy-btn {
   min-height: 36px;
