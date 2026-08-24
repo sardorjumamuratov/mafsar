@@ -181,6 +181,10 @@ function setNav(tab) {
   activeTab = tab;
   nav.querySelectorAll("button[data-nav]").forEach((b) => b.classList.toggle("on", b.dataset.nav === tab));
 }
+/** Back-button target for focus views (set detail, exam picker, import): return to whichever bottom-nav tab was active before entering. */
+function goToActiveTab() {
+  ({ home: renderHome, sets: renderSets, teams: renderTeams, you: renderYou }[activeTab] || renderHome)();
+}
 
 // ================================================================ HOME
 async function renderHome() {
