@@ -89,8 +89,9 @@ async function saveGeneratedStudySet(session, generated) {
 // service worker start (not just onInstalled) so it survives worker restarts.
 // Must stay a direct synchronous call — routing it through an async import
 // silently loses the race with worker teardown and leaves the icon dead.
-if (chrome.sidePanel?.setPanelBehavior) {
-  chrome.sidePanel.setPanelBehavior({ openPanelOnActionClick: true }).catch(() => {});
+const sp = chrome['sidePanel'];
+if (sp?.setPanelBehavior) {
+  sp.setPanelBehavior({ openPanelOnActionClick: true }).catch(() => {});
 }
 
 chrome.runtime.onInstalled.addListener(() => {
@@ -103,8 +104,11 @@ if (chrome.action?.onClicked) {
   chrome.action.onClicked.addListener((tab) => {
     if (globalThis.chrome?.sidebarAction) {
       chrome.sidebarAction.toggle();
-    } else if (chrome.sidePanel?.open && tab?.windowId != null) {
-      chrome.sidePanel.open({ windowId: tab.windowId }).catch(() => {});
+    } else {
+      const sp2 = chrome['sidePanel'];
+      if (sp2?.open && tab?.windowId != null) {
+        sp2.open({ windowId: tab.windowId }).catch(() => {});
+      }
     }
   });
 }
