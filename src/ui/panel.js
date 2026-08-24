@@ -1798,7 +1798,7 @@ async function renderYou() {
     : `<div class="block" style="display:flex;flex-direction:column;gap:10px">
          <div style="font-weight:600;font-size:13px">Back up and sync</div>
          <div style="font-size:12px;color:var(--muted);line-height:1.5">Sign in to sync your sets across devices. Everything works offline without an account.</div>
-         <button class="gbtn" data-action="auth-google">${GOOGLE_G} Continue with Google</button>
+         <button class="btn btn-ghost btn-block" data-action="auth-google">${GOOGLE_G} Continue with Google</button>
          <div class="or-divider">or</div>
          <div class="field"><label>Email</label><input id="youEmail" type="email" placeholder="you@example.com" autocomplete="email" /></div>
          <div class="field"><label>Password</label><input id="youPass" type="password" placeholder="8+ characters" autocomplete="new-password" /></div>
@@ -2248,7 +2248,7 @@ function renderAuthGate() {
         </div>
       </div>
       <div class="block" style="display:flex;flex-direction:column;gap:10px">
-        <button class="gbtn" data-action="auth-google">${GOOGLE_G} Continue with Google</button>
+        <button class="btn btn-ghost btn-block" data-action="auth-google">${GOOGLE_G} Continue with Google</button>
         <div class="or-divider">or</div>
         <div class="field"><label>Email</label><input id="youEmail" type="email" placeholder="you@example.com" autocomplete="email" /></div>
         <div class="field"><label>Password</label><input id="youPass" type="password" placeholder="8+ characters" autocomplete="new-password" /></div>

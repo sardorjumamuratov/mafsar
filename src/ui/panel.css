@@ -1447,9 +1447,6 @@ body {
   gap: 5px;
 }
 
-.gbtn { background: #fff; border: 1px solid #dadce0; color: #3c4043; min-height: 40px; display: flex; align-items: center; justify-content: center; border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: 500; font-family: system-ui, -apple-system, sans-serif; gap: 8px; width: 100%; transition: background-color 0.2s; margin-bottom: 4px; }
-.gbtn:hover:not(:disabled) { background: #f8f9fa; }
-.gbtn:disabled { opacity: 0.6; cursor: not-allowed; }
 .gicon { width: 18px; height: 18px; stroke: none; }
 .or-divider { display: flex; align-items: center; text-align: center; color: var(--muted); font-size: 13px; margin: 12px 0; }
 .or-divider::before, .or-divider::after { content: ''; flex: 1; border-bottom: 1px solid var(--border); }
