@@ -26,7 +26,7 @@ import { examReadiness, nextExam, weakTopics } from "../storage/readiness.js";
 import { quizLengths } from "./quiz-lengths.js";
 import { shareLinkFor, teamLinkFor, parseShareCode, parseTeamCode } from "./share-link.js";
 import { codeSize, MAX_CODE_CHARS } from "../storage/coding.js";
-import { getAuth, register, login, logout } from "../sync/auth.js";
+import { getAuth, register, login, logout, googleSignIn } from "../sync/auth.js";
 import { syncNow } from "../sync/sync.js";
 
 const app = document.getElementById("app");
@@ -77,6 +77,7 @@ const FLAME =
   '<svg viewBox="0 0 24 24"><path d="M13 2c.5 3.5-2.5 4.8-2.5 8A2.5 2.5 0 0 0 15 10c0-1-.3-1.8-.7-2.6 2.4 1.2 4.2 3.6 4.2 6.6a6.5 6.5 0 1 1-13 0c0-4.7 4-6.4 7.5-12z"/></svg>';
 const XBTN =
   '<button class="iconbtn" data-action="close-focus" aria-label="Close"><svg class="ic" viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></svg></button>';
+const GOOGLE_G = `<svg class="gicon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48"><path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"/><path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"/><path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"/><path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"/></svg>`;
 const COPY_SVG =
   '<svg class="ic" viewBox="0 0 24 24"><path d="M8 5H6a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-1M8 5a2 2 0 0 0 2 2h2a2 2 0 0 0 2-2M8 5a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2m0 0h2m-2 4h4m-4 4h4"/></svg>';
 
@@ -1845,7 +1846,7 @@ async function authGoogle(btn) {
   btn.disabled = true;
   
   const originalNodes = Array.from(btn.childNodes);
-  setHTML(btn, 'Waiting for Google... <button class="btn btn-ghost" style="margin-left:auto;padding:2px 8px;font-size:12px;min-height:0" onclick="event.stopPropagation();this.parentElement.click()">Cancel</button>');
+  setHTML(btn, 'Waiting for Google... <button class="btn btn-ghost" style="margin-left:auto;padding:2px 8px;font-size:12px;min-height:0" data-action="auth-google-cancel">Cancel</button>');
   
   googleAbortController = new AbortController();
   try {
@@ -1998,6 +1999,9 @@ document.addEventListener("click", (e) => {
     case "auth-signin": authSubmit("login", t); break;
       case "auth-register": authSubmit("register", t); break;
       case "auth-google": authGoogle(t); break;
+      case "auth-google-cancel":
+        if (googleAbortController) googleAbortController.abort();
+        break;
     case "auth-signout":
       logout().then(() => {
         toast("Signed out. Your sets stay on this device.");
