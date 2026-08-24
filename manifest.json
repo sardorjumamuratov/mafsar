@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Mafsar — AI Chat to Quiz",
-  "version": "0.1.1",
+  "version": "0.2.0",
   "description": "Capture your AI chat learning sessions and turn them into flashcards, quizzes, and spaced-repetition reviews so you don't forget.",
   "permissions": [
     "storage",
