@@ -20,11 +20,7 @@ jobs:
           node-version: 22
           cache: npm
           cache-dependency-path: server/package-lock.json
-      # `stripe` was added to package.json but package-lock.json wasn't
-      # regenerated, so `npm ci` (which requires the two to be in sync) fails.
-      # Use `npm install` until the lock is regenerated and committed, then
-      # switch this back to `npm ci` for reproducible installs.
-      - run: npm install --no-audit --no-fund
+      - run: npm ci
       - run: npm test
 
   client-tests:
@@ -73,11 +69,7 @@ jobs:
           node-version: 22
           cache: npm
           cache-dependency-path: server/package-lock.json
-      # `stripe` was added to package.json but package-lock.json wasn't
-      # regenerated, so `npm ci` (which requires the two to be in sync) fails.
-      # Use `npm install` until the lock is regenerated and committed, then
-      # switch this back to `npm ci` for reproducible installs.
-      - run: npm install --no-audit --no-fund
+      - run: npm ci
       - run: npx tsc --noEmit
       # Boot the server against a local file DB and hit the health endpoint —
       # catches runtime breakage (bad imports, env handling) before deploy.
