@@ -125,3 +125,5 @@ export const shareRevokeSchema = z.object({ code: z.string().min(1) });
 // are shown to members only, so a modest length bound is enough.
 export const teamCreateSchema = z.object({ name: z.string().trim().min(1).max(80) });
 export const teamJoinSchema = z.object({ code: z.string().trim().min(1).max(32) });
+
+export const pollSchema = z.object({ pollToken: z.string().min(20).max(200) });

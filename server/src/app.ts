@@ -1,14 +1,15 @@
 import { Hono } from "hono";
 import { cors } from "hono/cors";
+import { randomBytes, createHash, timingSafeEqual } from "node:crypto";
 import type { DB } from "./db.js";
 import {
-  register, login, requireAuth, signAccessToken, signRefreshToken,
+  register, login, requireAuth, signAccessToken, signRefreshToken, upsertGoogleUser,
 } from "./auth.js";
-import { syncSchema, registerSchema, loginSchema, generateSchema, gradeSchema, hypotheticalSchema, summarizeSchema, blurbSchema, codingTaskSchema, codingGradeSchema, shareCreateSchema, shareRevokeSchema, teamCreateSchema, teamJoinSchema } from "./schema.js";
+import { syncSchema, registerSchema, loginSchema, generateSchema, gradeSchema, hypotheticalSchema, summarizeSchema, blurbSchema, codingTaskSchema, codingGradeSchema, shareCreateSchema, shareRevokeSchema, teamCreateSchema, teamJoinSchema, pollSchema } from "./schema.js";
+import { googleConfigured, buildAuthUrl, pkcePair, exchangeCode, verifyIdToken } from "./google.js";
 import { applySync, changesSince } from "./sync.js";
 import { nowISO, one, all, run, uid } from "./db.js";
 import { genTeamCode, leaderboardFor, learningFor } from "./teams.js";
-import { randomBytes } from "node:crypto";
 import { generateStudySet, gradeAnswer, generateHypothetical, summarizeConversation, setBlurb, generateCodingTask, gradeCode } from "./llm.js";
 import { PRIVACY_HTML } from "./privacy.js";
 
@@ -76,6 +77,88 @@ export function createApp(db: DB) {
     } catch {
       return c.json({ error: "unauthorized" }, 401);
     }
+  });
+
+  app.post("/v1/auth/google/start", async (c) => {
+    if (!googleConfigured()) return c.json({ error: "google_unavailable" }, 501);
+    await run(db, "DELETE FROM pending_logins WHERE expires_at < ?", [nowISO()]);
+    
+    const state = uid();
+    const { verifier, challenge } = pkcePair();
+    const pollToken = randomBytes(32).toString("base64url");
+    const pollHash = createHash("sha256").update(pollToken).digest("hex");
+    
+    const authUrl = buildAuthUrl({ state, codeChallenge: challenge });
+    const expiresAt = new Date(Date.now() + 600 * 1000).toISOString();
+    
+    await run(db, "INSERT INTO pending_logins (id, poll_hash, code_verifier, created_at, expires_at) VALUES (?, ?, ?, ?, ?)", [state, pollHash, verifier, nowISO(), expiresAt]);
+    return c.json({ authUrl, pollToken, expiresIn: 600 });
+  });
+
+  app.get("/v1/auth/google/callback", async (c) => {
+    const error = c.req.query("error");
+    const state = c.req.query("state");
+    const code = c.req.query("code");
+    
+    if (!state) return c.html(`<style>body { font-family: system-ui; text-align: center; margin-top: 50px; }</style><h2>Sign-in failed</h2><p>Missing state parameter.</p>`);
+    
+    if (error === "access_denied") {
+      await run(db, "UPDATE pending_logins SET status = 'error', error = 'Sign-in cancelled' WHERE id = ?", [state]);
+      return c.html(`<style>body { font-family: system-ui; text-align: center; margin-top: 50px; }</style><h2>Sign-in cancelled</h2><p>You can close this tab and try again.</p>`);
+    }
+    
+    const pending = await one<{ code_verifier: string }>(db, "SELECT code_verifier FROM pending_logins WHERE id = ? AND expires_at > ?", [state, nowISO()]);
+    if (!pending) {
+      return c.html(`<style>body { font-family: system-ui; text-align: center; margin-top: 50px; }</style><h2>Link expired</h2><p>This sign-in request expired or was already used. Please try again.</p>`);
+    }
+
+    try {
+      if (!code) throw new Error("No code parameter");
+      const { id_token } = await exchangeCode(code, pending.code_verifier);
+      const profile = await verifyIdToken(id_token);
+      const user = await upsertGoogleUser(db, profile);
+      const accessToken = await signAccessToken(user.id);
+      const refreshToken = await signRefreshToken(user.id);
+      
+      await run(db, "UPDATE pending_logins SET status = 'ready', user_id = ?, access_token = ?, refresh_token = ?, email = ? WHERE id = ?", [user.id, accessToken, refreshToken, user.email, state]);
+      
+      return c.html(`<style>body { font-family: system-ui; text-align: center; margin-top: 50px; }</style><h2>Success!</h2><p>You are signed in. You can close this tab and return to Mafsar.</p>`);
+    } catch (e: any) {
+      const msg = e.message ? String(e.message).substring(0, 100) : "Unknown error";
+      await run(db, "UPDATE pending_logins SET status = 'error', error = ? WHERE id = ?", [msg, state]);
+      return c.html(`<style>body { font-family: system-ui; text-align: center; margin-top: 50px; }</style><h2>Sign-in failed</h2><p>Something went wrong. Please try again.</p>`);
+    }
+  });
+
+  app.post("/v1/auth/google/poll", async (c) => {
+    const { pollToken } = pollSchema.parse(await c.req.json());
+    const pollHash = createHash("sha256").update(pollToken).digest("hex");
+    
+    const rows = await all<{ id: string; poll_hash: string; status: string; error: string; user_id: string; access_token: string; refresh_token: string; email: string; expires_at: string }>(db, "SELECT * FROM pending_logins", []);
+    const row = rows.find(r => {
+      if (r.poll_hash.length !== pollHash.length) return false;
+      return timingSafeEqual(Buffer.from(r.poll_hash, 'hex'), Buffer.from(pollHash, 'hex'));
+    });
+    
+    if (!row || row.expires_at < nowISO()) {
+      return c.json({ status: "expired" }, 410);
+    }
+    if (row.status === "pending") {
+      return c.json({ status: "pending" });
+    }
+    if (row.status === "error") {
+      return c.json({ status: "error", error: row.error });
+    }
+    if (row.status === "ready") {
+      await run(db, "DELETE FROM pending_logins WHERE id = ?", [row.id]);
+      return c.json({
+        status: "ready",
+        accessToken: row.access_token,
+        refreshToken: row.refresh_token,
+        user: { id: row.user_id, email: row.email }
+      });
+    }
+    return c.json({ status: "error", error: "unknown state" });
   });
 
   app.get("/v1/me", async (c) => {

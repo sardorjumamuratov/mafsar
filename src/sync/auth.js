@@ -85,3 +85,45 @@ export async function authedFetch(path, opts = {}) {
   }
   return res;
 }
+
+export async function googleSignIn({ onTab, cancelSignal }) {
+  const res = await fetch(API_BASE + '/v1/auth/google/start', {
+    method: 'POST',
+  });
+  if (res.status === 501) throw new Error('google_unavailable');
+  if (!res.ok) throw new Error('Could not start Google sign in');
+  
+  const { authUrl, pollToken } = await res.json();
+  onTab(authUrl);
+
+  let attempts = 0;
+  while (attempts < 200) {
+    if (cancelSignal?.aborted) throw new Error('cancelled');
+    await new Promise(r => setTimeout(r, 1500));
+    if (cancelSignal?.aborted) throw new Error('cancelled');
+    
+    attempts++;
+    let pollRes;
+    try {
+      pollRes = await fetch(API_BASE + '/v1/auth/google/poll', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ pollToken })
+      });
+    } catch (e) {
+      continue;
+    }
+    
+    if (pollRes.status === 410) throw new Error('Sign-in expired');
+    if (!pollRes.ok) continue;
+    
+    const data = await pollRes.json();
+    if (data.status === 'pending') continue;
+    if (data.status === 'error') throw new Error(data.error);
+    if (data.status === 'ready') {
+      await setAuth({ accessToken: data.accessToken, refreshToken: data.refreshToken, user: data.user });
+      return data.user;
+    }
+  }
+  throw new Error('Sign-in timed out');
+}

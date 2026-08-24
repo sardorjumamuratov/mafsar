@@ -1797,6 +1797,8 @@ async function renderYou() {
     : `<div class="block" style="display:flex;flex-direction:column;gap:10px">
          <div style="font-weight:600;font-size:13px">Back up and sync</div>
          <div style="font-size:12px;color:var(--muted);line-height:1.5">Sign in to sync your sets across devices. Everything works offline without an account.</div>
+         <button class="gbtn" data-action="auth-google">${GOOGLE_G} Continue with Google</button>
+         <div class="or-divider">or</div>
          <div class="field"><label>Email</label><input id="youEmail" type="email" placeholder="you@example.com" autocomplete="email" /></div>
          <div class="field"><label>Password</label><input id="youPass" type="password" placeholder="8+ characters" autocomplete="new-password" /></div>
          <div style="display:flex;gap:10px">
@@ -1831,29 +1833,71 @@ async function renderYou() {
 }
 
 // --- account actions ---------------------------------------------------------
-async function authSubmit(kind) {
-  const email = document.getElementById("youEmail")?.value.trim();
-  const password = document.getElementById("youPass")?.value;
-  if (!email || !password) return toast("Enter an email and password.");
-  if (password.length < 8) return toast("Password needs at least 8 characters.");
-  const wasSignedIn = !!(await getAuth())?.user;
-  toast(kind === "register" ? "Creating account…" : "Signing in…");
+
+let googleAbortController = null;
+async function authGoogle(btn) {
+  if (googleAbortController) {
+    googleAbortController.abort();
+    googleAbortController = null;
+    renderHome();
+    return;
+  }
+  btn.disabled = true;
+  
+  const originalNodes = Array.from(btn.childNodes);
+  setHTML(btn, 'Waiting for Google... <button class="btn btn-ghost" style="margin-left:auto;padding:2px 8px;font-size:12px;min-height:0" onclick="event.stopPropagation();this.parentElement.click()">Cancel</button>');
+  
+  googleAbortController = new AbortController();
   try {
-    const user = kind === "register" ? await register(email, password) : await login(email, password);
-    toast("Signed in");
-    try {
-      const r = await syncNow();
-      if (!r.skipped) toast(r.pulled === 0 ? "Up to date" : "Updated from your other devices");
-    } catch { /* offline is fine */ }
-    // From the first-launch gate go Home; from the You tab stay on You.
-    wasSignedIn ? renderYou() : renderHome();
+    const user = await googleSignIn({
+      onTab: (url) => chrome.tabs.create({ url, active: true }, (tab) => {
+        googleAbortController.tabId = tab.id;
+      }),
+      cancelSignal: googleAbortController.signal
+    });
+    if (googleAbortController.tabId) chrome.tabs.remove(googleAbortController.tabId);
+    googleAbortController = null;
+    await afterSignIn(false);
   } catch (e) {
-    toast(e.message);
+    if (googleAbortController?.tabId) chrome.tabs.remove(googleAbortController.tabId).catch(() => {});
+    googleAbortController = null;
+    if (e.message !== 'cancelled') {
+      toast(e.message === 'google_unavailable' ? "Google sign-in isn't available right now." : e.message);
+    }
+    btn.disabled = false;
+    btn.replaceChildren(...originalNodes);
   }
 }
 
+async function afterSignIn(wasSignedIn) {
+  if (!wasSignedIn) toast("Signed in");
+  try {
+    await syncNow();
+  } catch (e) {
+  }
+  if (!wasSignedIn && activeTab !== "you") renderHome();
+  else renderYou();
+}
 
-
+async function authSubmit(kind, btn) {
+    const email = document.getElementById("youEmail")?.value.trim();
+    const password = document.getElementById("youPass")?.value;
+    if (!email || !password) return toast("Enter an email and password.");
+    if (password.length < 8) return toast("Password needs at least 8 characters.");
+    const wasSignedIn = !!(await getAuth())?.user;
+    if (btn) btn.disabled = true;
+    try {
+      if (kind === "register") {
+        await register(email, password);
+      } else {
+        await login(email, password);
+      }
+      await afterSignIn(wasSignedIn);
+    } catch (e) {
+      if (btn) btn.disabled = false;
+      toast(e.message);
+    }
+}
 // ================================================================ capture current tab
 async function captureCurrent() {
   toast("Capturing…");
@@ -1951,8 +1995,9 @@ document.addEventListener("click", (e) => {
     case "gen-summary": generateSummary(id); break;
     case "export-backup": exportBackup(); break;
     case "import-backup": document.getElementById("backupFile")?.click(); break;
-    case "auth-signin": authSubmit("login"); break;
-    case "auth-register": authSubmit("register"); break;
+    case "auth-signin": authSubmit("login", t); break;
+      case "auth-register": authSubmit("register", t); break;
+      case "auth-google": authGoogle(t); break;
     case "auth-signout":
       logout().then(() => {
         toast("Signed out. Your sets stay on this device.");
@@ -2199,6 +2244,8 @@ function renderAuthGate() {
         </div>
       </div>
       <div class="block" style="display:flex;flex-direction:column;gap:10px">
+        <button class="gbtn" data-action="auth-google">${GOOGLE_G} Continue with Google</button>
+        <div class="or-divider">or</div>
         <div class="field"><label>Email</label><input id="youEmail" type="email" placeholder="you@example.com" autocomplete="email" /></div>
         <div class="field"><label>Password</label><input id="youPass" type="password" placeholder="8+ characters" autocomplete="new-password" /></div>
         <button class="btn btn-primary btn-block" data-action="auth-register">Create account</button>

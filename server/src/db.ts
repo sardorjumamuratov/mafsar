@@ -132,6 +132,25 @@ const MIGRATIONS: string[] = [
   );
   CREATE INDEX idx_team_members_user ON team_members(user_id);
   `,
+  `
+  ALTER TABLE users ADD COLUMN google_sub TEXT;
+  ALTER TABLE users ADD COLUMN name TEXT;
+  CREATE UNIQUE INDEX idx_users_google_sub ON users(google_sub);
+  CREATE TABLE pending_logins (
+    id            TEXT PRIMARY KEY,
+    poll_hash     TEXT NOT NULL,
+    code_verifier TEXT NOT NULL,
+    status        TEXT NOT NULL DEFAULT 'pending',
+    user_id       TEXT,
+    access_token  TEXT,
+    refresh_token TEXT,
+    email         TEXT,
+    error         TEXT,
+    created_at    TEXT NOT NULL,
+    expires_at    TEXT NOT NULL
+  );
+  CREATE INDEX idx_pending_logins_expires ON pending_logins(expires_at);
+  `
 ];
 
 export async function migrate(db: DB): Promise<void> {

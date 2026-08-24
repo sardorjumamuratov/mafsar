@@ -79,8 +79,52 @@ export async function login(db: DB, email: string, password: string) {
     "SELECT * FROM users WHERE email = ?",
     [email.trim().toLowerCase()]
   );
-  if (!user || !(await verifyPassword(password, user.password_hash))) {
-    return null;
+  if (!user || !user.password_hash) return null;
+  if (!(await verifyPassword(password, user.password_hash))) return null;
+  return user;
+}
+
+export async function upsertGoogleUser(
+  db: DB,
+  profile: { sub: string; email: string; name?: string }
+) {
+  const bySub = await one<{ id: string; email: string }>(
+    db,
+    "SELECT id, email FROM users WHERE google_sub = ?",
+    [profile.sub]
+  );
+  if (bySub) return bySub;
+
+  const normalized = profile.email.trim().toLowerCase();
+  const byEmail = await one<{ id: string; email: string; name?: string }>(
+    db,
+    "SELECT id, email, name FROM users WHERE email = ?",
+    [normalized]
+  );
+  
+  if (byEmail) {
+    // Only reachable because verifyIdToken rejected unverified emails.
+    // Without that check, anyone controlling a workspace domain could hijack an account.
+    await run(
+      db,
+      "UPDATE users SET google_sub = ?, name = COALESCE(name, ?) WHERE id = ?",
+      [profile.sub, profile.name || null, byEmail.id]
+    );
+    return byEmail;
   }
+
+  const user = {
+    id: uid(),
+    email: normalized,
+    password_hash: "",
+    created_at: nowISO(),
+    google_sub: profile.sub,
+    name: profile.name || null,
+  };
+  await run(
+    db,
+    "INSERT INTO users (id, email, password_hash, created_at, google_sub, name) VALUES (?, ?, ?, ?, ?, ?)",
+    [user.id, user.email, user.password_hash, user.created_at, user.google_sub, user.name]
+  );
   return user;
 }
