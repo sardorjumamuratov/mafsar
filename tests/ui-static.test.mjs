@@ -5,7 +5,22 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 
-const src = readFileSync(new URL("../src/ui/panel.js", import.meta.url), "utf8");
+import fs, { readdirSync, statSync } from "node:fs";
+import { join } from "node:path";
+import { fileURLToPath } from "node:url";
+
+const __dirname = fileURLToPath(new URL(".", import.meta.url));
+const uiDir = join(__dirname, "../src/ui");
+function getAllJs(dir) {
+  let files = [];
+  for (const file of readdirSync(dir)) {
+    const p = join(dir, file);
+    if (statSync(p).isDirectory()) files.push(...getAllJs(p));
+    else if (p.endsWith(".js")) files.push(p);
+  }
+  return files;
+}
+const src = getAllJs(uiDir).map(f => readFileSync(f, "utf8").replace(/\r\n/g, "\n")).join("\n");
 let passed = 0;
 function test(name, fn) {
   fn();
@@ -46,7 +61,7 @@ test("in-place repaints never reset scroll", () => {
 console.log("quiz length picker wiring (item 1)");
 
 test("panel uses the extracted quizLengths helper", () => {
-  assert.ok(src.includes('from "./quiz-lengths.js"'));
+  assert.ok(src.includes("quiz-lengths.js"));
   assert.ok(src.includes("quizLengths(s.total, available)"));
   assert.ok(!src.includes("[0.1, \"Quick\"]"), "old percentage rule is gone");
 });
@@ -83,9 +98,9 @@ test("SM-2 schedules survive a regenerate (service worker)", () => {
 
 console.log("coding practice decoupling (standalone session)");
 
-const codingStart = src.indexOf("// --- Coding practice: a standalone session started from the set");
-const codingEnd = src.indexOf("// --- Typed-answer practice over a set's cards");
-const codingBlock = src.slice(codingStart, codingEnd);
+let codingBlock = readFileSync(join(__dirname, "../src/ui/flows/coding.js"), "utf8");
+const codingStart = 0;
+const codingEnd = codingBlock.length;
 
 test("the coding block never touches the review queue", () => {
   assert.ok(codingStart !== -1 && codingEnd !== -1, "coding block found");
@@ -97,7 +112,7 @@ test("the coding block never touches the review queue", () => {
 test("session shape mirrors typed practice (5 items, focusReturn, showChrome)", () => {
   assert.ok(codingBlock.includes("startCodingPractice(sessionId)"));
   assert.ok(codingBlock.includes("slice(0, 5)"), "coding sessions are 5 exercises");
-  assert.ok(codingBlock.includes('focusReturn = "set:" + sessionId'));
+  assert.ok(codingBlock.includes('setFocusReturn("set:" + sessionId)'));
   assert.ok(codingBlock.includes("showChrome(false)"));
   assert.ok(codingBlock.includes("paintCodingQ();"));
 });
@@ -109,13 +124,13 @@ test("progress chrome counts the session, not the queue", () => {
 });
 
 test("code-next advances codingState, never qIdx", () => {
-  assert.ok(src.includes('case "code-next": codingState.idx++; paintCodingQ(); break;'));
+  assert.ok(src.includes('case "code-next": codingNext(); break;'));
   assert.ok(!src.includes('case "code-next": qIdx++'));
 });
 
 test("a slow LLM response cannot paint over a left/restarted session", () => {
   assert.ok(codingBlock.includes("codingState.token !== token"), "stale-response token guard");
-  assert.ok(src.includes("function goReturn() {\n  codingState = null;"), "leaving the focus view ends the sitting");
+  assert.ok(src.includes("function goReturn() {\n  setCodingState(null);"), "leaving the focus view ends the sitting");
 });
 
 test("the review flow shows Apply unconditionally again", () => {
@@ -159,10 +174,10 @@ test('receiving side: lookup, duplicate guard, preview, import', () => {
 });
 
 test('import builds fresh ids and fresh schedules, no sender fields', () => {
-  const fn = src.slice(src.indexOf("async function importSharedSet"), src.indexOf("async function authSubmit"));
+  const fn = fs.readFileSync(join(__dirname, "../src/ui/views/sets.js"), "utf8");
   assert.ok(fn.length > 200, 'import function located');
   assert.ok(fn.includes('...initSchedule(now)'), 'cards start from scratch');
-  assert.ok(fn.includes('id: uid()'), 'new ids');
+  assert.ok(fn.includes('id: uid()') || fn.includes('id:uid()'), 'new ids');
   for (const leak of ['examDate', 'summary', 'blurb', 'easiness']) {
     assert.ok(!fn.includes(leak), 'import must not carry ' + leak);
   }
@@ -203,7 +218,7 @@ test('team detail: copyable link + code, leaderboard, who is learning what, leav
 });
 
 test('share link helpers come from the pure module', () => {
-  assert.ok(src.includes('from "./share-link.js"'));
+  assert.ok(src.includes("share-link.js"));
   assert.ok(src.includes('shareLinkFor(code, LANDING_BASE)'));
   assert.ok(src.includes('parseShareCode('));
   assert.ok(src.includes('parseTeamCode('));
