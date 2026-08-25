@@ -1787,34 +1787,75 @@ async function renderYou() {
     try {
       const { authedFetch } = await import("../sync/auth.js");
       const meRes = await authedFetch('/v1/me');
-      if (meRes.ok) {
-        const data = await meRes.json();
-        const plan = data.user.plan;
-        const usage = data.usage;
-        if (plan === "free") {
-          const pct = Math.min(100, Math.max(0, (usage.used / usage.limit) * 100));
-          billingHtml = `
-            <div class="block" style="display:flex;flex-direction:column;gap:10px;margin-bottom:12px">
-              <div style="font-weight:600;font-size:13px">Mafsar Free</div>
-              <div style="font-size:12px;color:var(--muted)">${usage.used} of ${usage.limit} free generations this month</div>
-              <div class="bar"><i style="width:${pct}%"></i></div>
-              <button class="btn btn-primary btn-block" data-action="billing-checkout">Upgrade to Pro</button>
-            </div>
-          `;
-        } else {
-          billingHtml = `
-            <div class="block" style="display:flex;flex-direction:column;gap:10px;margin-bottom:12px">
-              <div style="font-weight:600;font-size:13px;display:flex;align-items:center;gap:6px">
-                <svg class="ic" viewBox="0 0 24 24" style="color:var(--primary);width:16px;height:16px"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>
-                Mafsar Pro
+      const PLAN_COPY = `<div style="font-size:11px;color:var(--muted);text-align:center;margin-top:6px">Plus $2/month, Pro $6/month</div>`;
+        if (meRes.ok) {
+          const data = await meRes.json();
+          const plan = data.usage.plan;
+          const usage = data.usage;
+          if (plan === "free" || plan === "plus") {
+            const winText = usage.window === "day" ? "today" : "this month";
+            
+            const meter = (name, u, l) => {
+               if (l === null) return "";
+               const pct = Math.min(100, Math.max(0, (u / l) * 100));
+               return `
+                 <div style="font-size:12px;color:var(--muted);display:flex;justify-content:space-between">
+                   <span>${name}</span>
+                   <span>${u} of ${l}</span>
+                 </div>
+                 <div class="bar" style="margin-bottom:8px"><i style="width:${pct}%"></i></div>
+               `;
+            };
+
+            const metersHtml = meter("Set generations", usage.set.used, usage.set.limit) +
+                               meter("Coding exercises", usage.coding.used, usage.coding.limit) +
+                               meter("Practice gradings", usage.practice.used, usage.practice.limit);
+
+            const title = plan === "plus" ? "Mafsar Plus" : "Mafsar Free";
+            
+            let btnsHtml = "";
+            if (plan === "free") {
+              btnsHtml = `
+                <div style="display:flex;gap:8px">
+                  <button class="btn btn-primary" style="flex:1;padding:7px 10px;font-size:12.5px;" data-action="billing-checkout" data-plan="plus">Upgrade to Plus</button>
+                  <button class="btn btn-ghost" style="flex:1;padding:7px 10px;font-size:12.5px;" data-action="billing-checkout" data-plan="pro">Upgrade to Pro</button>
+                </div>
+                ${PLAN_COPY}
+              `;
+            } else if (plan === "plus") {
+              btnsHtml = `
+                <div style="display:flex;gap:8px">
+                  <button class="btn btn-ghost" style="flex:1;padding:7px 10px;font-size:12.5px;" data-action="billing-portal">Manage subscription</button>
+                  <button class="btn btn-primary" style="flex:1;padding:7px 10px;font-size:12.5px;" data-action="billing-checkout" data-plan="pro">Upgrade to Pro</button>
+                </div>
+                ${PLAN_COPY}
+              `;
+            }
+
+            billingHtml = `
+              <div class="block" style="display:flex;flex-direction:column;gap:6px;margin-bottom:12px">
+                <div style="font-weight:600;font-size:13px">${title}</div>
+                <div style="font-size:12px;color:var(--muted);margin-bottom:4px">Usage ${winText}</div>
+                ${metersHtml}
+                <div style="margin-top:6px">
+                  ${btnsHtml}
+                </div>
               </div>
-              <div style="font-size:12px;color:var(--muted)">Unlimited generations</div>
-              <button class="btn btn-ghost btn-block" data-action="billing-portal">Manage subscription</button>
-            </div>
-          `;
+            `;
+          } else {
+            billingHtml = `
+              <div class="block" style="display:flex;flex-direction:column;gap:10px;margin-bottom:12px">
+                <div style="font-weight:600;font-size:13px;display:flex;align-items:center;gap:6px">
+                  <svg class="ic" viewBox="0 0 24 24" style="color:var(--primary);width:16px;height:16px"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>
+                  Mafsar Pro
+                </div>
+                <div style="font-size:12px;color:var(--muted)">Unlimited generations</div>
+                <button class="btn btn-ghost btn-block" data-action="billing-portal">Manage subscription</button>
+              </div>
+            `;
+          }
         }
-      }
-    } catch (e) {
+      } catch (e) {
       // A dead refresh token (authedFetch already logged out) shouldn't be a
       // silent no-op — the rest of this render still uses the `auth` object
       // captured above, so it'll show as signed in for one more paint, but
@@ -1997,33 +2038,34 @@ document.addEventListener("click", (e) => {
         toast(e.message);
       });
       break;
-    case "billing-checkout":
-      t.disabled = true;
-      t.textContent = "Opening…";
-      send({ type: "BILLING_CHECKOUT" }).then(async (res) => {
-        const { pollBilling } = await import("../sync/auth.js");
-        let activeTabId = null;
-        chrome.tabs.create({ url: res.url }, (tab) => {
-          if (tab) activeTabId = tab.id;
-        });
-        const ac = new AbortController();
-        try {
-          await pollBilling({ cancelSignal: ac.signal });
-          // Best-effort: the user may have already closed the tab themselves.
-          if (activeTabId) await chrome.tabs.remove(activeTabId).catch(() => {});
-          await renderYou();
-        } catch (e) {
-          toast(e.message);
-        } finally {
+    case "billing-checkout": {
+        const plan = t.dataset.plan || "plus";
+        t.disabled = true;
+        t.textContent = "OpeningвЂ¦";
+        send({ type: "BILLING_CHECKOUT", plan }).then(async (res) => {
+          const { pollBilling } = await import("../sync/auth.js");
+          let activeTabId = null;
+          chrome.tabs.create({ url: res.url }, (tab) => {
+            if (tab) activeTabId = tab.id;
+          });
+          const ac = new AbortController();
+          try {
+            await pollBilling({ cancelSignal: ac.signal });
+            if (activeTabId) await chrome.tabs.remove(activeTabId).catch(() => {});
+            await renderYou();
+          } catch (e) {
+            toast(e.message);
+          } finally {
+            t.disabled = false;
+            t.textContent = plan === "pro" ? "Upgrade to Pro" : "Upgrade to Plus";
+          }
+        }).catch((e) => {
           t.disabled = false;
-          t.textContent = "Upgrade to Pro";
-        }
-      }).catch((e) => {
-        t.disabled = false;
-        t.textContent = "Upgrade to Pro";
-        toast(e.message);
-      });
-      break;
+          t.textContent = plan === "pro" ? "Upgrade to Pro" : "Upgrade to Plus";
+          toast(e.message);
+        });
+        break;
+      }
     case "apply-card": startApply(); break;
     case "set-mode":
       (async () => {

@@ -160,7 +160,11 @@ const MIGRATIONS: string[] = [
     created_at TEXT NOT NULL
   );
   CREATE INDEX idx_generation_events_user_time ON generation_events(user_id, created_at);
-  `
+    `,
+    `
+    ALTER TABLE generation_events ADD COLUMN category TEXT NOT NULL DEFAULT 'set';
+    CREATE INDEX idx_generation_events_user_cat_time ON generation_events(user_id, category, created_at);
+    `
 ];
 
 export async function migrate(db: DB): Promise<void> {

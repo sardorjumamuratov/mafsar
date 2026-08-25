@@ -14,9 +14,11 @@ async function post(path, body) {
   // `error` is the machine code. Prefer the former so the toast is actionable.
   if (!res.ok) {
     if (res.status === 402 && data.error === "quota_exceeded") {
-      throw new Error(`You've used all ${data.limit} free generations this month — upgrade on the You tab for unlimited.`);
+      const catName = data.category === "coding" ? "coding exercises" : data.category === "practice" ? "practice gradings" : "set generations";
+      const winName = data.window === "day" ? "today" : "this month";
+      throw new Error(`You've used all ${data.limit} ${catName} ${winName} - upgrade on the You tab for more.`);
     }
-    if (data.error === "billing_unavailable") {
+    if (data.error === "billing_unavailable" || data.error === "billing_not_configured") {
       throw new Error("Upgrades aren't available right now — try again later.");
     }
     if (data.error === "no_subscription") {
@@ -27,8 +29,9 @@ async function post(path, body) {
   return data;
 }
 
-export function backendBillingCheckout() {
-  return post("/v1/billing/checkout", {});
+/** plan: "plus" | "pro" — the server rejects anything else with 400 invalid_plan. */
+export function backendBillingCheckout(plan) {
+  return post("/v1/billing/checkout", { plan });
 }
 
 export function backendBillingPortal() {

@@ -359,7 +359,7 @@ async function handle(msg) {
 
     // Billing
     case "BILLING_CHECKOUT": {
-      const { url } = await backendBillingCheckout();
+      const { url } = await backendBillingCheckout(msg.plan);
       return { url };
     }
     case "BILLING_PORTAL": {
