@@ -19,13 +19,21 @@ export function billingConfigured(): boolean {
   );
 }
 
+// 30/month: comfortably covers casual use (a few captured chats + one light
+// practice session is ~15-25 calls) without ever pinching a free user who
+// isn't cramming for something. Someone studying hard daily clears it within
+// days — right when they're most motivated to upgrade. The actual per-call
+// LLM cost (~$0.0006, see llm.ts) makes this a behavioral choice, not a cost
+// one: even a generous free tier costs the business pennies per user.
+const DEFAULT_FREE_MONTHLY_GENERATIONS = 30;
+
 export function freeMonthlyLimit(): number {
   const raw = process.env.FREE_MONTHLY_GENERATIONS;
-  // `Number(raw) || 20` would silently turn an intentional "0" (kill the free
-  // tier during an incident) back into 20 — 0 is falsy, not unset.
-  if (raw === undefined || raw === "") return 20;
+  // `Number(raw) || N` would silently turn an intentional "0" (kill the free
+  // tier during an incident) back into the default — 0 is falsy, not unset.
+  if (raw === undefined || raw === "") return DEFAULT_FREE_MONTHLY_GENERATIONS;
   const n = Number(raw);
-  return Number.isFinite(n) && n >= 0 ? n : 20;
+  return Number.isFinite(n) && n >= 0 ? n : DEFAULT_FREE_MONTHLY_GENERATIONS;
 }
 
 /** Stripe's success/cancel/return URLs must point at Mafsar's own domain — a
