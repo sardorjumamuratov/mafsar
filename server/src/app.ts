@@ -12,7 +12,7 @@ import { nowISO, one, all, run, uid } from "./db.js";
 import { genTeamCode, leaderboardFor, learningFor } from "./teams.js";
 import { generateStudySet, gradeAnswer, generateHypothetical, summarizeConversation, setBlurb, generateCodingTask, gradeCode } from "./llm.js";
 import { PRIVACY_HTML } from "./privacy.js";
-import { billingConfigured, stripeClient, getOrCreateStripeCustomer, applySubscriptionStatus, requireQuota, monthlyUsage } from "./billing.js";
+import { billingConfigured, stripeClient, getOrCreateStripeCustomer, applySubscriptionStatus, requireQuota, monthlyUsage, freeMonthlyLimit, resolveOrigin } from "./billing.js";
 
 export function createApp(db: DB) {
   const app = new Hono<{ Variables: { userId: string } }>();
@@ -164,13 +164,15 @@ export function createApp(db: DB) {
 
   app.get("/v1/me", async (c) => {
     const userId = c.get("userId") as string;
-    const user = await one<{ id: string; email: string; created_at: string; plan: string }>(
-      db, "SELECT id, email, created_at, plan FROM users WHERE id = ?", [userId]
-    );
+    const [user, used] = await Promise.all([
+      one<{ id: string; email: string; created_at: string; plan: string }>(
+        db, "SELECT id, email, created_at, plan FROM users WHERE id = ?", [userId]
+      ),
+      monthlyUsage(db, userId),
+    ]);
     if (!user) return c.json({ error: "not_found" }, 404);
-    const used = await monthlyUsage(db, userId);
-    const limit = Number(process.env.FREE_MONTHLY_GENERATIONS) || 20;
-    return c.json({ user, usage: { used, limit: user?.plan === "pro" ? null : limit } });
+    const limit = freeMonthlyLimit();
+    return c.json({ user, usage: { used, limit: user.plan === "pro" ? null : limit } });
   });
 
   app.post("/v1/sync", async (c) => {
@@ -190,7 +192,7 @@ export function createApp(db: DB) {
 
     const stripe = stripeClient();
     const customer = await getOrCreateStripeCustomer(db, stripe, userId, user.email);
-    const origin = process.env.PUBLIC_BASE_URL || (c.req.header("host") ? `${c.req.header("x-forwarded-proto") || "http"}://${c.req.header("host")}` : "http://localhost:3000");
+    const origin = resolveOrigin(c);
 
     const session = await stripe.checkout.sessions.create({
       mode: "subscription",
@@ -210,7 +212,7 @@ export function createApp(db: DB) {
     if (!user || !user.stripe_customer_id) return c.json({ error: "no_subscription" }, 404);
 
     const stripe = stripeClient();
-    const origin = process.env.PUBLIC_BASE_URL || (c.req.header("host") ? `${c.req.header("x-forwarded-proto") || "http"}://${c.req.header("host")}` : "http://localhost:3000");
+    const origin = resolveOrigin(c);
 
     const session = await stripe.billingPortal.sessions.create({
       customer: user.stripe_customer_id,
@@ -254,34 +256,33 @@ export function createApp(db: DB) {
   app.get("/billing/cancel", (c) => c.html(`<style>body { font-family: system-ui; text-align: center; margin-top: 50px; }</style><h2>Checkout cancelled</h2><p>You can close this tab and return to Mafsar.</p>`));
   app.get("/billing/return", (c) => c.html(`<style>body { font-family: system-ui; text-align: center; margin-top: 50px; }</style><h2>Portal Closed</h2><p>You can close this tab and return to Mafsar.</p>`));
 
-  app.use(
-    ["/v1/generate", "/v1/grade", "/v1/hypothetical", "/v1/summarize", "/v1/blurb", "/v1/coding-task", "/v1/coding-grade"],
-    requireQuota(db)
-  );
-
   // --- Phase 2: LLM proxy (server key, grounded in user-supplied source) ---
-  app.post("/v1/generate", async (c) => {
+  // Every route below costs a real LLM call, so requireQuota(db) runs first on
+  // each one — inline per-route rather than a separate hand-maintained path
+  // list (Hono's `use()` also has no array-of-paths overload to hang that list
+  // off), so a new metered route can't be added here without its gate.
+  app.post("/v1/generate", requireQuota(db), async (c) => {
     const body = generateSchema.parse(await c.req.json());
     const generated = await generateStudySet(body.messages);
     return c.json(generated);
   });
 
-  app.post("/v1/grade", async (c) => {
+  app.post("/v1/grade", requireQuota(db), async (c) => {
     const body = gradeSchema.parse(await c.req.json());
     return c.json(await gradeAnswer(body.question, body.reference, body.answer));
   });
 
-  app.post("/v1/hypothetical", async (c) => {
+  app.post("/v1/hypothetical", requireQuota(db), async (c) => {
     const body = hypotheticalSchema.parse(await c.req.json());
     return c.json(await generateHypothetical(body.concept, body.reference));
   });
 
-  app.post("/v1/summarize", async (c) => {
+  app.post("/v1/summarize", requireQuota(db), async (c) => {
     const body = summarizeSchema.parse(await c.req.json());
     return c.json(await summarizeConversation(body.messages));
   });
 
-  app.post("/v1/blurb", async (c) => {
+  app.post("/v1/blurb", requireQuota(db), async (c) => {
     const body = blurbSchema.parse(await c.req.json());
     return c.json(await setBlurb(body.title, body.cardFronts));
   });
@@ -290,12 +291,12 @@ export function createApp(db: DB) {
   // submitted code. Separate routes rather than extending /v1/hypothetical and
   // /v1/grade — the response shapes differ substantially, and those two are already
   // used by the Apply and Type-answers flows.
-  app.post("/v1/coding-task", async (c) => {
+  app.post("/v1/coding-task", requireQuota(db), async (c) => {
     const body = codingTaskSchema.parse(await c.req.json());
     return c.json(await generateCodingTask(body.concept, body.reference, body.language));
   });
 
-  app.post("/v1/coding-grade", async (c) => {
+  app.post("/v1/coding-grade", requireQuota(db), async (c) => {
     const body = codingGradeSchema.parse(await c.req.json());
     return c.json(await gradeCode(body));
   });

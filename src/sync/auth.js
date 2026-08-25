@@ -140,6 +140,11 @@ export async function pollBilling({ cancelSignal } = {}) {
     try {
       pollRes = await authedFetch('/v1/me');
     } catch (e) {
+      // authedFetch throws these two specific messages when the session is
+      // actually gone (not a transient network blip) — retrying for up to 5
+      // minutes and then reporting "Checkout timed out" would hide the real
+      // cause from the user.
+      if (e.message === 'not signed in' || e.message === 'Session expired — signed out') throw e;
       continue;
     }
     

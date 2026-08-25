@@ -1797,7 +1797,7 @@ async function renderYou() {
             <div class="block" style="display:flex;flex-direction:column;gap:10px;margin-bottom:12px">
               <div style="font-weight:600;font-size:13px">Mafsar Free</div>
               <div style="font-size:12px;color:var(--muted)">${usage.used} of ${usage.limit} free generations this month</div>
-              <div class="bar"><div class="prog-line" style="width:${pct}%"></div></div>
+              <div class="bar"><i style="width:${pct}%"></i></div>
               <button class="btn btn-primary btn-block" data-action="billing-checkout">Upgrade to Pro</button>
             </div>
           `;
@@ -1814,7 +1814,13 @@ async function renderYou() {
           `;
         }
       }
-    } catch(e) {}
+    } catch (e) {
+      // A dead refresh token (authedFetch already logged out) shouldn't be a
+      // silent no-op — the rest of this render still uses the `auth` object
+      // captured above, so it'll show as signed in for one more paint, but
+      // the user should at least learn why their plan/usage vanished.
+      if (e.message === "Session expired — signed out") toast(e.message);
+    }
   }
 
   const accountHtml = auth?.user
@@ -1998,13 +2004,14 @@ document.addEventListener("click", (e) => {
         const { pollBilling } = await import("../sync/auth.js");
         let activeTabId = null;
         chrome.tabs.create({ url: res.url }, (tab) => {
-          activeTabId = tab.id;
+          if (tab) activeTabId = tab.id;
         });
         const ac = new AbortController();
         try {
           await pollBilling({ cancelSignal: ac.signal });
-          if (activeTabId) chrome.tabs.remove(activeTabId);
-          renderYou();
+          // Best-effort: the user may have already closed the tab themselves.
+          if (activeTabId) await chrome.tabs.remove(activeTabId).catch(() => {});
+          await renderYou();
         } catch (e) {
           toast(e.message);
         } finally {

@@ -21,7 +21,7 @@ Base URL: `__RAILWAY_URL__`
 - `POST /v1/auth/register` `{email, password}` → `{accessToken, refreshToken, user:{id,email}}`
 - `POST /v1/auth/login` `{email, password}` → same
 - `POST /v1/auth/refresh` `{refreshToken}` → `{accessToken}`
-- `GET  /v1/me` (Bearer accessToken) → `{user}`
+- `GET  /v1/me` (Bearer accessToken) → `{user, usage: {used, limit}}` (`limit` is `null` on Pro)
 - `POST /v1/sync` (Bearer accessToken) — offline-first, last-write-wins by `updatedAt`:
   - **request** `{ since?, sets[], cards[], quiz[], activity[], reviews[] }`
   - **response** `{ serverTime, sets[], cards[], quiz[], activity[], reviews[] }`

@@ -19,6 +19,30 @@ export function billingConfigured(): boolean {
   );
 }
 
+export function freeMonthlyLimit(): number {
+  const raw = process.env.FREE_MONTHLY_GENERATIONS;
+  // `Number(raw) || 20` would silently turn an intentional "0" (kill the free
+  // tier during an incident) back into 20 — 0 is falsy, not unset.
+  if (raw === undefined || raw === "") return 20;
+  const n = Number(raw);
+  return Number.isFinite(n) && n >= 0 ? n : 20;
+}
+
+/** Stripe's success/cancel/return URLs must point at Mafsar's own domain — a
+ * spoofed Host header (passed through by most proxies) would otherwise let a
+ * request redirect a post-checkout user to an attacker-controlled origin.
+ * Production must set PUBLIC_BASE_URL explicitly; only dev falls back to the
+ * request's own headers. */
+export function resolveOrigin(c: Context): string {
+  const configured = process.env.PUBLIC_BASE_URL;
+  if (configured) return configured;
+  if (process.env.NODE_ENV === "production") {
+    throw new Error("PUBLIC_BASE_URL must be set in production");
+  }
+  const host = c.req.header("host");
+  return host ? `${c.req.header("x-forwarded-proto") || "http"}://${host}` : "http://localhost:3000";
+}
+
 export function startOfMonthISO(): string {
   const now = new Date();
   return new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1)).toISOString();
@@ -61,10 +85,24 @@ export async function getOrCreateStripeCustomer(
     metadata: { mafsar_user_id: userId },
   });
 
-  await run(db, "UPDATE users SET stripe_customer_id = ? WHERE id = ?", [
-    customer.id,
-    userId,
-  ]);
+  // Two concurrent checkout attempts (e.g. a double-click before the button
+  // disables) can both reach here with stripe_customer_id still NULL — the
+  // `WHERE ... IS NULL` guard means only the first UPDATE actually lands. If
+  // this one lost the race, the winner's id is what the webhook will later
+  // match against, so use that instead of the orphaned customer just created.
+  const changed = await run(
+    db,
+    "UPDATE users SET stripe_customer_id = ? WHERE id = ? AND stripe_customer_id IS NULL",
+    [customer.id, userId]
+  );
+  if (changed === 0) {
+    const existing = await one<{ stripe_customer_id: string | null }>(
+      db,
+      "SELECT stripe_customer_id FROM users WHERE id = ?",
+      [userId]
+    );
+    if (existing?.stripe_customer_id) return existing.stripe_customer_id;
+  }
 
   return customer.id;
 }
@@ -91,7 +129,7 @@ export function requireQuota(db: DB) {
     );
     if (user?.plan !== "pro") {
       const used = await monthlyUsage(db, userId);
-      const limit = Number(process.env.FREE_MONTHLY_GENERATIONS) || 20;
+      const limit = freeMonthlyLimit();
       if (used >= limit) {
         return c.json({ error: "quota_exceeded", limit, used }, 402);
       }

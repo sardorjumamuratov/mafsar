@@ -16,6 +16,12 @@ async function post(path, body) {
     if (res.status === 402 && data.error === "quota_exceeded") {
       throw new Error(`You've used all ${data.limit} free generations this month — upgrade on the You tab for unlimited.`);
     }
+    if (data.error === "billing_unavailable") {
+      throw new Error("Upgrades aren't available right now — try again later.");
+    }
+    if (data.error === "no_subscription") {
+      throw new Error("You don't have an active subscription to manage yet.");
+    }
     throw new Error(data.message || data.error || `Request failed (${res.status})`);
   }
   return data;
