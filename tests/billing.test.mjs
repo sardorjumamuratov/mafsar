@@ -43,11 +43,11 @@ import { pollBilling } from "../src/sync/auth.js";
 async function testPollResolves() {
   fetchResponses = [
     new Error("transient network failure"),
-    { ok: true, json: async () => ({ usage: { limit: 20 } }) },
-    { ok: true, json: async () => ({ usage: { limit: null } }) } // plan is pro
+    { ok: true, json: async () => ({ usage: { plan: "free" } }) },
+    { ok: true, json: async () => ({ usage: { plan: "pro" } }) } // plan is pro
   ];
   
-  const res = await pollBilling();
+  const res = await pollBilling({ fromPlan: "free" });
   assert.equal(res, true);
   console.log("resolves passed");
 }
@@ -57,7 +57,7 @@ async function testPollCancel() {
   fetchResponses = [
     { ok: true, json: async () => {
       ac.abort();
-      return { usage: { limit: 20 } };
+      return { usage: { plan: "free" } };
     }}
   ];
   try {
@@ -77,7 +77,7 @@ async function testPollTimeout() {
   
   // Return free plan repeatedly
   global.fetch = async (url) => {
-    return { ok: true, json: async () => ({ usage: { limit: 20 } }) };
+    return { ok: true, json: async () => ({ usage: { plan: "free" } }) };
   };
 
   try {

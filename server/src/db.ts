@@ -164,6 +164,12 @@ const MIGRATIONS: string[] = [
     `
     ALTER TABLE generation_events ADD COLUMN category TEXT NOT NULL DEFAULT 'set';
     CREATE INDEX idx_generation_events_user_cat_time ON generation_events(user_id, category, created_at);
+    `,
+    `
+    ALTER TABLE users ADD COLUMN billing_customer_id TEXT;
+    ALTER TABLE users ADD COLUMN billing_provider TEXT;
+    UPDATE users SET billing_customer_id = stripe_customer_id, billing_provider = 'stripe' WHERE stripe_customer_id IS NOT NULL;
+    CREATE INDEX idx_users_billing_customer ON users(billing_customer_id);
     `
 ];
 

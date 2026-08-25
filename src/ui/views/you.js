@@ -58,8 +58,8 @@ export async function renderYou() {
             if (plan === "free") {
               btnsHtml = `
                 <div style="display:flex;gap:8px">
-                  <button class="btn btn-primary" style="flex:1;padding:7px 10px;font-size:12.5px;" data-action="billing-checkout" data-plan="plus">Upgrade to Plus</button>
-                  <button class="btn btn-ghost" style="flex:1;padding:7px 10px;font-size:12.5px;" data-action="billing-checkout" data-plan="pro">Upgrade to Pro</button>
+                  <button class="btn btn-primary" style="flex:1;padding:7px 10px;font-size:12.5px;" data-action="billing-checkout" data-plan="plus" data-current-plan="${plan}">Upgrade to Plus</button>
+                  <button class="btn btn-ghost" style="flex:1;padding:7px 10px;font-size:12.5px;" data-action="billing-checkout" data-plan="pro" data-current-plan="${plan}">Upgrade to Pro</button>
                 </div>
                 ${PLAN_COPY}
               `;
@@ -67,7 +67,7 @@ export async function renderYou() {
               btnsHtml = `
                 <div style="display:flex;gap:8px">
                   <button class="btn btn-ghost" style="flex:1;padding:7px 10px;font-size:12.5px;" data-action="billing-portal">Manage subscription</button>
-                  <button class="btn btn-primary" style="flex:1;padding:7px 10px;font-size:12.5px;" data-action="billing-checkout" data-plan="pro">Upgrade to Pro</button>
+                  <button class="btn btn-primary" style="flex:1;padding:7px 10px;font-size:12.5px;" data-action="billing-checkout" data-plan="pro" data-current-plan="${plan}">Upgrade to Pro</button>
                 </div>
                 ${PLAN_COPY}
               `;

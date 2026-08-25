@@ -56,6 +56,7 @@ document.addEventListener("click", (e) => {
         const plan = (/** @type {any} */ (t)).dataset.plan || "plus";
         (/** @type {any} */ (t)).disabled = true;
         t.textContent = "OpeningвЂ¦";
+        const currentPlan = (/** @type {any} */ (t)).dataset.currentPlan || "free";
         send({ type: "BILLING_CHECKOUT", plan }).then(async (res) => {
           const { pollBilling } = await import("../sync/auth.js");
           let activeTabId = null;
@@ -64,7 +65,7 @@ document.addEventListener("click", (e) => {
           });
           const ac = new AbortController();
           try {
-            await pollBilling({ cancelSignal: ac.signal });
+            await pollBilling({ cancelSignal: ac.signal, fromPlan: currentPlan });
             if (activeTabId) await chrome.tabs.remove(activeTabId).catch(() => {});
             await renderYou();
           } catch (e) {

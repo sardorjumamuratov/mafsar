@@ -79,7 +79,7 @@ describe("db + migrations", () => {
     // Re-running migrations must not throw or duplicate.
     await expect(migrate(db)).resolves.toBeUndefined();
     const rows = await one<{ n: number }>(db, "SELECT COUNT(*) n FROM migrations");
-    expect(Number(rows!.n)).toBe(11); // one per MIGRATIONS entry
+    expect(Number(rows!.n)).toBe(12); // one per MIGRATIONS entry
   });
 
   it("enforces FK integrity for cards", async () => {

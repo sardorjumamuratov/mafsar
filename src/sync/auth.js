@@ -128,7 +128,7 @@ export async function googleSignIn({ onTab, cancelSignal }) {
   throw new Error('Sign-in timed out');
 }
 
-export async function pollBilling({ cancelSignal } = /** @type {any} */ ({})) {
+export async function pollBilling({ cancelSignal, fromPlan = "free" } = /** @type {any} */ ({})) {
   let attempts = 0;
   while (attempts < 200) {
     if (cancelSignal?.aborted) throw new Error('cancelled');
@@ -151,7 +151,7 @@ export async function pollBilling({ cancelSignal } = /** @type {any} */ ({})) {
     if (!pollRes.ok) continue;
     
     const data = await pollRes.json();
-    if (data.usage?.limit === null) {
+    if (data.usage?.plan && data.usage.plan !== fromPlan) {
       return true;
     }
   }

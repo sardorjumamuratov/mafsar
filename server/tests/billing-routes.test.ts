@@ -36,11 +36,13 @@ async function newUser(email: string) {
 
 function setBilling(on: boolean) {
     if (on) {
+      process.env.BILLING_PROVIDER = "stripe";
       process.env.STRIPE_SECRET_KEY = "sk_test";
       process.env.STRIPE_PRICE_ID_PLUS = "price_plus";
       process.env.STRIPE_PRICE_ID_PRO = "price_pro";
       process.env.STRIPE_WEBHOOK_SECRET = "whsec_test";
     } else {
+      delete process.env.BILLING_PROVIDER;
       delete process.env.STRIPE_SECRET_KEY;
       delete process.env.STRIPE_PRICE_ID_PLUS;
       delete process.env.STRIPE_PRICE_ID_PRO;

@@ -12,7 +12,7 @@ import { nowISO, one, all, run, uid } from "./db.js";
 import { genTeamCode, leaderboardFor, learningFor } from "./teams.js";
 import { generateStudySet, gradeAnswer, generateHypothetical, summarizeConversation, setBlurb, generateCodingTask, gradeCode } from "./llm.js";
 import { PRIVACY_HTML } from "./privacy.js";
-import { billingConfigured, stripeClient, getOrCreateStripeCustomer, applySubscriptionStatus, requireQuota, usageSummary, resolveOrigin } from "./billing.js";
+import { getProvider, billingConfigured, requireQuota, usageSummary, resolveOrigin, applyPlanChange, stripeProvider, paddleProvider, NoSubscriptionError } from "./billing/index.js";
 
 export function createApp(db: DB) {
   const app = new Hono<{ Variables: { userId: string } }>();
@@ -186,77 +186,73 @@ export function createApp(db: DB) {
     const raw = await c.req.json().catch(() => ({}));
     const plan = raw?.plan;
     if (plan !== "plus" && plan !== "pro") return c.json({ error: "invalid_plan" }, 400);
-    const priceId = plan === "plus" ? process.env.STRIPE_PRICE_ID_PLUS : (process.env.STRIPE_PRICE_ID_PRO || process.env.STRIPE_PRICE_ID);
-    if (!priceId) return c.json({ error: "billing_not_configured" }, 501);
-    
+
     const userId = c.get("userId") as string;
     const user = await one<{ email: string }>(db, "SELECT email FROM users WHERE id = ?", [userId]);
     if (!user) return c.json({ error: "not_found" }, 404);
 
-    const stripe = stripeClient();
-    const customer = await getOrCreateStripeCustomer(db, stripe, userId, user.email);
-    const origin = resolveOrigin(c);
-
-    const session = await stripe.checkout.sessions.create({
-      mode: "subscription",
-      customer,
-      line_items: [{ price: priceId, quantity: 1 }],
-      success_url: `${origin}/billing/success`,
-      cancel_url: `${origin}/billing/cancel`,
-    });
-
-    return c.json({ url: session.url });
+    try {
+      const provider = getProvider();
+      const url = await provider.createCheckout({ db, userId, email: user.email, plan, origin: resolveOrigin(c) });
+      return c.json({ url });
+    } catch (e: any) {
+      if (e.message === "billing_not_configured") return c.json({ error: "billing_not_configured" }, 501);
+      console.error("Checkout error:", e.stack);
+      return c.json({ error: "internal" }, 500);
+    }
   });
 
   app.post("/v1/billing/portal", async (c) => {
     if (!billingConfigured()) return c.json({ error: "billing_unavailable" }, 501);
     const userId = c.get("userId") as string;
-    const user = await one<{ stripe_customer_id: string }>(db, "SELECT stripe_customer_id FROM users WHERE id = ?", [userId]);
-    if (!user || !user.stripe_customer_id) return c.json({ error: "no_subscription" }, 404);
-
-    const stripe = stripeClient();
-    const origin = resolveOrigin(c);
-
-    const session = await stripe.billingPortal.sessions.create({
-      customer: user.stripe_customer_id,
-      return_url: `${origin}/billing/return`,
-    });
-
-    return c.json({ url: session.url });
+    
+    try {
+      const provider = getProvider();
+      const url = await provider.createPortal({ db, userId, origin: resolveOrigin(c) });
+      return c.json({ url });
+    } catch (e: any) {
+      if (e instanceof NoSubscriptionError) return c.json({ error: "no_subscription" }, 404);
+      console.error("Portal error:", e.stack);
+      return c.json({ error: "internal" }, 500);
+    }
   });
 
   app.post("/v1/webhooks/stripe", async (c) => {
-    if (!billingConfigured()) return c.json({ error: "billing_unavailable" }, 501);
+    if (!billingConfigured() || getProvider().name !== "stripe") return c.json({ error: "billing_unavailable" }, 501);
     const body = await c.req.text();
     const sig = c.req.header("stripe-signature") ?? "";
-    const stripe = stripeClient();
-
-    let event;
+    
     try {
-      event = stripe.webhooks.constructEvent(body, sig, process.env.STRIPE_WEBHOOK_SECRET!);
-    } catch (err: any) {
-      return c.json({ error: "invalid_signature" }, 400);
-    }
-
-    if (event.type === "checkout.session.completed") {
-        const session = event.data.object as any;
-        if (session.customer && session.subscription) {
-          const sub = await stripe.subscriptions.retrieve(session.subscription as string);
-          const priceId = sub.items?.data?.[0]?.price?.id;
-          await applySubscriptionStatus(db, session.customer as string, sub.status, priceId);
-        }
-      } else if (event.type === "customer.subscription.updated") {
-        const sub = event.data.object as any;
-        const priceId = sub.items?.data?.[0]?.price?.id;
-        await applySubscriptionStatus(db, sub.customer as string, sub.status, priceId);
-      } else if (event.type === "customer.subscription.deleted") {
-        const sub = event.data.object as any;
-        const priceId = sub.items?.data?.[0]?.price?.id;
-        await applySubscriptionStatus(db, sub.customer as string, "canceled", priceId);
+      const outcome = await stripeProvider.handleWebhook(body, sig);
+      if (outcome.kind === "invalid_signature") return c.json({ error: "invalid_signature" }, 400);
+      if (outcome.kind === "plan_change") {
+        await applyPlanChange(db, outcome.customerId, outcome.plan);
       }
-
-    return c.json({});
+      return c.json({});
+    } catch (e: any) {
+      console.error(e.stack);
+      return c.json({ error: "internal" }, 500);
+    }
   });
+
+  app.post("/v1/webhooks/paddle", async (c) => {
+    if (!billingConfigured() || getProvider().name !== "paddle") return c.json({ error: "billing_unavailable" }, 501);
+    const body = await c.req.text();
+    const sig = c.req.header("paddle-signature") ?? "";
+    
+    try {
+      const outcome = await paddleProvider.handleWebhook(body, sig);
+      if (outcome.kind === "invalid_signature") return c.json({ error: "invalid_signature" }, 400);
+      if (outcome.kind === "plan_change") {
+        await applyPlanChange(db, outcome.customerId, outcome.plan);
+      }
+      return c.json({});
+    } catch (e: any) {
+      console.error(e.stack);
+      return c.json({ error: "internal" }, 500);
+    }
+  });
+
 
   app.get("/billing/success", (c) => c.html(`<style>body { font-family: system-ui; text-align: center; margin-top: 50px; }</style><h2>Thank you!</h2><p>Your subscription is active. You can close this tab and return to Mafsar.</p>`));
   app.get("/billing/cancel", (c) => c.html(`<style>body { font-family: system-ui; text-align: center; margin-top: 50px; }</style><h2>Checkout cancelled</h2><p>You can close this tab and return to Mafsar.</p>`));
