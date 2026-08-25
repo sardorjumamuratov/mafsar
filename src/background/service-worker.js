@@ -104,8 +104,8 @@ chrome.runtime.onInstalled.addListener(() => {
 // it doubles as the fallback if the call above failed; Firefox always uses it.
 if (chrome.action?.onClicked) {
   chrome.action.onClicked.addListener((tab) => {
-    if (globalThis.chrome?.sidebarAction) {
-      chrome.sidebarAction.toggle();
+    if (/** @type {any} */ (globalThis.chrome)?.sidebarAction) {
+      chrome["sidebarAction"].toggle();
     } else {
       const sp2 = chrome['sidePanel'];
       if (sp2?.open && tab?.windowId != null) {
@@ -124,7 +124,7 @@ function extractPage() {
   if (text.length < 40) {
     // No meaningful selection → grab the main content instead of the whole page chrome.
     const el = document.querySelector("main, article") || document.body;
-    text = (el.innerText || "").trim();
+    text = ((/** @type {any} */ (el)).innerText || "").trim();
   }
   return {
     title: document.title || location.hostname,

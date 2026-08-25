@@ -19,7 +19,7 @@ export function examReadiness({ examDate, total, mastered, due, now = Date.now()
   // Behind when the required pace exceeds a sustainable ~20 cards/day, or the
   // exam is imminent with most of the set still untouched.
   else if (dailyTarget > 20 || (daysLeft <= 2 && remaining > total * 0.5)) status = "behind";
-  return { daysLeft, progress, onTrack: status === "on-track", dailyTarget, status };
+  return { daysLeft, progress, onTrack: status === "on-track", dailyTarget, status: /** @type {"today" | "on-track" | "past" | "behind"} */ (status) };
 }
 
 /**

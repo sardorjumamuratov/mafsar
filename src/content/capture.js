@@ -1,7 +1,7 @@
 // Content script: injects a "Save conversation" button and reads the chat via
 // the matching site adapter. Sends captured sessions to the service worker.
 (function () {
-  const mafsar = window.__mafsar;
+  const mafsar = (/** @type {any} */ (window)).__mafsar;
   if (!mafsar) return;
 
   const adapter = mafsar.pick();

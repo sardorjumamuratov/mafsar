@@ -1,9 +1,9 @@
 // Claude adapter (claude.ai).
 // DOM is site-specific and changes over time — keep this file small and isolated.
 (function () {
-  if (!window.__mafsar) return;
+  if (!(/** @type {any} */ (window)).__mafsar) return;
 
-  window.__mafsar.register({
+  (/** @type {any} */ (window)).__mafsar.register({
     id: "claude",
     label: "Claude",
 
@@ -23,7 +23,7 @@
         else if (testid === "assistant-message" || el.classList.contains("font-claude-message"))
           role = "assistant";
         else return;
-        const text = (el.innerText || "").trim();
+        const text = ((/** @type {any} */ (el)).innerText || "").trim();
         if (!text) return;
         out.push({ role, text });
       });
@@ -32,7 +32,7 @@
 
     getTitle() {
       const active = document.querySelector('[data-testid="menu-item"][data-active="true"]');
-      const t = (active?.innerText || "").trim();
+      const t = ((/** @type {any} */ (active))?.innerText || "").trim();
       return t || (document.title || "Claude conversation").replace(/\s*[-—|].*$/, "").trim();
     },
   });

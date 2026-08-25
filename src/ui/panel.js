@@ -84,9 +84,9 @@ const COPY_SVG =
 function toast(msg, ms = 2600) {
   const t = document.getElementById("toast");
   t.textContent = msg;
-  t.classList.remove("hidden");
-  clearTimeout(toast._t);
-  toast._t = setTimeout(() => t.classList.add("hidden"), ms);
+  (/** @type {any} */ (t)).classList.remove("hidden");
+  clearTimeout((/** @type {any} */ (toast))._t);
+  (/** @type {any} */ (toast))._t = setTimeout(() => (/** @type {any} */ (t)).classList.add("hidden"), ms);
 }
 
 function send(msg) {
@@ -180,7 +180,7 @@ function showChrome(visible) {
 }
 function setNav(tab) {
   activeTab = tab;
-  nav.querySelectorAll("button[data-nav]").forEach((b) => b.classList.toggle("on", b.dataset.nav === tab));
+  nav.querySelectorAll("button[data-nav]").forEach((b) => b.classList.toggle("on", (/** @type {any} */ (b)).dataset.nav === tab));
 }
 /** Back-button target for focus views (set detail, exam picker, import): return to whichever bottom-nav tab was active before entering. */
 function goToActiveTab() {
@@ -409,7 +409,7 @@ async function fillMissingBlurbs(sessions, studySets) {
 }
 
 async function saveExamSelection() {
-  const dateStr = document.getElementById("pickerDate")?.value;
+  const dateStr = /** @type {HTMLInputElement} */ (document.getElementById("pickerDate"))?.value;
   const date = dateStr ? new Date(`${dateStr}T23:59:59`).getTime() : null;
   if (!date) return toast("Pick an exam date first.");
   const { studySets } = await bundle();
@@ -925,7 +925,7 @@ async function startApply() {
       concept: item.card.front,
       reference: item.card.back,
     });
-    applyState.hypothetical = r.hypothetical;
+    (/** @type {any} */ (applyState)).hypothetical = /** @type {any} */ (r).hypothetical;
     applyState.phase = "answer";
     paintApplyAnswer();
   } catch (e) {
@@ -949,11 +949,11 @@ function paintApplyAnswer() {
 }
 
 async function checkApply() {
-  const answer = document.getElementById("applyAnswer")?.value.trim();
+  const answer = /** @type {HTMLInputElement} */ (document.getElementById("applyAnswer"))?.value.trim();
   if (!answer) return toast("Type an answer first.");
   const { item, hypothetical } = applyState;
   const btn = app.querySelector('[data-action="apply-check"]');
-  btn.disabled = true;
+  /** @type {HTMLButtonElement} */ (btn).disabled = true;
   btn.textContent = "Grading…";
   try {
     const r = await send({
@@ -973,7 +973,7 @@ async function checkApply() {
     paintGraded(r.grading, "apply-next");
   } catch (e) {
     toast(e.message);
-    btn.disabled = false;
+    /** @type {HTMLButtonElement} */ (btn).disabled = false;
     btn.textContent = "Check answer";
   }
 }
@@ -1093,15 +1093,15 @@ function paintCodeEditor() {
   ta.addEventListener("keydown", (e) => {
     if (e.key !== "Tab" || e.shiftKey) return;
     e.preventDefault();
-    const { selectionStart: a, selectionEnd: b, value } = ta;
-    ta.value = value.slice(0, a) + "  " + value.slice(b);
-    ta.selectionStart = ta.selectionEnd = a + 2;
+    const { selectionStart: a, selectionEnd: b, value } = /** @type {HTMLInputElement} */ (ta);
+    /** @type {HTMLInputElement} */ (ta).value = value.slice(0, a) + "  " + value.slice(b);
+    /** @type {HTMLInputElement} */ (ta).selectionStart = /** @type {HTMLInputElement} */ (ta).selectionEnd = a + 2;
     paintCodeCount();
   });
   ta.addEventListener("input", paintCodeCount);
   paintCodeCount();
   ta.focus();
-  ta.selectionStart = ta.selectionEnd = ta.value.length;
+  /** @type {HTMLInputElement} */ (ta).selectionStart = /** @type {HTMLInputElement} */ (ta).selectionEnd = /** @type {HTMLInputElement} */ (ta).value.length;
 }
 
 /** Live counter. The cap disables submit; the target never does. */
@@ -1110,14 +1110,14 @@ function paintCodeCount() {
   const out = document.getElementById("codeCount");
   const btn = app.querySelector('[data-action="code-check"]');
   if (!ta || !out || !btn) return;
-  const s = codeSize(ta.value, codingState.task.expectedLines);
+  const s = codeSize(/** @type {HTMLInputElement} */ (ta).value, codingState.task.expectedLines);
 
   out.textContent = s.overCap
     ? `${s.chars} / ${s.cap} characters — too long to submit`
     : `${s.lines} line${s.lines === 1 ? "" : "s"}${s.verbose ? " · longer than needed" : ""}`;
   out.classList.toggle("over", s.overCap);
   out.classList.toggle("warn", !s.overCap && s.verbose);
-  btn.disabled = s.overCap || s.empty;
+  /** @type {HTMLButtonElement} */ (btn).disabled = s.overCap || s.empty;
 }
 
 async function checkCode() {
@@ -1125,12 +1125,12 @@ async function checkCode() {
   const ta = document.getElementById("codeInput");
   const { items, idx, task, sessionId } = codingState;
   const { card } = items[idx];
-  const s = codeSize(ta?.value, task.expectedLines);
+  const s = codeSize(/** @type {HTMLInputElement} */ (ta)?.value, task.expectedLines);
   if (s.empty) return toast("Write some code first.");
   if (s.overCap) return toast(`That\'s too long — keep it under ${MAX_CODE_CHARS} characters.`);
 
   const btn = app.querySelector('[data-action="code-check"]');
-  btn.disabled = true;
+  /** @type {HTMLButtonElement} */ (btn).disabled = true;
   btn.textContent = "Reviewing…";
   try {
     const r = await send({
@@ -1139,7 +1139,7 @@ async function checkCode() {
       rubric: task.rubric,
       language: task.language,
       expectedLines: task.expectedLines,
-      code: ta.value,
+      code: /** @type {HTMLInputElement} */ (ta).value,
     });
     await Promise.all([
       bumpActivity(1),
@@ -1152,7 +1152,7 @@ async function checkCode() {
     paintCodeGraded(r.grading);
   } catch (e) {
     toast(e.message);
-    btn.disabled = false;
+    /** @type {HTMLButtonElement} */ (btn).disabled = false;
     btn.textContent = "Submit for review";
   }
 }
@@ -1241,11 +1241,11 @@ function paintTypedQ() {
 }
 
 async function checkTyped() {
-  const answer = document.getElementById("typedAnswer")?.value.trim();
+  const answer = /** @type {HTMLInputElement} */ (document.getElementById("typedAnswer"))?.value.trim();
   if (!answer) return toast("Type an answer first.");
   const { card } = typedState.items[typedState.idx];
   const btn = app.querySelector('[data-action="typed-check"]');
-  btn.disabled = true;
+  /** @type {HTMLButtonElement} */ (btn).disabled = true;
   btn.textContent = "Grading…";
   try {
     const r = await send({ type: "GRADE_ANSWER", question: card.front, reference: card.back, answer });
@@ -1260,7 +1260,7 @@ async function checkTyped() {
     paintGraded(r.grading, "typed-next");
   } catch (e) {
     toast(e.message);
-    btn.disabled = false;
+    /** @type {HTMLButtonElement} */ (btn).disabled = false;
     btn.textContent = "Check answer";
   }
 }
@@ -1367,7 +1367,7 @@ function answerQuiz(i) {
   const q = quizSet.quiz[quizIdx];
   const opts = app.querySelectorAll("#opts .opt");
   opts.forEach((b, bi) => {
-    b.disabled = true;
+    /** @type {HTMLButtonElement} */ (b).disabled = true;
     if (bi === q.answer) b.classList.add("correct");
   });
   if (i === q.answer) quizScore++;
@@ -1440,11 +1440,11 @@ function parseCards(text, termRaw, cardRaw, clean = false) {
   return cards;
 }
 const importCards = () => {
-  const clean = document.getElementById("importClean")?.checked;
+  const clean = /** @type {HTMLInputElement} */ (document.getElementById("importClean"))?.checked;
   return parseCards(
-    document.getElementById("importText").value,
-    document.getElementById("termSep").value,
-    document.getElementById("cardSep").value,
+    (/** @type {any} */ (document.getElementById("importText"))).value,
+    (/** @type {any} */ (document.getElementById("termSep"))).value,
+    (/** @type {any} */ (document.getElementById("cardSep"))).value,
     clean
   );
 };
@@ -1500,7 +1500,7 @@ function previewImport() {
 async function doImport() {
   const cards = importCards();
   if (!cards.length) return toast("Couldn't read that. Check there\'s one card per line.");
-  const title = document.getElementById("importTitle").value.trim() || "Imported flashcards";
+  const title = (/** @type {any} */ (document.getElementById("importTitle"))).value.trim() || "Imported flashcards";
   const now = Date.now();
   const flashcards = cards.map((c) => ({ id: uid(), front: c.front, back: c.back, ...initSchedule(now) }));
   const session = await addSession({
@@ -1560,7 +1560,7 @@ async function renderTeams() {
     ? teams
         .map(
           (t) => `
-        <div class="setrow" data-action="open-team" data-id="${esc(t.id)}">
+        <div class="setrow" data-action="open-team" data-id="${esc((/** @type {any} */ (t)).id)}">
           <div class="top"><div class="name">${esc(t.name)}</div><span class="tag">${t.memberCount} member${t.memberCount === 1 ? "" : "s"}</span></div>
           <div class="prog-line"><span>Code ${esc(t.code)}</span><span>Open</span></div>
         </div>`
@@ -1614,7 +1614,7 @@ function renderTeamCreate() {
   });
 }
 async function createTeamFromForm() {
-  const name = document.getElementById("teamName")?.value.trim();
+  const name = /** @type {HTMLInputElement} */ (document.getElementById("teamName"))?.value.trim();
   if (!name) return toast("Give the team a name first.");
   try {
     const r = await send({ type: "TEAM_CREATE", name });
@@ -1626,7 +1626,7 @@ async function createTeamFromForm() {
 }
 
 async function joinTeamFromInput() {
-  const code = parseTeamCode(document.getElementById("teamCode")?.value || "");
+  const code = parseTeamCode(/** @type {HTMLInputElement} */ (document.getElementById("teamCode"))?.value || "");
   if (!code) return toast("Enter a team code first.");
   try {
     const r = await send({ type: "TEAM_JOIN", code });
@@ -1702,7 +1702,7 @@ async function leaveTeam(id) {
 }
 
 async function lookupShare() {
-  const code = parseShareCode(document.getElementById("shareCode")?.value || "");
+  const code = parseShareCode(/** @type {HTMLInputElement} */ (document.getElementById("shareCode"))?.value || "");
   if (!code) return toast("Enter a code first.");
   const out = document.getElementById("sharePreview");
   if (out) setHTML(out, '<div style="font-size:13px;color:var(--muted)">Looking up…</div>');
@@ -1936,15 +1936,15 @@ async function authGoogle(btn) {
   try {
     const user = await googleSignIn({
       onTab: (url) => chrome.tabs.create({ url, active: true }, (tab) => {
-        googleAbortController.tabId = tab.id;
+        (/** @type {any} */ (googleAbortController)).tabId = tab.id;
       }),
       cancelSignal: googleAbortController.signal
     });
-    if (googleAbortController.tabId) chrome.tabs.remove(googleAbortController.tabId);
+    if ((/** @type {any} */ (googleAbortController)).tabId) chrome.tabs.remove((/** @type {any} */ (googleAbortController)).tabId);
     googleAbortController = null;
     await afterSignIn(false);
   } catch (e) {
-    if (googleAbortController?.tabId) chrome.tabs.remove(googleAbortController.tabId).catch(() => {});
+    if (/** @type {any} */ (googleAbortController)?.tabId) chrome.tabs.remove((/** @type {any} */ (googleAbortController)).tabId).catch(() => {});
     googleAbortController = null;
     if (e.message !== 'cancelled') {
       toast(e.message === 'google_unavailable' ? "Google sign-in isn't available right now." : e.message);
@@ -1965,8 +1965,8 @@ async function afterSignIn(wasSignedIn) {
 }
 
 async function authSubmit(kind, btn) {
-    const email = document.getElementById("youEmail")?.value.trim();
-    const password = document.getElementById("youPass")?.value;
+    const email = /** @type {HTMLInputElement} */ (document.getElementById("youEmail"))?.value.trim();
+    const password = /** @type {HTMLInputElement} */ (document.getElementById("youPass"))?.value;
     if (!email || !password) return toast("Enter an email and password.");
     if (password.length < 8) return toast("Password needs at least 8 characters.");
     const wasSignedIn = !!(await getAuth())?.user;
@@ -2008,10 +2008,10 @@ async function captureCurrent() {
 
 // ================================================================ action router
 document.addEventListener("click", (e) => {
-  const t = e.target.closest("[data-action]");
+  const t = (/** @type {any} */ (e.target)).closest("[data-action]");
   if (!t) return;
-  const a = t.dataset.action;
-  const id = t.dataset.id;
+  const a = (/** @type {any} */ (t)).dataset.action;
+  const id = (/** @type {any} */ (t)).dataset.id;
   switch (a) {
     case "open-import": renderImport(); break;
     case "nav-back": goToActiveTab(); break;
@@ -2019,30 +2019,30 @@ document.addEventListener("click", (e) => {
     case "open-set": renderSetDetail(id); break;
     case "make-set": makeSet(id); break;
     case "capture-current": captureCurrent(); break;
-    case "tab": renderSetDetail(detail.session.id, t.dataset.tab); break;
+    case "tab": renderSetDetail(detail.session.id, (/** @type {any} */ (t)).dataset.tab); break;
     case "delete-set":
       if (confirm("Delete this set and its cards?")) deleteSession(id).then(goToActiveTab);
       break;
     case "start-review": startGlobalReview(); break;
     case "set-review": startSetReview(id); break;
     case "flip": revealCard(); break;
-    case "grade": gradeCard(Number(t.dataset.g)); break;
+    case "grade": gradeCard(Number((/** @type {any} */ (t)).dataset.g)); break;
     case "billing-portal":
-      t.disabled = true;
+      (/** @type {any} */ (t)).disabled = true;
       t.textContent = "Opening…";
       send({ type: "BILLING_PORTAL" }).then((res) => {
         chrome.tabs.create({ url: res.url });
-        t.disabled = false;
+        (/** @type {any} */ (t)).disabled = false;
         t.textContent = "Manage subscription";
       }).catch((e) => {
-        t.disabled = false;
+        (/** @type {any} */ (t)).disabled = false;
         t.textContent = "Manage subscription";
         toast(e.message);
       });
       break;
     case "billing-checkout": {
-        const plan = t.dataset.plan || "plus";
-        t.disabled = true;
+        const plan = (/** @type {any} */ (t)).dataset.plan || "plus";
+        (/** @type {any} */ (t)).disabled = true;
         t.textContent = "OpeningвЂ¦";
         send({ type: "BILLING_CHECKOUT", plan }).then(async (res) => {
           const { pollBilling } = await import("../sync/auth.js");
@@ -2058,11 +2058,11 @@ document.addEventListener("click", (e) => {
           } catch (e) {
             toast(e.message);
           } finally {
-            t.disabled = false;
+            (/** @type {any} */ (t)).disabled = false;
             t.textContent = plan === "pro" ? "Upgrade to Pro" : "Upgrade to Plus";
           }
         }).catch((e) => {
-          t.disabled = false;
+          (/** @type {any} */ (t)).disabled = false;
           t.textContent = plan === "pro" ? "Upgrade to Pro" : "Upgrade to Plus";
           toast(e.message);
         });
@@ -2072,18 +2072,18 @@ document.addEventListener("click", (e) => {
     case "set-mode":
       (async () => {
         const { studySets } = await bundle();
-        const set = setFor(t.dataset.id, studySets);
-        if (!set || (set.mode || "general") === t.dataset.mode) return;
-        set.mode = t.dataset.mode;
+        const set = setFor((/** @type {any} */ (t)).dataset.id, studySets);
+        if (!set || (set.mode || "general") === (/** @type {any} */ (t)).dataset.mode) return;
+        set.mode = (/** @type {any} */ (t)).dataset.mode;
         await saveStudySet(set);
-        toast(t.dataset.mode === "coding" ? "Coding mode on — review now asks for code." : "General mode on.");
-        renderSetDetail(t.dataset.id, "summary");
+        toast((/** @type {any} */ (t)).dataset.mode === "coding" ? "Coding mode on — review now asks for code." : "General mode on.");
+        renderSetDetail((/** @type {any} */ (t)).dataset.id, "summary");
       })();
       break;
     case "start-coding": startCodingPractice(id); break;
     case "set-share": toggleSetShare(id); break;
-    case "share-copy": copyShareCode(t.dataset.code, t); break;
-    case "share-revoke": revokeShareFor(t.dataset.id); break;
+    case "share-copy": copyShareCode((/** @type {any} */ (t)).dataset.code, t); break;
+    case "share-revoke": revokeShareFor((/** @type {any} */ (t)).dataset.id); break;
     case "open-team": renderTeam(id); break;
     case "team-create": renderTeamCreate(); break;
     case "team-create-save": createTeamFromForm(); break;
@@ -2092,8 +2092,8 @@ document.addEventListener("click", (e) => {
     case "nav-teams": renderTeams(); break;
     case "nav-you": renderYou(); break;
     case "select-all":
-      t.select();
-      copyShareCode(t.value, t.nextElementSibling);
+      (/** @type {any} */ (t)).select();
+      copyShareCode((/** @type {any} */ (t)).value, t.nextElementSibling);
       break;
     case "share-lookup": lookupShare(); break;
     case "share-import": importSharedSet(); break;
@@ -2149,20 +2149,20 @@ document.addEventListener("click", (e) => {
         b.classList.toggle("on", on);
         b.setAttribute("aria-pressed", String(on));
       });
-      app.querySelector('[data-action="start-quiz"]').dataset.n = t.dataset.n;
+      /** @type {HTMLElement} */ (app.querySelector('[data-action="start-quiz"]')).dataset.n = (/** @type {any} */ (t)).dataset.n;
       break;
     case "start-quiz":
-      startQuiz(detail.studySet, "set:" + detail.session.id, Number(t.dataset.n) || 0);
+      startQuiz(detail.studySet, "set:" + detail.session.id, Number((/** @type {any} */ (t)).dataset.n) || 0);
       break;
     case "quiz-after-review":
       (async () => {
-        const id = t.dataset.id;
+        const id = (/** @type {any} */ (t)).dataset.id;
         const { studySets } = await bundle();
         const set = setFor(id, studySets);
         if (set?.quiz?.length) startQuiz(set, "set:" + id, quickQuizLen(set));
       })();
       break;
-    case "quiz-opt": answerQuiz(Number(t.dataset.i)); break;
+    case "quiz-opt": answerQuiz(Number((/** @type {any} */ (t)).dataset.i)); break;
     case "quiz-next": quizIdx++; paintQuizQ(); break;
     case "import-preview": previewImport(); break;
     case "import-save": doImport(); break;
@@ -2221,16 +2221,16 @@ function paintAddCard() {
   if (btn) insertHTMLBefore(btn.closest("div"), html);
 }
 async function saveNewCard(sessionId) {
-  const front = document.getElementById("newFront")?.value.trim();
-  const back = document.getElementById("newBack")?.value.trim();
+  const front = /** @type {HTMLInputElement} */ (document.getElementById("newFront"))?.value.trim();
+  const back = /** @type {HTMLInputElement} */ (document.getElementById("newBack"))?.value.trim();
   if (!front) return toast("Add a question first.");
   await addCard(sessionId, front, back || "");
   toast("Card added");
   renderSetDetail(sessionId, "cards");
 }
 async function saveCardEdit(sessionId, cardId) {
-  const front = document.getElementById("editFront")?.value.trim();
-  const back = document.getElementById("editBack")?.value.trim();
+  const front = /** @type {HTMLInputElement} */ (document.getElementById("editFront"))?.value.trim();
+  const back = /** @type {HTMLInputElement} */ (document.getElementById("editBack"))?.value.trim();
   if (!front) return toast("Add a question first.");
   await updateCard(sessionId, cardId, { front, back: back || "" });
   toast("Card saved");
@@ -2290,16 +2290,16 @@ function importBackupFile(file) {
 // date inputs + file input don't fire click-based data-action routing
 document.addEventListener("change", (e) => {
   const t = e.target;
-  if (t.id === "examDate" && t.dataset.session) {
-    const ms = t.value ? new Date(`${t.value}T23:59:59`).getTime() : null;
-    setExamDate(t.dataset.session, ms).then(() => {
+  if ((/** @type {any} */ (t)).id === "examDate" && (/** @type {any} */ (t)).dataset.session) {
+    const ms = (/** @type {any} */ (t)).value ? new Date(`${(/** @type {any} */ (t)).value}T23:59:59`).getTime() : null;
+    setExamDate((/** @type {any} */ (t)).dataset.session, ms).then(() => {
       toast(ms ? "Exam date set. Cards will resurface before it." : "Exam date cleared");
-      renderSetDetail(t.dataset.session, "cards");
+      renderSetDetail((/** @type {any} */ (t)).dataset.session, "cards");
     });
-  } else if (t.id === "homeExamDate") {
+  } else if ((/** @type {any} */ (t)).id === "homeExamDate") {
     // Date changed on Home: if an exam already exists, move it for every
     // selected set; otherwise draft it and go pick sets.
-    const ms = t.value ? new Date(`${t.value}T23:59:59`).getTime() : null;
+    const ms = (/** @type {any} */ (t)).value ? new Date(`${(/** @type {any} */ (t)).value}T23:59:59`).getTime() : null;
     (async () => {
       const { studySets } = await bundle();
       const selected = studySets.filter((s) => s.examDate);
@@ -2312,29 +2312,29 @@ document.addEventListener("change", (e) => {
         openExamPicker();
       }
     })();
-  } else if (t.id === "pickerDate") {
-    if (examDraft) examDraft.date = t.value ? new Date(`${t.value}T23:59:59`).getTime() : null;
-  } else if (t.classList?.contains("picker-check")) {
-    if (examDraft) t.checked ? examDraft.picked.add(t.dataset.id) : examDraft.picked.delete(t.dataset.id);
-  } else if (t.id === "backupFile" && t.files?.[0]) {
-    importBackupFile(t.files[0]);
-    t.value = "";
-  } else if (t.id === "importFile" && t.files?.[0]) {
-    const file = t.files[0];
-    t.value = "";
+  } else if ((/** @type {any} */ (t)).id === "pickerDate") {
+    if (examDraft) examDraft.date = (/** @type {any} */ (t)).value ? new Date(`${(/** @type {any} */ (t)).value}T23:59:59`).getTime() : null;
+  } else if ((/** @type {any} */ (t)).classList?.contains("picker-check")) {
+    if (examDraft) (/** @type {any} */ (t)).checked ? examDraft.picked.add((/** @type {any} */ (t)).dataset.id) : examDraft.picked.delete((/** @type {any} */ (t)).dataset.id);
+  } else if ((/** @type {any} */ (t)).id === "backupFile" && (/** @type {any} */ (t)).files?.[0]) {
+    importBackupFile((/** @type {any} */ (t)).files[0]);
+    (/** @type {any} */ (t)).value = "";
+  } else if ((/** @type {any} */ (t)).id === "importFile" && (/** @type {any} */ (t)).files?.[0]) {
+    const file = (/** @type {any} */ (t)).files[0];
+    (/** @type {any} */ (t)).value = "";
     const reader = new FileReader();
     reader.onload = () => {
       const text = String(reader.result || "");
-      document.getElementById("importText").value = text;
+      (/** @type {any} */ (document.getElementById("importText"))).value = text;
       // Auto-title from the filename ("Spanish Verbs.txt" -> "Spanish Verbs"),
       // and default the term separator to Tab — Anki's plain-text export format.
       const titleEl = document.getElementById("importTitle");
-      if (titleEl && !titleEl.value.trim()) {
-        titleEl.value = file.name.replace(/\.(txt|csv|tsv)$/i, "").replace(/[_-]+/g, " ") || "Imported";
+      if (titleEl && !/** @type {HTMLInputElement} */ (titleEl).value.trim()) {
+        /** @type {HTMLInputElement} */ (titleEl).value = file.name.replace(/\.(txt|csv|tsv)$/i, "").replace(/[_-]+/g, " ") || "Imported";
       }
       if (/\.tsv$/i.test(file.name) || /\.txt$/i.test(file.name)) {
-        document.getElementById("termSep").value = "\\t";
-        document.getElementById("cardSep").value = "\\n";
+        (/** @type {any} */ (document.getElementById("termSep"))).value = "\\t";
+        (/** @type {any} */ (document.getElementById("cardSep"))).value = "\\n";
       }
       previewImport();
     };
@@ -2344,14 +2344,14 @@ document.addEventListener("change", (e) => {
 
 // extra actions that need the add-card form state
 document.addEventListener("click", (e) => {
-  const t = e.target.closest("[data-action]");
+  const t = (/** @type {any} */ (e.target)).closest("[data-action]");
   if (!t) return;
-  if (t.dataset.action === "add-cancel") renderSetDetail(detail.session.id, "cards");
-  if (t.dataset.action === "add-save") saveNewCard(t.dataset.id);
+  if ((/** @type {any} */ (t)).dataset.action === "add-cancel") renderSetDetail(detail.session.id, "cards");
+  if ((/** @type {any} */ (t)).dataset.action === "add-save") saveNewCard((/** @type {any} */ (t)).dataset.id);
 });
 // bottom nav
 nav.addEventListener("click", (e) => {
-  const b = e.target.closest("button[data-nav]");
+  const b = (/** @type {any} */ (e.target)).closest("button[data-nav]");
   if (!b) return;
   const n = b.dataset.nav;
   if (n === "review") return startGlobalReview();

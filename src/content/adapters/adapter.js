@@ -2,11 +2,11 @@
 // Content scripts can't use ES module imports, so adapters attach to a global.
 // Each site adapter registers itself; capture.js picks the one matching the host.
 (function () {
-  if (window.__mafsar) return;
+  if ((/** @type {any} */ (window)).__mafsar) return;
 
   const registry = [];
 
-  window.__mafsar = {
+  (/** @type {any} */ (window)).__mafsar = {
     /**
      * Register a site adapter.
      * @param {Object} adapter

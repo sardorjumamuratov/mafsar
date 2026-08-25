@@ -74,8 +74,8 @@
       .forEach((row) => {
         const cells = row.querySelectorAll('[class*="TermText"], [class*="text"], [lang]');
         if (cells.length >= 2) {
-          const front = (cells[0].innerText || "").trim();
-          const back = (cells[1].innerText || "").trim();
+          const front = ((/** @type {any} */ (cells[0])).innerText || "").trim();
+          const back = ((/** @type {any} */ (cells[1])).innerText || "").trim();
           if (front) out.push({ front, back });
         }
       });
@@ -85,7 +85,7 @@
   /** AI fallback source: visible page text (same idea as universal capture). */
   function pageText() {
     const el = document.querySelector("main, article") || document.body;
-    return (el ? el.innerText : "").trim().slice(0, 24000);
+    return (el ? (/** @type {any} */ (el)).innerText : "").trim().slice(0, 24000);
   }
 
   function getTitle() {

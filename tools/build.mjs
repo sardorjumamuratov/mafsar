@@ -61,7 +61,7 @@ function walk(dir, out = []) {
 
 /** Collect [zipPath, contents] pairs for one browser's package. */
 function collect(manifest, target) {
-  const files = [["manifest.json", Buffer.from(JSON.stringify(manifest, null, 2) + "\n", "utf8")]];
+  const files = [["manifest.json", /** @type {any} */ (Buffer).from(JSON.stringify(manifest, null, 2) + "\n", "utf8")]];
   for (const full of walk(join(ROOT, "src"))) {
     const rel = relative(ROOT, full).split(sep).join("/");
     if (EXCLUDE[target].includes(rel)) continue;
@@ -87,7 +87,7 @@ function zip(files, outPath) {
   let offset = 0;
 
   for (const [name, data] of files) {
-    const nameBuf = Buffer.from(name, "utf8");
+    const nameBuf = /** @type {any} */ (Buffer).from(name, "utf8");
     const deflated = deflateRawSync(data);
     const store = deflated.length >= data.length;
     const payload = store ? data : deflated;
@@ -123,7 +123,7 @@ function zip(files, outPath) {
     offset += lh.length + nameBuf.length + payload.length;
   }
 
-  const centralBuf = Buffer.concat(central);
+  const centralBuf = /** @type {any} */ (Buffer).concat(central);
   const end = Buffer.alloc(22);
   end.writeUInt32LE(0x06054b50, 0);
   end.writeUInt16LE(files.length, 8);
@@ -131,7 +131,7 @@ function zip(files, outPath) {
   end.writeUInt32LE(centralBuf.length, 12);
   end.writeUInt32LE(offset, 16);
 
-  writeFileSync(outPath, Buffer.concat([...local, centralBuf, end]));
+  writeFileSync(outPath, /** @type {any} */ (Buffer).concat([...local, centralBuf, end]));
 }
 
 mkdirSync(DIST, { recursive: true });

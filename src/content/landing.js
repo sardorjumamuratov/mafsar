@@ -14,14 +14,14 @@ const run = () => {
       const code = addBtn.dataset.code;
       if (!code) return;
       
-      addBtn.disabled = true;
+      (/** @type {any} */ (addBtn)).disabled = true;
       addBtn.textContent = "Adding...";
       if (statusEl) statusEl.textContent = "";
       
       // Message background worker to import the set
       chrome.runtime.sendMessage({ type: "LANDING_IMPORT_SHARE", code }, (resp) => {
         if (chrome.runtime.lastError || (resp && !resp.ok)) {
-          addBtn.disabled = false;
+          (/** @type {any} */ (addBtn)).disabled = false;
           addBtn.textContent = "Add to Mafsar";
           if (statusEl) {
             statusEl.textContent = chrome.runtime.lastError?.message || resp?.error || "Failed to add set.";

@@ -2,9 +2,9 @@
 // DOM is site-specific and changes over time — keep this file small and isolated
 // so a breakage here is a one-file fix.
 (function () {
-  if (!window.__mafsar) return;
+  if (!(/** @type {any} */ (window)).__mafsar) return;
 
-  window.__mafsar.register({
+  (/** @type {any} */ (window)).__mafsar.register({
     id: "chatgpt",
     label: "ChatGPT",
 
@@ -16,7 +16,7 @@
       const out = [];
       turns.forEach((el) => {
         const role = el.getAttribute("data-message-author-role");
-        const text = (el.innerText || "").trim();
+        const text = ((/** @type {any} */ (el)).innerText || "").trim();
         if (!text) return;
         if (role !== "user" && role !== "assistant") return;
         out.push({ role, text });
@@ -29,7 +29,7 @@
       const active =
         document.querySelector('nav a[aria-current="page"]') ||
         document.querySelector('nav [data-active="true"]');
-      const t = (active?.innerText || "").trim();
+      const t = ((/** @type {any} */ (active))?.innerText || "").trim();
       return t || (document.title || "ChatGPT conversation").replace(/\s*[-—|].*$/, "").trim();
     },
   });
