@@ -1783,6 +1783,7 @@ async function renderYou() {
   const auth = await getAuth();
 
   let billingHtml = "";
+  let globalPlan = "free";
   if (auth?.user) {
     try {
       const { authedFetch } = await import("../sync/auth.js");
@@ -1791,6 +1792,7 @@ async function renderYou() {
         if (meRes.ok) {
           const data = await meRes.json();
           const plan = data.usage.plan;
+            globalPlan = plan;
           const usage = data.usage;
           if (plan === "free" || plan === "plus") {
             const winText = usage.window === "day" ? "today" : "this month";
@@ -1906,10 +1908,10 @@ async function renderYou() {
       </div>
       ${accountHtml}
             <div class="listhd"><span class="t-label">Backup</span></div>
-      <div style="display:flex;gap:10px">
+      ${globalPlan === "plus" || globalPlan === "pro" ? `<div style="display:flex;gap:10px">
         <button class="btn btn-ghost" style="flex:1" data-action="export-backup">⇩ Export JSON</button>
         <button class="btn btn-ghost" style="flex:1" data-action="import-backup">⇪ Restore</button>
-      </div>
+      </div>` : `<div style="font-size:12px;color:var(--muted);text-align:center;padding:10px 0">Available on Plus and Pro plans.</div>`}
       <input type="file" id="backupFile" accept="application/json,.json" class="hidden" />
     </div>`);
   topOfView();
