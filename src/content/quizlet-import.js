@@ -165,8 +165,14 @@
     importViaAI(button);
   }
 
+  const RUNTIME_EXEC_ID = Math.random().toString(36);
+
   function injectButton() {
-    if (document.getElementById(BTN_ID)) return;
+    const existing = document.getElementById(BTN_ID);
+    if (existing) {
+      if (existing.dataset.execId === RUNTIME_EXEC_ID) return;
+      existing.remove();
+    }
     // Only show on a set page — the presence of a terms list or set title is
     // a good-enough signal.
     const looksLikeSet =
@@ -177,6 +183,7 @@
 
     const btn = document.createElement("button");
     btn.id = BTN_ID;
+    btn.dataset.execId = RUNTIME_EXEC_ID;
     btn.type = "button";
     btn.dataset.label = "\u21ea Import to Mafsar";
     btn.textContent = btn.dataset.label;

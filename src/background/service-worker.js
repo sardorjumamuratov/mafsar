@@ -449,3 +449,26 @@ async function handle(msg) {
       throw new Error(`Unknown message type: ${msg?.type}`);
   }
 }
+
+// --- Auto-inject on install/update so existing tabs don't need a reload ---
+chrome.runtime.onInstalled.addListener(async () => {
+  const manifest = chrome.runtime.getManifest();
+  const scripts = manifest.content_scripts || [];
+  for (const cs of scripts) {
+    const tabs = await new Promise((resolve) => chrome.tabs.query({ url: cs.matches }, resolve));
+    for (const tab of tabs) {
+      if (tab.id) {
+        chrome.scripting.executeScript({
+          target: { tabId: tab.id },
+          files: cs.js
+        }).catch(() => {});
+        if (cs.css) {
+          chrome.scripting.insertCSS({
+            target: { tabId: tab.id },
+            files: cs.css
+          }).catch(() => {});
+        }
+      }
+    }
+  }
+});

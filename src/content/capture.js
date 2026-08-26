@@ -148,10 +148,17 @@
     return btn;
   }
 
+  const RUNTIME_EXEC_ID = Math.random().toString(36);
+
   function injectButtons() {
-    if (document.getElementById(WRAP_ID)) return;
+    const existing = document.getElementById(WRAP_ID);
+    if (existing) {
+      if (existing.dataset.execId === RUNTIME_EXEC_ID) return;
+      existing.remove(); // Replace orphaned buttons from a previous extension version
+    }
     const wrap = document.createElement("div");
     wrap.id = WRAP_ID;
+    wrap.dataset.execId = RUNTIME_EXEC_ID;
     wrap.appendChild(
       makeButton(
         ANSWER_BTN_ID,

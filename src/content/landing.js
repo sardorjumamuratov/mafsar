@@ -10,26 +10,32 @@ const run = () => {
     installedView.style.display = "block";
     notInstalledView.style.display = "none";
     
-    addBtn.addEventListener("click", () => {
-      const code = addBtn.dataset.code;
+    let targetBtn = addBtn;
+    if (targetBtn.dataset.bound) {
+      targetBtn = addBtn.cloneNode(true);
+      addBtn.parentNode.replaceChild(targetBtn, addBtn);
+    }
+    targetBtn.dataset.bound = "true";
+    targetBtn.addEventListener("click", () => {
+      const code = targetBtn.dataset.code;
       if (!code) return;
       
-      (/** @type {any} */ (addBtn)).disabled = true;
-      addBtn.textContent = "Adding...";
+      (/** @type {any} */ (targetBtn)).disabled = true;
+      targetBtn.textContent = "Adding...";
       if (statusEl) statusEl.textContent = "";
       
       // Message background worker to import the set
       chrome.runtime.sendMessage({ type: "LANDING_IMPORT_SHARE", code }, (resp) => {
         if (chrome.runtime.lastError || (resp && !resp.ok)) {
-          (/** @type {any} */ (addBtn)).disabled = false;
-          addBtn.textContent = "Add to Mafsar";
+          (/** @type {any} */ (targetBtn)).disabled = false;
+          targetBtn.textContent = "Add to Mafsar";
           if (statusEl) {
             statusEl.textContent = chrome.runtime.lastError?.message || resp?.error || "Failed to add set.";
             statusEl.style.color = "var(--ember)";
           }
         } else {
-          addBtn.textContent = "Added to your sets!";
-          addBtn.style.background = "var(--success)";
+          targetBtn.textContent = "Added to your sets!";
+          targetBtn.style.background = "var(--success)";
           if (statusEl) {
             statusEl.textContent = "Open the Mafsar extension to review it.";
             statusEl.style.color = "var(--success)";
