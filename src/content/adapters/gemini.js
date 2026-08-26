@@ -34,6 +34,13 @@
       return out;
     },
 
+    isGenerating() {
+      // Gemini swaps the send icon for a stop control while responding.
+      return !!document.querySelector(
+        'button[aria-label*="Stop" i], .stop-icon, [data-test-id="stop-button"]'
+      );
+    },
+
     getTitle() {
       const active = document.querySelector(
         '[data-test-id="conversation"].selected, .conversation.selected .conversation-title'

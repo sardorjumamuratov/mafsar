@@ -30,6 +30,13 @@
       return out;
     },
 
+    isGenerating() {
+      // The send control becomes a stop button for the duration of the reply.
+      return !!document.querySelector(
+        '[aria-label="Stop response"], [data-testid="stop-button"], button[aria-label*="Stop" i]'
+      );
+    },
+
     getTitle() {
       const active = document.querySelector('[data-testid="menu-item"][data-active="true"]');
       const t = ((/** @type {any} */ (active))?.innerText || "").trim();

@@ -24,6 +24,11 @@
       return out;
     },
 
+    isGenerating() {
+      // While streaming, the composer's send button swaps to a stop control.
+      return !!document.querySelector('[data-testid="stop-button"]');
+    },
+
     getTitle() {
       // Active item in the sidebar, falling back to the document title.
       const active =

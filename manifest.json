@@ -60,6 +60,7 @@
         "src/content/adapters/chatgpt.js",
         "src/content/adapters/claude.js",
         "src/content/adapters/gemini.js",
+        "src/storage/last-answer.js",
         "src/content/capture.js"
       ],
       "css": [
