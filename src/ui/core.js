@@ -83,6 +83,18 @@ export function sendToTab(tabId, msg) {
   });
 }
 
+/**
+ * Is the active tab a supported AI chat? Used to show "Capture last answer"
+ * only where an answer can exist — a button that always fails is worse than one
+ * that is not there. A tab with no content script simply never replies.
+ */
+export async function chatTabAvailable() {
+  const tab = await queryActiveTab();
+  if (!tab?.id) return false;
+  const resp = await sendToTab(tab.id, { type: "MAFSAR_PING" });
+  return !!resp?.ok;
+}
+
 export function timeUntil(ts) {
   const s = Math.floor((ts - Date.now()) / 1000);
   if (s <= 0) return "now";

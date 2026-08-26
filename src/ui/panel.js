@@ -3,7 +3,7 @@ import { app, bundle, nav, send, setFor, toast } from "./core.js";
 import { goToActiveTab, registerTabs } from "./nav.js";
 import { importSharedSet, lookupShare, renderSets } from "./views/sets.js";
 import { currentDetail, makeSet, openDetailTab, paintDetail, promptAddCard, renderSetDetail, saveCardEdit, saveNewCard, setEditingCardId, startQuizForCurrentSet } from "./views/set-detail.js";
-import { captureCurrent } from "./capture.js";
+import { captureCurrent, captureLastAnswer } from "./capture.js";
 import { deleteCard, deleteSession, saveStudySet, setExamDate } from "../storage/store.js";
 import { review } from "../storage/srs.js";
 import { applyNext, goReturn, gradeCard, revealCard, startGlobalReview, startSetReview } from "./flows/review.js";
@@ -31,6 +31,7 @@ document.addEventListener("click", (e) => {
     case "open-set": renderSetDetail(id); break;
     case "make-set": makeSet(id); break;
     case "capture-current": captureCurrent(); break;
+    case "capture-last-answer": captureLastAnswer(); break;
     case "tab": openDetailTab((/** @type {any} */ (t)).dataset.tab); break;
     case "delete-set":
       if (confirm("Delete this set and its cards?")) deleteSession(id).then(goToActiveTab);

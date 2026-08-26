@@ -1,4 +1,4 @@
-import { app, bundle, esc, send, setFor, setHTML, sourceLabel, summarize, toast, topOfView } from "../core.js";
+import { app, bundle, chatTabAvailable, esc, send, setFor, setHTML, sourceLabel, summarize, toast, topOfView } from "../core.js";
 import { setNav, showChrome } from "../nav.js";
 import { parseShareCode } from ".././share-link.js";
 import { setSharedPreview, sharedPreview } from "../views/teams.js";
@@ -26,6 +26,8 @@ export async function renderSets() {
   setNav("sets");
   showChrome(true);
   const { sessions, studySets } = await bundle();
+  // Only offered on a supported chat tab — elsewhere there's no "last answer".
+  const canCaptureAnswer = await chatTabAvailable();
   setHTML(app, `
     <div class="view">
       <div class="ahd"><div class="h-title">Your sets</div>
@@ -41,6 +43,7 @@ export async function renderSets() {
         <input id="shareCode" type="text" placeholder="e.g. 7KX2M9QRTA or mafsar.../s/..." autocomplete="off" autocapitalize="off" /></div>
       <button class="btn btn-primary btn-block" data-action="share-lookup">Look up set</button>
       <div id="sharePreview"></div>
+      ${canCaptureAnswer ? `<button class="btn btn-ghost btn-block" data-action="capture-last-answer">✨ Capture last answer</button>` : ""}
       <button class="btn btn-ghost btn-block" data-action="capture-current">＋ Capture this page</button>
     </div>`);
   topOfView();
