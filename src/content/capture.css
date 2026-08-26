@@ -9,7 +9,8 @@
   bottom: 18px;
   z-index: 2147483000;
   display: flex;
-  align-items: center;
+  flex-direction: column;
+  align-items: flex-end;
   gap: 8px;
 }
 

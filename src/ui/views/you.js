@@ -97,11 +97,9 @@ export async function renderYou() {
           }
         }
       } catch (e) {
-      // A dead refresh token (authedFetch already logged out) shouldn't be a
-      // silent no-op — the rest of this render still uses the `auth` object
-      // captured above, so it'll show as signed in for one more paint, but
-      // the user should at least learn why their plan/usage vanished.
-      if (e.message === "Session expired — signed out") toast(e.message);
+      // Session expiry is actionable; other errors (network, 500) shouldn't
+      // block the rest of the You tab from rendering, but the user should know.
+      if (e.message) toast(e.message);
     }
   }
 

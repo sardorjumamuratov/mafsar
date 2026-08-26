@@ -56,7 +56,7 @@ document.addEventListener("click", (e) => {
     case "billing-checkout": {
         const plan = (/** @type {any} */ (t)).dataset.plan || "plus";
         (/** @type {any} */ (t)).disabled = true;
-        t.textContent = "OpeningвЂ¦";
+        t.textContent = "Opening\u2026";
         const currentPlan = (/** @type {any} */ (t)).dataset.currentPlan || "free";
         send({ type: "BILLING_CHECKOUT", plan }).then(async (res) => {
           const { pollBilling } = await import("../sync/auth.js");
@@ -136,16 +136,16 @@ document.addEventListener("click", (e) => {
     case "export-backup": exportBackup(); break;
     case "import-backup": document.getElementById("backupFile")?.click(); break;
     case "auth-signin": authSubmit("login", t); break;
-      case "auth-register": authSubmit("register", t); break;
-      case "auth-google": authGoogle(t); break;
-      case "auth-google-cancel":
-        if (googleAbortController) googleAbortController.abort();
-        break;
+    case "auth-register": authSubmit("register", t); break;
+    case "auth-google": authGoogle(t); break;
+    case "auth-google-cancel":
+      if (googleAbortController) googleAbortController.abort();
+      break;
     case "auth-signout":
       logout().then(() => {
         toast("Signed out. Your sets stay on this device.");
-        renderYou();
-      });
+        renderAuthGate();
+      }).catch((e) => toast(e.message));
       break;
     case "exam-pick": openExamPicker(); break;
     case "exam-clear":

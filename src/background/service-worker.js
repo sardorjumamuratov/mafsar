@@ -3,7 +3,6 @@
 // side panel when the toolbar icon is clicked.
 
 import {
-  getSettings,
   addSession,
   getSessions,
   deleteSession,
@@ -11,7 +10,7 @@ import {
   saveStudySet,
   uid,
 } from "../storage/store.js";
-import { initSchedule, isDue } from "../storage/srs.js";
+import { initSchedule } from "../storage/srs.js";
 import {
   backendGenerate,
   backendGrade,

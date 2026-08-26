@@ -224,4 +224,30 @@ test('share link helpers come from the pure module', () => {
   assert.ok(src.includes('parseTeamCode('));
 });
 
+console.log('recent fixes');
+
+test('capture.css stacks action buttons vertically', () => {
+  const css = fs.readFileSync(join(__dirname, "../src/content/capture.css"), "utf8");
+  assert.ok(css.includes('flex-direction: column;'));
+  assert.ok(css.includes('align-items: flex-end;'));
+});
+
+test('capture.js does not swallow generation failure reasons', () => {
+  const cap = fs.readFileSync(join(__dirname, "../src/ui/capture.js"), "utf8");
+  assert.ok(cap.includes('toast(r.reason || '));
+});
+
+test('panel.js sign out redirects to auth gate', () => {
+  const pan = fs.readFileSync(join(__dirname, "../src/ui/panel.js"), "utf8");
+  assert.ok(pan.includes('renderAuthGate()'));
+  assert.ok(pan.includes('logout().then(() => {'));
+  assert.ok(pan.includes('.catch((e) => toast(e.message))'));
+});
+
+test('you.js doesn\\'t silently swallow all billing fetch errors', () => {
+  const you = fs.readFileSync(join(__dirname, "../src/ui/views/you.js"), "utf8");
+  assert.ok(you.includes('if (e.message) toast(e.message);'));
+  assert.ok(!you.includes('if (e.message === "Session expired — signed out") toast(e.message);'));
+});
+
 console.log(`\n${passed} tests passed`);

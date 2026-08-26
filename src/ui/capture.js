@@ -17,7 +17,7 @@ export async function captureCurrent() {
       r = await send({ type: "CAPTURE_UNIVERSAL" });
     }
     if (r.generated) toast(`${r.cards} flashcards ready`);
-    else toast("Saved, but we couldn\'t make flashcards. Open the set to try again.");
+    else toast(r.reason || "Saved, but we couldn\'t make flashcards. Open the set to try again.");
     renderHome();
   } catch (e) {
     toast(e.message);
@@ -50,8 +50,8 @@ export async function captureLastAnswer() {
     // Two capture buttons sit side by side, so naming what was saved is what
     // makes either of them trustworthy.
     const name = shortTitle(resp.session.title);
-    if (r.generated) toast(`Saved “${name}” · ${r.cards} cards`);
-    else toast(`Saved “${name}”, but we couldn\'t make flashcards.`);
+    if (r.generated) toast(`Saved "${name}" · ${r.cards} cards`);
+    else toast(r.reason || `Saved "${name}", but we couldn\'t make flashcards.`);
     renderHome();
   } catch (e) {
     toast(e.message);
