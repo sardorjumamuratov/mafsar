@@ -15,6 +15,10 @@
      * @param {(host:string)=>boolean} adapter.matches
      * @param {()=>{role:string,text:string}[]} adapter.getMessages
      * @param {()=>string} [adapter.getTitle]
+     * @param {()=>boolean} [adapter.isGenerating] - true while a reply is still
+     *   streaming. Optional: callers must treat a missing (or throwing) method
+     *   as "not generating" so a stale selector degrades to a cosmetic gap
+     *   rather than a dead button.
      */
     register(adapter) {
       registry.push(adapter);
