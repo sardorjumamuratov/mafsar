@@ -143,6 +143,7 @@ export async function checkCode() {
       expectedLines: task.expectedLines,
       code: /** @type {HTMLInputElement} */ (ta).value,
     });
+    if (!codingState || codingState.task !== task) return;
     await Promise.all([
       bumpActivity(1),
       appendReviewLog({

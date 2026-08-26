@@ -8,7 +8,8 @@ export let applyState = null; // { item, hypothetical, phase }
 export async function startApply() {
   const item = queue[qIdx];
   if (!item || !item.card.back) return paintReviewCard();
-  applyState = { item, phase: "loading" };
+  const token = Math.random();
+  applyState = { item, phase: "loading", token };
   setHTML(app, `
     <div class="rev-top">${XBTN}<div class="bar"><i style="width:${Math.round((qIdx / queue.length) * 100)}%"></i></div>
       <span class="rev-count tnum">${qIdx + 1} / ${queue.length}</span></div>
@@ -25,6 +26,7 @@ export async function startApply() {
       concept: item.card.front,
       reference: item.card.back,
     });
+    if (!applyState || applyState.token !== token) return;
     (/** @type {any} */ (applyState)).hypothetical = /** @type {any} */ (r).hypothetical;
     applyState.phase = "answer";
     paintApplyAnswer();
@@ -62,6 +64,7 @@ export async function checkApply() {
       reference: hypothetical.rubric,
       answer,
     });
+    if (applyState?.hypothetical !== hypothetical) return;
     await Promise.all([
       bumpActivity(1),
       appendReviewLog({

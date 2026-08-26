@@ -14,7 +14,8 @@ export async function startTypedPractice(sessionId) {
   if (!cards.length) return toast("This set has no cards yet.");
   const due = cards.filter((c) => isDue(c));
   const items = (due.length ? due : cards).slice(0, 10).map((card) => ({ sessionId, card }));
-  typedState = { sessionId, items, idx: 0 };
+  const token = Math.random();
+  typedState = { sessionId, items, idx: 0, token };
   setFocusReturn("set:" + sessionId);
   showChrome(false);
   paintTypedQ();
@@ -53,8 +54,10 @@ export async function checkTyped() {
   const btn = app.querySelector('[data-action="typed-check"]');
   /** @type {HTMLButtonElement} */ (btn).disabled = true;
   btn.textContent = "Grading…";
+  const token = typedState.token;
   try {
     const r = await send({ type: "GRADE_ANSWER", question: card.front, reference: card.back, answer });
+    if (!typedState || typedState.token !== token) return;
     await Promise.all([
       bumpActivity(1),
       appendReviewLog({

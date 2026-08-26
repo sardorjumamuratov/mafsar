@@ -34,7 +34,7 @@ document.addEventListener("click", (e) => {
     case "capture-last-answer": captureLastAnswer(); break;
     case "tab": openDetailTab((/** @type {any} */ (t)).dataset.tab); break;
     case "delete-set":
-      if (confirm("Delete this set and its cards?")) deleteSession(id).then(goToActiveTab);
+      if (confirm("Delete this set and its cards?")) deleteSession(id).then(goToActiveTab).catch(e => toast(e.message));
       break;
     case "start-review": startGlobalReview(); break;
     case "set-review": startSetReview(id); break;
@@ -92,7 +92,7 @@ document.addEventListener("click", (e) => {
         await saveStudySet(set);
         toast((/** @type {any} */ (t)).dataset.mode === "coding" ? "Coding mode on — review now asks for code." : "General mode on.");
         renderSetDetail((/** @type {any} */ (t)).dataset.id, "summary");
-      })();
+      })().catch(e => toast(e.message));
       break;
     case "start-coding": startCodingPractice(id); break;
     case "set-share": toggleSetShare(id); break;
@@ -118,7 +118,7 @@ document.addEventListener("click", (e) => {
     case "start-typed": startTypedPractice(id); break;
     case "typed-check": checkTyped(); break;
     case "typed-next": typedNext(); break;
-    case "clear-exam": setExamDate(id, null).then(() => renderSetDetail(id, "cards")); break;
+    case "clear-exam": setExamDate(id, null).then(() => renderSetDetail(id, "cards")).catch(e => toast(e.message)); break;
     case "add-card": promptAddCard(id); break;
     case "card-edit": setEditingCardId(id); paintDetail(); break;
     case "edit-cancel": setEditingCardId(null); paintDetail(); break;
@@ -126,10 +126,10 @@ document.addEventListener("click", (e) => {
       saveCardEdit(currentDetail().session.id, id).then(() => {
         setEditingCardId(null);
         openDetailTab("cards");
-      });
+      }).catch(e => toast(e.message));
       break;
     case "card-del":
-      if (confirm("Delete this card?")) deleteCard(currentDetail().session.id, id).then(() => paintDetail());
+      if (confirm("Delete this card?")) deleteCard(currentDetail().session.id, id).then(() => paintDetail()).catch(e => toast(e.message));
       break;
     // case "export-tsv": exportSetTsv(id); break; // paused with the export button
     case "gen-summary": generateSummary(id); break;
@@ -154,7 +154,7 @@ document.addEventListener("click", (e) => {
         for (const s of studySets) if (s.examDate) await setExamDate(s.sessionId, null);
         toast("Exam cleared");
         renderHome();
-      })();
+      })().catch(e => toast(e.message));
       break;
     case "picker-save": saveExamSelection(); break;
     case "quiz-len":
@@ -174,7 +174,7 @@ document.addEventListener("click", (e) => {
         const { studySets } = await bundle();
         const set = setFor(id, studySets);
         if (set?.quiz?.length) startQuiz(set, "set:" + id, quickQuizLen(set));
-      })();
+      })().catch(e => toast(e.message));
       break;
     case "quiz-opt": answerQuiz(Number((/** @type {any} */ (t)).dataset.i)); break;
     case "quiz-next": quizNext(); break;
@@ -193,7 +193,7 @@ document.addEventListener("change", (e) => {
     setExamDate((/** @type {any} */ (t)).dataset.session, ms).then(() => {
       toast(ms ? "Exam date set. Cards will resurface before it." : "Exam date cleared");
       renderSetDetail((/** @type {any} */ (t)).dataset.session, "cards");
-    });
+    }).catch(e => toast(e.message));
   } else if ((/** @type {any} */ (t)).id === "homeExamDate") {
     // Date changed on Home: if an exam already exists, move it for every
     // selected set; otherwise draft it and go pick sets.
@@ -209,7 +209,7 @@ document.addEventListener("change", (e) => {
         setExamDraft({ date: ms, picked: new Set() });
         openExamPicker();
       }
-    })();
+    })().catch(e => toast(e.message));
   } else if ((/** @type {any} */ (t)).id === "pickerDate") {
     if (examDraft) examDraft.date = (/** @type {any} */ (t)).value ? new Date(`${(/** @type {any} */ (t)).value}T23:59:59`).getTime() : null;
   } else if ((/** @type {any} */ (t)).classList?.contains("picker-check")) {
@@ -269,5 +269,8 @@ nav.addEventListener("click", (e) => {
   }
   renderHome();
   syncNow().catch(() => {});
-})();
+})().catch(e => {
+  toast(e.message);
+  renderAuthGate();
+});
 

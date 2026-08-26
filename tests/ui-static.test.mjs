@@ -251,3 +251,21 @@ test('you.js doesn\\'t silently swallow all billing fetch errors', () => {
 });
 
 console.log(`\n${passed} tests passed`);
+
+test('apply.js prevents stale LLM responses', () => {
+  const file = fs.readFileSync(join(__dirname, "../src/ui/flows/apply.js"), "utf8");
+  assert.ok(file.includes('const token = Math.random();'));
+  assert.ok(file.includes('if (!applyState || applyState.token !== token) return;'));
+  assert.ok(file.includes('if (applyState?.hypothetical !== hypothetical) return;'));
+});
+
+test('typed.js prevents stale LLM responses', () => {
+  const file = fs.readFileSync(join(__dirname, "../src/ui/flows/typed.js"), "utf8");
+  assert.ok(file.includes('const token = Math.random();'));
+  assert.ok(file.includes('if (!typedState || typedState.token !== token) return;'));
+});
+
+test('service-worker fallback to empty array on missing LLM structure', () => {
+  const file = fs.readFileSync(join(__dirname, "../src/background/service-worker.js"), "utf8");
+  assert.ok(file.includes('Array.isArray(q.options) ? q.options : []'));
+});

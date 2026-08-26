@@ -46,8 +46,8 @@ async function generateForSession(session) {
   generated.quiz = (generated.quiz || []).map((q) => ({
     id: uid(),
     q: String(q.q),
-    options: q.options.map(String),
-    answer: Math.max(0, Math.min(q.options.length - 1, Number(q.answer) || 0)),
+    options: (Array.isArray(q.options) ? q.options : []).map(String),
+    answer: Math.max(0, Math.min((q.options?.length || 1) - 1, Number(q.answer) || 0)),
     explain: q.explain ? String(q.explain) : "",
     updatedAt: new Date(now).toISOString(),
   }));
