@@ -4,6 +4,7 @@
 
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
+import { AI_CHAT_HOSTS } from "../src/ui/ai-hosts.js";
 
 import fs, { readdirSync, statSync } from "node:fs";
 import { join } from "node:path";
@@ -295,5 +296,23 @@ test("service-worker.js contains no tabs.onActivated listener", () => {
   const file = fs.readFileSync(join(__dirname, "../src/background/service-worker.js"), "utf8");
   assert.ok(!file.includes("tabs.onActivated"));
 });
+
+test("manifest.json AI chat hosts are in AI_CHAT_HOSTS", () => {
+  const manifest = JSON.parse(fs.readFileSync(join(__dirname, "../manifest.json"), "utf8"));
+  for (const group of manifest.content_scripts || []) {
+    for (const match of group.matches || []) {
+      const url = new URL(match.replace("/*", "/"));
+      const host = url.hostname;
+      // Exclude non-chat hosts
+      if (host === "quizlet.com") continue; // Quizlet import flow
+      if (host === "mafsar-production.up.railway.app") continue; // Mafsar landing page
+      
+      const isCovered = AI_CHAT_HOSTS.some((h) => host === h || host.endsWith("." + h));
+      assert.ok(isCovered, `Host ${host} from manifest is missing from AI_CHAT_HOSTS`);
+    }
+  }
+});
+
+
 
 console.log(`\n${passed} tests passed`);
