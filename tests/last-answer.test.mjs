@@ -138,6 +138,17 @@ test("falls back to the answer's first sentence when there is no question", () =
   assert.equal(r.title, "A monad is a monoid in the category of endofunctors.");
 });
 
+console.log("deriveTitle");
+const deriveTitle = globalThis.__mafsarLastAnswer.deriveTitle;
+
+test("uses question if present", () => {
+  assert.equal(deriveTitle("What is it?", "It is an object."), "What is it?");
+});
+
+test("falls back to answer first sentence", () => {
+  assert.equal(deriveTitle(null, "It is a very interesting object. And another thing."), "It is a very interesting object.");
+});
+
 console.log("cleanAnswerText");
 
 test("drops a standalone Copy code line", () => {

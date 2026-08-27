@@ -142,9 +142,23 @@
     return btn;
   }
 
-  const RUNTIME_EXEC_ID = Math.random().toString(36);
+  let RUNTIME_EXEC_ID = "unknown";
+  try { RUNTIME_EXEC_ID = chrome.runtime.getManifest().version; } catch { /* orphaned */ }
+
+  function runtimeAlive() {
+    try { return !!chrome.runtime?.id; } catch { return false; }
+  }
+
+  let mo;
 
   function injectButtons() {
+    if (!runtimeAlive()) {
+      if (mo) mo.disconnect();
+      const old = document.getElementById(WRAP_ID);
+      if (old && old.dataset.execId === RUNTIME_EXEC_ID) old.remove();
+      return;
+    }
+
     const existing = document.getElementById(WRAP_ID);
     if (existing) {
       if (existing.dataset.execId === RUNTIME_EXEC_ID) return;
@@ -161,13 +175,15 @@
         onSaveClick
       )
     );
+    
+    if (mo) mo.disconnect();
     document.body.appendChild(wrap);
+    if (mo) mo.observe(document.body, { childList: true, subtree: false });
   }
 
-  // Re-inject if the SPA re-renders and drops our container.
+  mo = new MutationObserver(() => injectButtons());
+  // Initial injection
   injectButtons();
-  const mo = new MutationObserver(() => injectButtons());
-  mo.observe(document.body, { childList: true, subtree: false });
 
   // Allow the side panel to trigger a capture of the active tab.
   chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {

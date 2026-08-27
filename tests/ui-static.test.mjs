@@ -244,13 +244,11 @@ test('panel.js sign out redirects to auth gate', () => {
   assert.ok(pan.includes('.catch((e) => toast(e.message))'));
 });
 
-test('you.js doesn\\'t silently swallow all billing fetch errors', () => {
+test("you.js doesn't silently swallow all billing fetch errors", () => {
   const you = fs.readFileSync(join(__dirname, "../src/ui/views/you.js"), "utf8");
   assert.ok(you.includes('if (e.message) toast(e.message);'));
   assert.ok(!you.includes('if (e.message === "Session expired — signed out") toast(e.message);'));
 });
-
-console.log(`\n${passed} tests passed`);
 
 test('apply.js prevents stale LLM responses', () => {
   const file = fs.readFileSync(join(__dirname, "../src/ui/flows/apply.js"), "utf8");
@@ -269,3 +267,10 @@ test('service-worker fallback to empty array on missing LLM structure', () => {
   const file = fs.readFileSync(join(__dirname, "../src/background/service-worker.js"), "utf8");
   assert.ok(file.includes('Array.isArray(q.options) ? q.options : []'));
 });
+
+test("capture.js does not read a bare r.title", () => {
+  const file = fs.readFileSync(join(__dirname, "../src/ui/capture.js"), "utf8");
+  assert.ok(!file.includes("r.title"));
+});
+
+console.log(`\n${passed} tests passed`);

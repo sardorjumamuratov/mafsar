@@ -121,4 +121,24 @@ describe("paddle webhook", () => {
     expect(row?.plan).toBe("free");
   });
 
+  it("subscription.updated past_due does NOT downgrade (dunning)", async () => {
+    const { user } = await newUser("wh_pastdue@mafsar.dev");
+    await run(db, "UPDATE users SET billing_customer_id = 'ctm_123', plan = 'pro' WHERE id = ?", [user.id]);
+    const res = await sendEvent({
+      eventType: "subscription.updated",
+      data: { customerId: "ctm_123", status: "past_due" },
+    });
+    expect(res.status).toBe(200);
+    const row = await one<{ plan: string }>(db, "SELECT plan FROM users WHERE id = ?", [user.id]);
+    expect(row?.plan).toBe("pro");
+  });
+
+  it("webhook missing customer id does not throw and ignores", async () => {
+    const res = await sendEvent({
+      eventType: "subscription.updated",
+      data: { status: "active", items: [{ price: { id: "pri_pro" } }] }, // No customerId
+    });
+    expect(res.status).toBe(200);
+  });
+
 });

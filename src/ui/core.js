@@ -92,15 +92,25 @@ import { AI_CHAT_HOSTS } from "./ai-hosts.js";
  */
 export async function isAIChatTab() {
   const tab = await queryActiveTab();
-  if (!tab?.url) return false;
-  try {
-    const host = new URL(tab.url).hostname;
-    return AI_CHAT_HOSTS.some(
-      (h) => host === h || host.endsWith("." + h)
-    );
-  } catch {
-    return false;
+  if (!tab?.id) return { ok: false };
+  
+  if (tab.url) {
+    try {
+      const host = new URL(tab.url).hostname;
+      if (AI_CHAT_HOSTS.some((h) => host === h || host.endsWith("." + h))) {
+        return { ok: true, url: tab.url };
+      }
+    } catch {
+      return { ok: false };
+    }
   }
+
+  // Without host permissions, URL is hidden. Fall back to pinging the 
+  // content scripts we *do* have explicit host_permissions for.
+  const resp = await sendToTab(tab.id, { type: "MAFSAR_PING" });
+  if (resp?.ok) return { ok: true, url: null };
+
+  return { ok: false };
 }
 
 export function timeUntil(ts) {

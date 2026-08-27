@@ -119,4 +119,42 @@ describe("Billing logic", () => {
     expect(m1).toBe(m2); // Still same month
     vi.useRealTimers();
   });
+  it("enforces quota atomically against concurrent requests", async () => {
+    const userId = uid();
+    await run(db, "INSERT INTO users (id, email, password_hash, created_at, plan) VALUES (?, ?, ?, ?, 'free')", [userId, "toctou@test.com", "hash", new Date().toISOString()]);
+    
+    // Set limit to 3. Fill 2 of them so exactly 1 remains.
+    process.env.FREE_SET_LIMIT = "3";
+    await run(db, "INSERT INTO generation_events (id, user_id, category, created_at) VALUES (?, ?, 'set', ?)", [uid(), userId, windowStartISO('month')]);
+    await run(db, "INSERT INTO generation_events (id, user_id, category, created_at) VALUES (?, ?, 'set', ?)", [uid(), userId, windowStartISO('month')]);
+
+    const middleware = requireQuota(db, "set");
+
+    // Fire two concurrent requests
+    const c1 = { get: () => userId, res: { status: 200 }, json: vi.fn((data, status) => ({ status, data })) } as any;
+    const c2 = { get: () => userId, res: { status: 200 }, json: vi.fn((data, status) => ({ status, data })) } as any;
+    const next1 = vi.fn().mockResolvedValue(undefined);
+    const next2 = vi.fn().mockResolvedValue(undefined);
+
+    await Promise.all([
+      middleware(c1, next1),
+      middleware(c2, next2),
+    ]);
+
+    // Exactly one should succeed, one should return 402 quota_exceeded
+    const nextCalls = next1.mock.calls.length + next2.mock.calls.length;
+    expect(nextCalls).toBe(1);
+
+    const jsonCalls = c1.json.mock.calls.length + c2.json.mock.calls.length;
+    expect(jsonCalls).toBe(1);
+
+    if (c1.json.mock.calls.length > 0) {
+      expect(c1.json.mock.calls[0][1]).toBe(402);
+    } else {
+      expect(c2.json.mock.calls[0][1]).toBe(402);
+    }
+
+    const usage = await categoryUsage(db, userId, "set", "month");
+    expect(usage).toBe(3);
+  });
 });

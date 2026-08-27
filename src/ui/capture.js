@@ -31,11 +31,27 @@ function shortTitle(title, max = 40) {
 }
 
 // ================================================================ capture last answer
-export async function captureLastAnswer() {
+export async function captureLastAnswer(btnElement) {
+  const origin = btnElement && btnElement.dataset.origin;
+  if (origin) {
+    const originPattern = origin + "/*";
+    try {
+      const granted = await new Promise((resolve) => {
+        chrome.permissions.request({ origins: [originPattern] }, resolve);
+      });
+      if (!granted) {
+        toast("Mafsar needs permission to read this page.");
+        return;
+      }
+    } catch {
+      // ignore
+    }
+  }
+
   toast("Capturing…");
   try {
     const r = await send({ type: "CAPTURE_LAST_ANSWER_SMART" });
-    const name = shortTitle(r.title);
+    const name = shortTitle(r.session?.title);
     if (r.generated) toast(`Saved "${name}" · ${r.cards} cards`);
     else toast(r.reason || `Saved "${name}", but we couldn't make flashcards.`);
     renderHome();

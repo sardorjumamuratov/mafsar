@@ -165,9 +165,23 @@
     importViaAI(button);
   }
 
-  const RUNTIME_EXEC_ID = Math.random().toString(36);
+  let RUNTIME_EXEC_ID = "unknown";
+  try { RUNTIME_EXEC_ID = chrome.runtime.getManifest().version; } catch { /* orphaned */ }
+
+  function runtimeAlive() {
+    try { return !!chrome.runtime?.id; } catch { return false; }
+  }
+
+  let mo;
 
   function injectButton() {
+    if (!runtimeAlive()) {
+      if (mo) mo.disconnect();
+      const old = document.getElementById(BTN_ID);
+      if (old && old.dataset.execId === RUNTIME_EXEC_ID) old.remove();
+      return;
+    }
+
     const existing = document.getElementById(BTN_ID);
     if (existing) {
       if (existing.dataset.execId === RUNTIME_EXEC_ID) return;
@@ -189,10 +203,12 @@
     btn.textContent = btn.dataset.label;
     btn.title = "Import this Quizlet set into Mafsar as a study set";
     btn.addEventListener("click", onClick);
+    
+    if (mo) mo.disconnect();
     document.body.appendChild(btn);
+    if (mo) mo.observe(document.body, { childList: true, subtree: true });
   }
 
+  mo = new MutationObserver(() => injectButton());
   injectButton();
-  const mo = new MutationObserver(() => injectButton());
-  mo.observe(document.body, { childList: true, subtree: true });
 })();

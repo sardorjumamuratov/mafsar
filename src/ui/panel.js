@@ -31,7 +31,7 @@ document.addEventListener("click", (e) => {
     case "open-set": renderSetDetail(id); break;
     case "make-set": makeSet(id); break;
     case "capture-current": captureCurrent(); break;
-    case "capture-last-answer": captureLastAnswer(); break;
+    case "capture-last-answer": captureLastAnswer(t); break;
     case "tab": openDetailTab((/** @type {any} */ (t)).dataset.tab); break;
     case "delete-set":
       if (confirm("Delete this set and its cards?")) deleteSession(id).then(goToActiveTab).catch(e => toast(e.message));

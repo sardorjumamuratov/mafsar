@@ -9,7 +9,11 @@
     "sidePanel",
     "scripting",
     "notifications",
-    "contextMenus"
+    "contextMenus",
+    "tabs"
+  ],
+  "optional_host_permissions": [
+    "*://*/*"
   ],
   "host_permissions": [
     "https://chatgpt.com/*",

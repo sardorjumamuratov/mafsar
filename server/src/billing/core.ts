@@ -107,6 +107,9 @@ export async function applyPlanChange(
   billingCustomerId: string,
   plan: "free" | "plus" | "pro"
 ): Promise<void> {
+  if (!billingCustomerId) {
+    throw new Error("Cannot apply plan change: billingCustomerId is falsy");
+  }
   await run(db, "UPDATE users SET plan = ? WHERE billing_customer_id = ? OR stripe_customer_id = ?", [plan, billingCustomerId, billingCustomerId]);
 }
 
@@ -128,16 +131,41 @@ export function requireQuota(db: DB, category: "set" | "coding" | "practice") {
     const limits = planLimits(plan);
     const limit = limits[category];
     
-    let used = 0;
+    let eventId = "";
+
     if (limit !== null && limits.window !== null) {
-      used = await categoryUsage(db, userId, category, limits.window);
-      if (used >= limit) {
+      // Atomic check and insert in one transaction
+      // SQLite transactions are serialized. Using `db.execute` if available, or just generic execute.
+      // Wait, we only have `run` and `one`. So we must use a single SQL statement for the check?
+      // Since SQLite doesn't let us conditionally INSERT easily without INSERT INTO ... SELECT, let's do:
+      eventId = uid();
+      const res = await run(
+        db,
+        `INSERT INTO generation_events (id, user_id, category, created_at)
+         SELECT ?, ?, ?, ?
+         WHERE (SELECT COUNT(*) FROM generation_events WHERE user_id = ? AND category = ? AND created_at >= ?) < ?`,
+        [eventId, userId, category, nowISO(), userId, category, windowStartISO(limits.window), limit]
+      );
+      
+      if (res === 0) {
+        const used = await categoryUsage(db, userId, category, limits.window);
         return c.json({ error: "quota_exceeded", category, limit, used, window: limits.window, plan }, 402);
       }
+    } else {
+      // Unlimited plan
+      eventId = uid();
+      await run(
+        db,
+        "INSERT INTO generation_events (id, user_id, category, created_at) VALUES (?, ?, ?, ?)",
+        [eventId, userId, category, nowISO()]
+      );
     }
+
     await next();
-    if (c.res.status < 400) {
-      await recordGeneration(db, userId, category);
+
+    // Roll back if the downstream handler failed
+    if (c.res.status >= 400 && eventId) {
+      await run(db, "DELETE FROM generation_events WHERE id = ?", [eventId]);
     }
   };
 }

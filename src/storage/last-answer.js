@@ -139,5 +139,6 @@
     cleanAnswerText,
     extractLastAnswer,
     answerMessages,
+    deriveTitle,
   };
 })(typeof globalThis !== "undefined" ? globalThis : self);

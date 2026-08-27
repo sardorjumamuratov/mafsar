@@ -132,9 +132,9 @@ export const paddleProvider: BillingProvider = {
     }
 
     const paddle = paddleClient();
-    let event: any;
+    let event: { eventType: string; data: any };
     try {
-      event = await paddle.webhooks.unmarshal(rawBody, secret, signature);
+      event = (await paddle.webhooks.unmarshal(rawBody, secret, signature)) as any;
     } catch {
       return { kind: "invalid_signature" };
     }
@@ -143,16 +143,24 @@ export const paddleProvider: BillingProvider = {
       return { kind: "invalid_signature" };
     }
 
-    const eventType = event.eventType || event.event_type;
-    const data = event.data;
-
     if (
-      eventType === "subscription.created" ||
-      eventType === "subscription.updated" ||
-      eventType === "subscription.activated"
+      event.eventType === "subscription.created" ||
+      event.eventType === "subscription.updated" ||
+      event.eventType === "subscription.activated"
     ) {
+      const data = event.data;
       const status = data?.status;
       const customerId = data?.customerId || data?.customer_id;
+
+      if (!customerId) {
+        console.warn(`No customerId in Paddle event ${event.eventType}`);
+        return { kind: "ignored" };
+      }
+
+      if (status === "past_due") {
+        console.warn(`Customer ${customerId} is past due (dunning). Keeping current plan.`);
+        return { kind: "ignored" };
+      }
 
       if (status === "active" || status === "trialing") {
         const priceId = data?.items?.[0]?.price?.id;
@@ -165,7 +173,6 @@ export const paddleProvider: BillingProvider = {
         return { kind: "plan_change", customerId, plan };
       } else if (
         status === "canceled" ||
-        status === "past_due" ||
         status === "paused"
       ) {
         return { kind: "plan_change", customerId, plan: "free" };
@@ -173,8 +180,13 @@ export const paddleProvider: BillingProvider = {
       return { kind: "ignored" };
     }
 
-    if (eventType === "subscription.canceled") {
+    if (event.eventType === "subscription.canceled") {
+      const data = event.data;
       const customerId = data?.customerId || data?.customer_id;
+      if (!customerId) {
+        console.warn("No customerId in Paddle subscription.canceled event");
+        return { kind: "ignored" };
+      }
       return { kind: "plan_change", customerId, plan: "free" };
     }
 

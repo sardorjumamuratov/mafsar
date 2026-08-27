@@ -1,6 +1,7 @@
 // Background service worker (ES module). Orchestrates capture storage and
 // generation through the Mafsar backend (server-side LLM key), and opens the
 // side panel when the toolbar icon is clicked.
+import "../storage/last-answer.js";
 
 import {
   addSession,
@@ -178,51 +179,68 @@ async function captureTabAndSave(tabId) {
 
 /** Runs INSIDE the page for generic last-answer extraction. */
 function extractLastAnswerGeneric() {
-  const blocks = [];
-  // Find all elements that look like chat messages
-  document.querySelectorAll('div, p, article, section').forEach(el => {
-    const htmlEl = /** @type {HTMLElement} */ (el);
-    // Only grab elements that actually have text and aren't hidden
-    if (htmlEl.offsetParent === null) return;
-    const text = (htmlEl.innerText || "").trim();
-    if (!text || text.length < 10) return;
+  const candidates = document.querySelectorAll("div, p, article, section, main");
+  let bestContainer = null;
+  let maxScore = -1;
+  let bestDepth = -1;
 
-    // We only care about leaf-like elements or direct message wrappers to avoid double-counting
-    // This is a naive heuristic: if this element's text is roughly the same as a parent's,
-    // we only keep the parent. We filter out duplicates later.
-    blocks.push({ el: htmlEl, text });
-  });
+  // Bound the work
+  const limit = Math.min(candidates.length, 5000);
 
-  // Filter overlapping parents (keep the highest node that contains the message)
-  // This is a very rough heuristic for arbitrary sites.
-  let leafBlocks = [];
-  for (let i = 0; i < blocks.length; i++) {
-    let isChild = false;
-    for (let j = 0; j < blocks.length; j++) {
-      if (i !== j && blocks[j].el.contains(blocks[i].el)) {
-        isChild = true;
-        break;
-      }
+  for (let i = 0; i < limit; i++) {
+    const el = candidates[i];
+    // Visibility check tolerant of position: fixed
+    if (el.getClientRects().length === 0) continue;
+
+    let score = 0;
+    // Compute turnScore: number of direct children with text length > 30
+    for (let j = 0; j < el.children.length; j++) {
+      const child = el.children[j];
+      if (child.getClientRects().length === 0) continue;
+      const text = (child.innerText || "").trim();
+      if (text.length > 30) score++;
     }
-    if (!isChild) leafBlocks.push(blocks[i]);
+
+    if (score < 2) continue;
+
+    let depth = 0;
+    let curr = el;
+    while (curr.parentElement) {
+      depth++;
+      curr = curr.parentElement;
+    }
+
+    if (score > maxScore || (score === maxScore && depth > bestDepth)) {
+      maxScore = score;
+      bestDepth = depth;
+      bestContainer = el;
+    }
   }
 
-  // Filter out tiny UI elements
-  leafBlocks = leafBlocks.filter(b => b.text.length > 30);
-
-  if (leafBlocks.length < 1) {
-    // Ultimate fallback: just return the page text like CAPTURE_UNIVERSAL
+  if (!bestContainer) {
     return { ok: false, fallback: true };
   }
 
-  // The last block is typically the AI's answer
-  const answer = leafBlocks[leafBlocks.length - 1].text;
+  // Walk direct children from the end
+  let answer = null;
+  let question = null;
   
-  // The block before that is typically the user's question
-  const question = leafBlocks.length >= 2 ? leafBlocks[leafBlocks.length - 2].text : null;
-  
-  if (answer.length < 100) {
-    return { ok: false, error: "That answer's too short to make cards from." };
+  for (let i = bestContainer.children.length - 1; i >= 0; i--) {
+    const child = bestContainer.children[i];
+    if (child.getClientRects().length === 0) continue;
+    const text = (child.innerText || "").trim();
+    if (!text) continue;
+
+    if (answer === null) {
+      answer = text;
+    } else if (question === null) {
+      question = text;
+      break;
+    }
+  }
+
+  if (answer === null) {
+    return { ok: false, fallback: true };
   }
 
   return { ok: true, question, answer, title: document.title };
@@ -250,18 +268,16 @@ async function captureLastAnswerGeneric(tabId, url, host) {
   }
 
   const qStr = result.question ? String(result.question).trim() : null;
-  const aStr = String(result.answer).trim();
+  const rawAns = String(result.answer).trim();
 
-  // Simple title generation (copied from last-answer.js)
-  let title = result.title || host;
-  if (qStr) {
-    title = qStr.length <= 80 ? qStr : qStr.slice(0, 80) + "…";
-  } else {
-    const flat = aStr.replace(/\s+/g, " ").trim();
-    const m = flat.match(/^(.{20,}?[.!?])(?:\s|$)/);
-    const first = m ? m[1] : flat;
-    title = first.length <= 80 ? first : first.slice(0, 80) + "…";
+  const la = globalThis.__mafsarLastAnswer;
+  const aStr = la.cleanAnswerText(rawAns);
+
+  if (aStr.length < la.MIN_ANSWER_CHARS) {
+    throw new Error("That answer's too short to make cards from.");
   }
+
+  const title = la.deriveTitle(qStr, aStr) || host;
 
   const session = {
     source: "generic",
@@ -592,11 +608,18 @@ async function handle(msg) {
 }
 
 // --- Auto-inject on install/update so existing tabs don't need a reload ---
-chrome.runtime.onInstalled.addListener(async () => {
+chrome.runtime.onInstalled.addListener(async (details) => {
+  if (details.reason !== "install" && details.reason !== "update") return;
+
   const manifest = chrome.runtime.getManifest();
   const scripts = manifest.content_scripts || [];
   for (const cs of scripts) {
-    const tabs = await new Promise((resolve) => chrome.tabs.query({ url: cs.matches }, resolve));
+    let tabs = [];
+    try {
+      tabs = await new Promise((resolve) => chrome.tabs.query({ url: cs.matches }, resolve));
+    } catch {
+      continue;
+    }
     for (const tab of tabs) {
       if (tab.id) {
         chrome.scripting.executeScript({

@@ -27,7 +27,9 @@ export async function renderSets() {
   showChrome(true);
   const { sessions, studySets } = await bundle();
   // Only offered on a supported chat tab — elsewhere there's no "last answer".
-  const canCaptureAnswer = await isAIChatTab();
+  const chatTab = await isAIChatTab();
+  const originAttr = chatTab.url ? ` data-origin="${esc(new URL(chatTab.url).origin)}"` : "";
+
   setHTML(app, `
     <div class="view">
       <div class="ahd"><div class="h-title">Your sets</div>
@@ -43,7 +45,7 @@ export async function renderSets() {
         <input id="shareCode" type="text" placeholder="e.g. 7KX2M9QRTA or mafsar.../s/..." autocomplete="off" autocapitalize="off" /></div>
       <button class="btn btn-primary btn-block" data-action="share-lookup">Look up set</button>
       <div id="sharePreview"></div>
-      ${canCaptureAnswer ? `<button class="btn btn-ghost btn-block" data-action="capture-last-answer">✨ Capture last answer</button>` : ""}
+      ${chatTab.ok ? `<button class="btn btn-ghost btn-block" data-action="capture-last-answer"${originAttr}>✨ Capture last answer</button>` : ""}
       <button class="btn btn-ghost btn-block" data-action="capture-current">＋ Capture this page</button>
     </div>`);
   topOfView();
