@@ -315,4 +315,32 @@ test("manifest.json AI chat hosts are in AI_CHAT_HOSTS", () => {
 
 
 
+test("AI Studio is registered in ai-hosts, manifest and content_scripts", () => {
+  assert.ok(AI_CHAT_HOSTS.includes("aistudio.google.com"), "missing from ai-hosts.js");
+  const manifest = JSON.parse(fs.readFileSync(join(__dirname, "../manifest.json"), "utf8"));
+  assert.ok(manifest.host_permissions.includes("https://aistudio.google.com/*"), "missing from host_permissions");
+
+  const group = manifest.content_scripts.find((g) => g.matches.includes("https://aistudio.google.com/*"));
+  assert.ok(group, "missing from content_scripts");
+
+  const js = group.js;
+  const adapterIdx = js.indexOf("src/content/adapters/adapter.js");
+  const aistudioIdx = js.indexOf("src/content/adapters/aistudio.js");
+  const captureIdx = js.indexOf("src/content/capture.js");
+  assert.ok(adapterIdx !== -1 && aistudioIdx !== -1 && captureIdx !== -1);
+  assert.ok(adapterIdx < aistudioIdx, "aistudio.js must load after adapter.js");
+  assert.ok(aistudioIdx < captureIdx, "aistudio.js must load before capture.js");
+});
+
+test("makersuite.google.com is never granted a host permission", () => {
+  // It only 302-redirects to aistudio.google.com, so a permission for it would
+  // widen the install warning for a page that never actually renders.
+  const manifest = JSON.parse(fs.readFileSync(join(__dirname, "../manifest.json"), "utf8"));
+  const all = [
+    ...manifest.host_permissions,
+    ...manifest.content_scripts.flatMap((g) => g.matches || []),
+  ];
+  assert.ok(!all.some((h) => h.includes("makersuite")), "makersuite must not be in the manifest");
+});
+
 console.log(`\n${passed} tests passed`);

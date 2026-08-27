@@ -20,6 +20,7 @@
     "https://chat.openai.com/*",
     "https://claude.ai/*",
     "https://gemini.google.com/*",
+    "https://aistudio.google.com/*",
     "https://mafsar-production.up.railway.app/*"
   ],
   "background": {
@@ -57,10 +58,12 @@
         "https://chatgpt.com/*",
         "https://chat.openai.com/*",
         "https://claude.ai/*",
-        "https://gemini.google.com/*"
+        "https://gemini.google.com/*",
+        "https://aistudio.google.com/*"
       ],
       "js": [
         "src/content/adapters/adapter.js",
+        "src/content/adapters/aistudio.js",
         "src/content/adapters/chatgpt.js",
         "src/content/adapters/claude.js",
         "src/content/adapters/gemini.js",

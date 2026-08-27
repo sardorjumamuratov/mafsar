@@ -3,6 +3,7 @@ export const AI_CHAT_HOSTS = [
   "chat.openai.com",
   "claude.ai",
   "gemini.google.com",
+  "aistudio.google.com",
   "deepseek.com",
   "chat.deepseek.com",
   "poe.com",
