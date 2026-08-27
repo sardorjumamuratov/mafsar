@@ -1,7 +1,8 @@
 import { doImport, previewImport, renderImport } from "./views/import.js";
 import { app, bundle, nav, send, setFor, toast } from "./core.js";
 import { goToActiveTab, registerTabs } from "./nav.js";
-import { importSharedSet, lookupShare, renderSets } from "./views/sets.js";
+import { importSharedSet, lookupShare, renderSets, refreshCaptureAnswerButton } from "./views/sets.js";
+import { onActiveTabChange } from "./tab-watch.js";
 import { currentDetail, makeSet, openDetailTab, paintDetail, promptAddCard, renderSetDetail, saveCardEdit, saveNewCard, setEditingCardId, startQuizForCurrentSet } from "./views/set-detail.js";
 import { captureCurrent, captureLastAnswer } from "./capture.js";
 import { deleteCard, deleteSession, saveStudySet, setExamDate } from "../storage/store.js";
@@ -262,6 +263,7 @@ nav.addEventListener("click", (e) => {
 // --- first-launch auth gate: an account is required (backend-first) ---------
 (async function init() {
   registerTabs({ home: renderHome, sets: renderSets, teams: renderTeams, you: renderYou });
+  onActiveTabChange(() => { refreshCaptureAnswerButton().catch(() => {}); });
   const auth = await getAuth();
   if (!auth?.accessToken) {
     renderAuthGate();

@@ -273,4 +273,27 @@ test("capture.js does not read a bare r.title", () => {
   assert.ok(!file.includes("r.title"));
 });
 
+test("sets.js renders id='captureAnswerBtn' unconditionally", () => {
+  const file = fs.readFileSync(join(__dirname, "../src/ui/views/sets.js"), "utf8");
+  assert.ok(file.includes('id="captureAnswerBtn"'));
+  assert.ok(!file.includes('? `<button class="btn btn-ghost btn-block" id="captureAnswerBtn"'));
+});
+
+test("refreshCaptureAnswerButton uses Math.random() token guard", () => {
+  const file = fs.readFileSync(join(__dirname, "../src/ui/views/sets.js"), "utf8");
+  assert.ok(file.includes('const token = Math.random();'));
+  assert.ok(file.includes('if (captureAnswerToken !== token) return;'));
+});
+
+test("panel.js calls onActiveTabChange exactly once", () => {
+  const file = fs.readFileSync(join(__dirname, "../src/ui/panel.js"), "utf8");
+  const matches = [...file.matchAll(/onActiveTabChange\(/g)];
+  assert.equal(matches.length, 1);
+});
+
+test("service-worker.js contains no tabs.onActivated listener", () => {
+  const file = fs.readFileSync(join(__dirname, "../src/background/service-worker.js"), "utf8");
+  assert.ok(!file.includes("tabs.onActivated"));
+});
+
 console.log(`\n${passed} tests passed`);

@@ -21,6 +21,26 @@ export function setRow(session, s) {
     </div>`;
 }
 
+let captureAnswerToken = 0;
+
+export async function refreshCaptureAnswerButton() {
+  const btn = document.getElementById("captureAnswerBtn");
+  if (!btn) return;
+  
+  const token = Math.random();
+  captureAnswerToken = token;
+  
+  const chatTab = await isAIChatTab();
+  if (captureAnswerToken !== token) return; // stale response
+  
+  btn.classList.toggle("hidden", !chatTab.ok);
+  if (chatTab.url) {
+    btn.dataset.origin = new URL(chatTab.url).origin;
+  } else {
+    delete btn.dataset.origin;
+  }
+}
+
 // ================================================================ SETS
 export async function renderSets() {
   setNav("sets");
@@ -45,7 +65,7 @@ export async function renderSets() {
         <input id="shareCode" type="text" placeholder="e.g. 7KX2M9QRTA or mafsar.../s/..." autocomplete="off" autocapitalize="off" /></div>
       <button class="btn btn-primary btn-block" data-action="share-lookup">Look up set</button>
       <div id="sharePreview"></div>
-      ${chatTab.ok ? `<button class="btn btn-ghost btn-block" data-action="capture-last-answer"${originAttr}>✨ Capture last answer</button>` : ""}
+      <button class="btn btn-ghost btn-block${chatTab.ok ? "" : " hidden"}" id="captureAnswerBtn" data-action="capture-last-answer"${originAttr}>✨ Capture last answer</button>
       <button class="btn btn-ghost btn-block" data-action="capture-current">＋ Capture this page</button>
     </div>`);
   topOfView();
