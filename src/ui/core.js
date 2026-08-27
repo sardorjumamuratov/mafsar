@@ -84,37 +84,38 @@ export function sendToTab(tabId, msg) {
 }
 
 /**
- * Is the active tab a supported AI chat? Used to show "Capture last answer"
- * only where an answer can exist — a button that always fails is worse than one
- * that is not there. A tab with no content script simply never replies.
- *
- * Content scripts run at document_idle, so the panel can open before they are
- * ready. On a supported host we retry the ping up to 2 times with a short
- * delay so the button isn't silently dropped by a race condition.
+ * Known AI-chat hostnames. Checked purely by URL — no messaging needed, so
+ * detection works even before any content script loads. The list is broader
+ * than the adapter list on purpose: the generic extractor handles the rest.
  */
-const CHAT_HOSTS = ["chatgpt.com", "chat.openai.com", "claude.ai", "gemini.google.com"];
-export async function chatTabAvailable() {
+const AI_CHAT_HOSTS = [
+  "chatgpt.com",
+  "chat.openai.com",
+  "claude.ai",
+  "gemini.google.com",
+  "aistudio.google.com",
+  "copilot.microsoft.com",
+  "deepseek.com",
+  "chat.deepseek.com",
+  "poe.com",
+  "perplexity.ai",
+  "grok.com",
+  "huggingface.co",
+  "chat.mistral.ai",
+  "you.com"
+];
+
+export async function isAIChatTab() {
   const tab = await queryActiveTab();
-  if (!tab?.id) return false;
-
-  const resp = await sendToTab(tab.id, { type: "MAFSAR_PING" });
-  if (resp?.ok) return true;
-
-  // Only retry on hosts where a content script is expected.
+  if (!tab?.url) return false;
   try {
-    const host = tab.url ? new URL(tab.url).hostname : "";
-    if (!CHAT_HOSTS.some((h) => host === h || host.endsWith("." + h))) return false;
+    const host = new URL(tab.url).hostname;
+    return AI_CHAT_HOSTS.some(
+      (h) => host === h || host.endsWith("." + h)
+    );
   } catch {
     return false;
   }
-
-  // Content script may still be loading — retry twice with a delay.
-  for (let i = 0; i < 2; i++) {
-    await new Promise((r) => setTimeout(r, 300));
-    const retry = await sendToTab(tab.id, { type: "MAFSAR_PING" });
-    if (retry?.ok) return true;
-  }
-  return false;
 }
 
 export function timeUntil(ts) {

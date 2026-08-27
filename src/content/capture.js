@@ -1,10 +1,9 @@
-// Content script: injects the Mafsar action buttons and reads the chat via the
-// matching site adapter. Sends captured sessions to the service worker.
+// Content script: injects the Mafsar "Save chat" button and reads the chat via
+// the matching site adapter. Sends captured sessions to the service worker.
 //
-// Two capture modes share the adapter's message list:
-//   "Save chat"        - the whole conversation (the original behaviour)
-//   "Save last answer" - only the most recent answer, plus the question that
-//                        produced it (see src/storage/last-answer.js)
+// "Capture last answer" lives in the panel only — the content script still
+// handles the CAPTURE_LAST_ANSWER message so the service worker can use the
+// adapter when one is available.
 (function () {
   const mafsar = (/** @type {any} */ (window)).__mafsar;
   if (!mafsar) return;
@@ -16,7 +15,6 @@
 
   const WRAP_ID = "mafsar-actions";
   const BTN_ID = "mafsar-save-btn";
-  const ANSWER_BTN_ID = "mafsar-answer-btn";
 
   function captureSession() {
     const messages = adapter.getMessages();
@@ -127,10 +125,6 @@
     runCapture(e.currentTarget, captureSession, "Saving & generating…");
   }
 
-  function onSaveAnswerClick(e) {
-    runCapture(e.currentTarget, captureLastAnswerSession, "Saving answer…");
-  }
-
   /**
    * @param {string} id
    * @param {string} label
@@ -152,14 +146,6 @@
     if (document.getElementById(WRAP_ID)) return;
     const wrap = document.createElement("div");
     wrap.id = WRAP_ID;
-    wrap.appendChild(
-      makeButton(
-        ANSWER_BTN_ID,
-        "✨ Save last answer",
-        "Make flashcards from just the most recent answer",
-        onSaveAnswerClick
-      )
-    );
     wrap.appendChild(
       makeButton(
         BTN_ID,
