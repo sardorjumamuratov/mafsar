@@ -177,6 +177,29 @@ async function captureTabAndSave(tabId) {
   return r;
 }
 
+/**
+ * Send a message to a tab and resolve with the reply, or `null` if the tab has
+ * no listener, the listener errors, or it never answers within `timeoutMs`.
+ * The timeout is the important part: every content script here returns `true`
+ * from onMessage, so an unrecognised type leaves the channel open forever.
+ */
+function askTab(tabId, msg, timeoutMs = 4000) {
+  return new Promise((resolve) => {
+    let settled = false;
+    const done = (v) => { if (!settled) { settled = true; resolve(v); } };
+    const timer = setTimeout(() => done(null), timeoutMs);
+    try {
+      chrome.tabs.sendMessage(tabId, msg, (r) => {
+        clearTimeout(timer);
+        done(chrome.runtime.lastError ? null : r);
+      });
+    } catch {
+      clearTimeout(timer);
+      done(null);
+    }
+  });
+}
+
 /** Runs INSIDE the page for generic last-answer extraction. */
 function extractLastAnswerGeneric() {
   const candidates = document.querySelectorAll("div, p, article, section, main");
@@ -360,34 +383,55 @@ async function handle(msg) {
     }
 
     case "CAPTURE_LAST_ANSWER_SMART": {
+      // Content script listeners in this codebase `return true` unconditionally,
+      // which promises an async reply. A script that has no branch for the
+      // message never calls sendResponse, so the callback never fires — without
+      // a timeout the panel would sit on "Capturing…" forever.
       const tabs = await new Promise((resolve) =>
         chrome.tabs.query({ active: true, currentWindow: true }, (t) => resolve(t || []))
       );
       const tab = tabs[0];
       if (!tab?.id) throw new Error("No active tab.");
 
-      // Try pinging the adapter first
-      let ping;
-      try {
-        ping = await new Promise((resolve) => {
-          chrome.tabs.sendMessage(tab.id, { type: "MAFSAR_PING" }, (resp) => {
-            resolve(chrome.runtime.lastError ? null : resp);
-          });
-        });
-      } catch {
-        ping = null;
-      }
+      // Try pinging the adapter first. A short timeout here: a live script
+      // answers instantly, and a slow one must not stall the whole capture.
+      const ping = await askTab(tab.id, { type: "MAFSAR_PING" }, 1500);
 
       if (ping?.ok) {
-        // Adapter is alive, use it
-        const resp = await new Promise((resolve) => {
-          chrome.tabs.sendMessage(tab.id, { type: "CAPTURE_LAST_ANSWER" }, (r) => {
-            resolve(chrome.runtime.lastError ? null : r);
-          });
-        });
-        if (!resp) throw new Error("Content script stopped responding.");
+        // Ask for raw turns and extract here. The worker imports last-answer.js
+        // at the top of this file, so extraction cannot fail just because the
+        // page is missing its copy — the cause of "Mafsar couldn't load".
+        let resp = await askTab(tab.id, { type: "GET_MESSAGES" });
+        if (!resp) {
+          // A content script from an older version has no GET_MESSAGES branch
+          // and never calls sendResponse, so askTab times out. Fall back to the
+          // handler that version does have.
+          const legacy = await askTab(tab.id, { type: "CAPTURE_LAST_ANSWER" });
+          if (!legacy) throw new Error("Content script stopped responding — reload the page.");
+          if (!legacy.ok) throw new Error(legacy.error || "Nothing to capture.");
+          return await saveAndGenerate(legacy.session);
+        }
         if (!resp.ok) throw new Error(resp.error || "Nothing to capture.");
-        return await saveAndGenerate(resp.session);
+        if (resp.generating) throw new Error("Still writing — wait for it to finish.");
+
+        const lastAnswer = globalThis.__mafsarLastAnswer;
+        const result = lastAnswer.extractLastAnswer(resp.messages || []);
+        if (!result.ok) {
+          throw new Error(
+            result.reason === "no-answer"
+              ? "No answer to save yet."
+              : "That answer's too short to make cards from."
+          );
+        }
+        return await saveAndGenerate({
+          source: resp.source,
+          sourceLabel: resp.sourceLabel,
+          title: result.title || resp.title || "Saved answer",
+          url: tab.url || "",
+          capturedAt: Date.now(),
+          captureMode: "answer",
+          messages: lastAnswer.answerMessages(result.question, result.answer),
+        });
       }
 
       // No adapter - use generic extraction

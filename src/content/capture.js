@@ -11,7 +11,17 @@
   const adapter = mafsar.pick();
   if (!adapter) return; // not a supported site
 
-  const lastAnswer = (/** @type {any} */ (window)).__mafsarLastAnswer;
+  /**
+   * Read the extractor lazily, never at load time. Capturing it into a const
+   * when this IIFE runs freezes an undefined for the life of the page if
+   * last-answer.js has not executed yet (injection-order race, a partial
+   * re-inject, or an exception in that file) — and no amount of reloading
+   * recovers, because the reload re-runs the same race. The worker can also do
+   * this extraction itself, so a miss here is no longer fatal.
+   */
+  function getLastAnswer() {
+    return (/** @type {any} */ (window)).__mafsarLastAnswer || null;
+  }
 
   const WRAP_ID = "mafsar-actions";
   const BTN_ID = "mafsar-save-btn";
@@ -47,7 +57,10 @@
   }
 
   function captureLastAnswerSession() {
+    const lastAnswer = getLastAnswer();
     if (!lastAnswer) {
+      // The worker falls back to GET_MESSAGES and extracts on its side, so this
+      // is now only reachable if the worker asked for this message directly.
       return { ok: false, error: "Mafsar couldn't load — reload the page." };
     }
     if (isGenerating()) {
@@ -191,6 +204,22 @@
       sendResponse(captureSession());
     } else if (msg && msg.type === "CAPTURE_LAST_ANSWER") {
       sendResponse(captureLastAnswerSession());
+    } else if (msg && msg.type === "GET_MESSAGES") {
+      // Raw turns, no extraction. The worker imports last-answer.js itself and
+      // decides there, so "capture last answer" no longer depends on this page
+      // having loaded a second copy of that file.
+      try {
+        sendResponse({
+          ok: true,
+          messages: adapter.getMessages(),
+          source: adapter.id,
+          sourceLabel: adapter.label,
+          title: (adapter.getTitle && adapter.getTitle()) || "",
+          generating: isGenerating(),
+        });
+      } catch (e) {
+        sendResponse({ ok: false, error: "Couldn't read this page — no conversation found." });
+      }
     } else if (msg && msg.type === "MAFSAR_PING") {
       // Lets the panel show its "Capture last answer" button only where an
       // answer can exist. No reply at all (non-chat tab) reads as "hide it".

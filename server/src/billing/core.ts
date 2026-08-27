@@ -21,6 +21,36 @@ export function parseEnvLimit(raw: string | undefined, def: number | null): numb
   return Number.isFinite(n) && n >= 0 ? n : def;
 }
 
+/**
+ * Accounts that bypass every quota, listed by email in ADMIN_EMAILS
+ * (comma-separated). Keyed on email rather than a user id because ids are
+ * random `uid()` strings — there is no stable "first user" row to point at —
+ * and kept in the environment rather than the repo so the owner's address is
+ * not committed and access can be revoked without a deploy.
+ */
+export function isAdminEmail(email: string | null | undefined): boolean {
+  if (!email) return false;
+  const raw = process.env.ADMIN_EMAILS;
+  if (!raw) return false;
+  const target = email.trim().toLowerCase();
+  return raw
+    .split(",")
+    .map((s) => s.trim().toLowerCase())
+    .filter(Boolean)
+    .includes(target);
+}
+
+/**
+ * The plan a user is actually served, which is their stored plan unless they
+ * are an admin. Admins resolve to "pro" (unlimited) without their `plan`
+ * column being rewritten, so revoking admin returns them to whatever they
+ * genuinely pay for.
+ */
+export function effectivePlan(plan: string | null | undefined, email?: string | null): string {
+  if (isAdminEmail(email)) return "pro";
+  return plan || "free";
+}
+
 export function planLimits(plan: string): PlanLimits {
   const base = PLANS[plan] || PLANS.free;
   if (plan === "free") {
@@ -122,22 +152,20 @@ export function matchPriceId(priceId: string, envValue: string | undefined): boo
 export function requireQuota(db: DB, category: "set" | "coding" | "practice") {
   return async (c: Context, next: Next) => {
     const userId = c.get("userId") as string;
-    const user = await one<{ plan: string }>(
+    const user = await one<{ plan: string; email: string }>(
       db,
-      "SELECT plan FROM users WHERE id = ?",
+      "SELECT plan, email FROM users WHERE id = ?",
       [userId]
     );
-    const plan = user?.plan || "free";
+    const plan = effectivePlan(user?.plan, user?.email);
     const limits = planLimits(plan);
     const limit = limits[category];
     
     let eventId = "";
 
     if (limit !== null && limits.window !== null) {
-      // Atomic check and insert in one transaction
-      // SQLite transactions are serialized. Using `db.execute` if available, or just generic execute.
-      // Wait, we only have `run` and `one`. So we must use a single SQL statement for the check?
-      // Since SQLite doesn't let us conditionally INSERT easily without INSERT INTO ... SELECT, let's do:
+      // One statement, so the count and the insert cannot interleave: the row
+      // only lands if the window is still under the limit at write time.
       eventId = uid();
       const res = await run(
         db,

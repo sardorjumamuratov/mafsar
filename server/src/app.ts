@@ -12,7 +12,7 @@ import { nowISO, one, all, run, uid } from "./db.js";
 import { genTeamCode, leaderboardFor, learningFor } from "./teams.js";
 import { generateStudySet, gradeAnswer, generateHypothetical, summarizeConversation, setBlurb, generateCodingTask, gradeCode } from "./llm.js";
 import { PRIVACY_HTML } from "./privacy.js";
-import { getProvider, billingConfigured, requireQuota, usageSummary, resolveOrigin, applyPlanChange, stripeProvider, paddleProvider, NoSubscriptionError } from "./billing/index.js";
+import { getProvider, billingConfigured, requireQuota, usageSummary, effectivePlan, resolveOrigin, applyPlanChange, stripeProvider, paddleProvider, NoSubscriptionError } from "./billing/index.js";
 
 export function createApp(db: DB) {
   const app = new Hono<{ Variables: { userId: string } }>();
@@ -168,8 +168,11 @@ export function createApp(db: DB) {
       db, "SELECT id, email, created_at, plan FROM users WHERE id = ?", [userId]
     );
     if (!user) return c.json({ error: "not_found" }, 404);
-    const usage = await usageSummary(db, userId, user.plan || "free");
-    return c.json({ user, usage: { ...usage, plan: user.plan || "free" } });
+    // Report the plan the user is actually served, so an admin's panel shows
+    // unlimited rather than a free-tier meter they will never hit.
+    const plan = effectivePlan(user.plan, user.email);
+    const usage = await usageSummary(db, userId, plan);
+    return c.json({ user, usage: { ...usage, plan } });
   });
 
   app.post("/v1/sync", async (c) => {
