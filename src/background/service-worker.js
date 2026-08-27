@@ -176,6 +176,110 @@ async function captureTabAndSave(tabId) {
   return r;
 }
 
+/** Runs INSIDE the page for generic last-answer extraction. */
+function extractLastAnswerGeneric() {
+  const blocks = [];
+  // Find all elements that look like chat messages
+  document.querySelectorAll('div, p, article, section').forEach(el => {
+    const htmlEl = /** @type {HTMLElement} */ (el);
+    // Only grab elements that actually have text and aren't hidden
+    if (htmlEl.offsetParent === null) return;
+    const text = (htmlEl.innerText || "").trim();
+    if (!text || text.length < 10) return;
+
+    // We only care about leaf-like elements or direct message wrappers to avoid double-counting
+    // This is a naive heuristic: if this element's text is roughly the same as a parent's,
+    // we only keep the parent. We filter out duplicates later.
+    blocks.push({ el: htmlEl, text });
+  });
+
+  // Filter overlapping parents (keep the highest node that contains the message)
+  // This is a very rough heuristic for arbitrary sites.
+  let leafBlocks = [];
+  for (let i = 0; i < blocks.length; i++) {
+    let isChild = false;
+    for (let j = 0; j < blocks.length; j++) {
+      if (i !== j && blocks[j].el.contains(blocks[i].el)) {
+        isChild = true;
+        break;
+      }
+    }
+    if (!isChild) leafBlocks.push(blocks[i]);
+  }
+
+  // Filter out tiny UI elements
+  leafBlocks = leafBlocks.filter(b => b.text.length > 30);
+
+  if (leafBlocks.length < 1) {
+    // Ultimate fallback: just return the page text like CAPTURE_UNIVERSAL
+    return { ok: false, fallback: true };
+  }
+
+  // The last block is typically the AI's answer
+  const answer = leafBlocks[leafBlocks.length - 1].text;
+  
+  // The block before that is typically the user's question
+  const question = leafBlocks.length >= 2 ? leafBlocks[leafBlocks.length - 2].text : null;
+  
+  if (answer.length < 100) {
+    return { ok: false, error: "That answer's too short to make cards from." };
+  }
+
+  return { ok: true, question, answer, title: document.title };
+}
+
+async function captureLastAnswerGeneric(tabId, url, host) {
+  let result;
+  try {
+    const results = await new Promise((resolve, reject) => {
+      chrome.scripting.executeScript({ target: { tabId }, func: extractLastAnswerGeneric }, (r) =>
+        chrome.runtime.lastError ? reject(new Error(chrome.runtime.lastError.message)) : resolve(r)
+      );
+    });
+    result = results?.[0]?.result;
+  } catch {
+    throw new Error("Can't read this page. Try reloading.");
+  }
+  
+  if (!result || !result.ok) {
+    if (result && result.fallback) {
+      // Fallback to full page text
+      return await captureTabAndSave(tabId);
+    }
+    throw new Error(result?.error || "Couldn't find an answer here.");
+  }
+
+  const qStr = result.question ? String(result.question).trim() : null;
+  const aStr = String(result.answer).trim();
+
+  // Simple title generation (copied from last-answer.js)
+  let title = result.title || host;
+  if (qStr) {
+    title = qStr.length <= 80 ? qStr : qStr.slice(0, 80) + "…";
+  } else {
+    const flat = aStr.replace(/\s+/g, " ").trim();
+    const m = flat.match(/^(.{20,}?[.!?])(?:\s|$)/);
+    const first = m ? m[1] : flat;
+    title = first.length <= 80 ? first : first.slice(0, 80) + "…";
+  }
+
+  const session = {
+    source: "generic",
+    sourceLabel: host,
+    title,
+    url,
+    capturedAt: Date.now(),
+    captureMode: "answer",
+    messages: qStr 
+      ? [{ role: "user", text: qStr }, { role: "assistant", text: aStr }]
+      : [{ role: "assistant", text: aStr }]
+  };
+
+  const r = await saveAndGenerate(session);
+  if (!r.generated) throw new Error(r.reason || "generation-failed");
+  return r;
+}
+
 function registerContextMenus() {
   if (!chrome.contextMenus) return;
   chrome.contextMenus.removeAll(() => {
@@ -237,6 +341,43 @@ async function handle(msg) {
       );
       if (!tabs[0]?.id) throw new Error("No active tab.");
       return await captureTabAndSave(tabs[0].id);
+    }
+
+    case "CAPTURE_LAST_ANSWER_SMART": {
+      const tabs = await new Promise((resolve) =>
+        chrome.tabs.query({ active: true, currentWindow: true }, (t) => resolve(t || []))
+      );
+      const tab = tabs[0];
+      if (!tab?.id) throw new Error("No active tab.");
+
+      // Try pinging the adapter first
+      let ping;
+      try {
+        ping = await new Promise((resolve) => {
+          chrome.tabs.sendMessage(tab.id, { type: "MAFSAR_PING" }, (resp) => {
+            resolve(chrome.runtime.lastError ? null : resp);
+          });
+        });
+      } catch {
+        ping = null;
+      }
+
+      if (ping?.ok) {
+        // Adapter is alive, use it
+        const resp = await new Promise((resolve) => {
+          chrome.tabs.sendMessage(tab.id, { type: "CAPTURE_LAST_ANSWER" }, (r) => {
+            resolve(chrome.runtime.lastError ? null : r);
+          });
+        });
+        if (!resp) throw new Error("Content script stopped responding.");
+        if (!resp.ok) throw new Error(resp.error || "Nothing to capture.");
+        return await saveAndGenerate(resp.session);
+      }
+
+      // No adapter - use generic extraction
+      let host = "web";
+      try { host = new URL(tab.url).hostname.replace(/^www\./, ""); } catch {}
+      return await captureLastAnswerGeneric(tab.id, tab.url, host);
     }
 
     case "IMPORT_CARDS": {

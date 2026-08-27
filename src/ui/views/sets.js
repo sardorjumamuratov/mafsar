@@ -1,4 +1,4 @@
-import { app, bundle, chatTabAvailable, esc, send, setFor, setHTML, sourceLabel, summarize, toast, topOfView } from "../core.js";
+import { app, bundle, isAIChatTab, esc, send, setFor, setHTML, sourceLabel, summarize, toast, topOfView } from "../core.js";
 import { setNav, showChrome } from "../nav.js";
 import { parseShareCode } from ".././share-link.js";
 import { setSharedPreview, sharedPreview } from "../views/teams.js";
@@ -27,7 +27,7 @@ export async function renderSets() {
   showChrome(true);
   const { sessions, studySets } = await bundle();
   // Only offered on a supported chat tab — elsewhere there's no "last answer".
-  const canCaptureAnswer = await chatTabAvailable();
+  const canCaptureAnswer = await isAIChatTab();
   setHTML(app, `
     <div class="view">
       <div class="ahd"><div class="h-title">Your sets</div>

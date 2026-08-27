@@ -83,16 +83,24 @@ export function sendToTab(tabId, msg) {
   });
 }
 
+import { AI_CHAT_HOSTS } from "./ai-hosts.js";
+
 /**
- * Is the active tab a supported AI chat? Used to show "Capture last answer"
- * only where an answer can exist — a button that always fails is worse than one
- * that is not there. A tab with no content script simply never replies.
+ * Known AI-chat hostnames. Checked purely by URL — no messaging needed, so
+ * detection works even before any content script loads. The list is broader
+ * than the adapter list on purpose: the generic extractor handles the rest.
  */
-export async function chatTabAvailable() {
+export async function isAIChatTab() {
   const tab = await queryActiveTab();
-  if (!tab?.id) return false;
-  const resp = await sendToTab(tab.id, { type: "MAFSAR_PING" });
-  return !!resp?.ok;
+  if (!tab?.url) return false;
+  try {
+    const host = new URL(tab.url).hostname;
+    return AI_CHAT_HOSTS.some(
+      (h) => host === h || host.endsWith("." + h)
+    );
+  } catch {
+    return false;
+  }
 }
 
 export function timeUntil(ts) {

@@ -32,26 +32,12 @@ function shortTitle(title, max = 40) {
 
 // ================================================================ capture last answer
 export async function captureLastAnswer() {
-  const tab = await queryActiveTab();
-  if (!tab?.id) return toast("Open an AI chat to capture from.");
-
-  // The content script does the extraction and every refusal check, so a
-  // rejection here costs nothing — no request has been made yet.
-  const resp = await sendToTab(tab.id, { type: "CAPTURE_LAST_ANSWER" });
-  if (!resp) return toast("Open a ChatGPT, Claude, or Gemini tab first.");
-  if (!resp.ok) return toast(resp.error || "Nothing to capture.");
-
-  // Deliberately no CAPTURE_UNIVERSAL fallback: quietly saving the whole page
-  // when the user asked for one answer gives them the opposite of what they
-  // clicked, and bills them a generation for it.
   toast("Capturing…");
   try {
-    const r = await send({ type: "SAVE_AND_GENERATE", payload: resp.session });
-    // Two capture buttons sit side by side, so naming what was saved is what
-    // makes either of them trustworthy.
-    const name = shortTitle(resp.session.title);
+    const r = await send({ type: "CAPTURE_LAST_ANSWER_SMART" });
+    const name = shortTitle(r.title);
     if (r.generated) toast(`Saved "${name}" · ${r.cards} cards`);
-    else toast(r.reason || `Saved "${name}", but we couldn\'t make flashcards.`);
+    else toast(r.reason || `Saved "${name}", but we couldn't make flashcards.`);
     renderHome();
   } catch (e) {
     toast(e.message);
