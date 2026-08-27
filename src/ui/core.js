@@ -83,28 +83,13 @@ export function sendToTab(tabId, msg) {
   });
 }
 
+import { AI_CHAT_HOSTS } from "./ai-hosts.js";
+
 /**
  * Known AI-chat hostnames. Checked purely by URL — no messaging needed, so
  * detection works even before any content script loads. The list is broader
  * than the adapter list on purpose: the generic extractor handles the rest.
  */
-const AI_CHAT_HOSTS = [
-  "chatgpt.com",
-  "chat.openai.com",
-  "claude.ai",
-  "gemini.google.com",
-  "aistudio.google.com",
-  "copilot.microsoft.com",
-  "deepseek.com",
-  "chat.deepseek.com",
-  "poe.com",
-  "perplexity.ai",
-  "grok.com",
-  "huggingface.co",
-  "chat.mistral.ai",
-  "you.com"
-];
-
 export async function isAIChatTab() {
   const tab = await queryActiveTab();
   if (!tab?.url) return false;
