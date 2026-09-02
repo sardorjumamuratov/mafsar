@@ -75,11 +75,31 @@ export function queryActiveTab() {
     chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => resolve(tabs && tabs[0]));
   });
 }
-export function sendToTab(tabId, msg) {
+/**
+ * Ask a tab something, resolving `null` if it has no listener, errors, or never
+ * answers within `timeoutMs`.
+ *
+ * The timeout is load-bearing. Every content script here ends its onMessage
+ * handler with `return true`, which promises an async reply — so a script that
+ * has no branch for this message type never calls sendResponse and the
+ * callback never fires. Without a deadline, isAIChatTab() would await forever
+ * against an older content script left in an open tab, and renderSets() would
+ * never finish painting: a permanently blank Sets view.
+ */
+export function sendToTab(tabId, msg, timeoutMs = 2000) {
   return new Promise((resolve) => {
-    chrome.tabs.sendMessage(tabId, msg, (resp) => {
-      resolve(chrome.runtime.lastError ? null : resp);
-    });
+    let settled = false;
+    const done = (v) => { if (!settled) { settled = true; resolve(v); } };
+    const timer = setTimeout(() => done(null), timeoutMs);
+    try {
+      chrome.tabs.sendMessage(tabId, msg, (resp) => {
+        clearTimeout(timer);
+        done(chrome.runtime.lastError ? null : resp);
+      });
+    } catch {
+      clearTimeout(timer);
+      done(null);
+    }
   });
 }
 

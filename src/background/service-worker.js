@@ -294,6 +294,7 @@ async function captureLastAnswerGeneric(tabId, url, host) {
   const rawAns = String(result.answer).trim();
 
   const la = globalThis.__mafsarLastAnswer;
+  if (!la) throw new Error("Mafsar couldn't load the extractor — reload the extension.");
   const aStr = la.cleanAnswerText(rawAns);
 
   if (aStr.length < la.MIN_ANSWER_CHARS) {
@@ -383,10 +384,6 @@ async function handle(msg) {
     }
 
     case "CAPTURE_LAST_ANSWER_SMART": {
-      // Content script listeners in this codebase `return true` unconditionally,
-      // which promises an async reply. A script that has no branch for the
-      // message never calls sendResponse, so the callback never fires — without
-      // a timeout the panel would sit on "Capturing…" forever.
       const tabs = await new Promise((resolve) =>
         chrome.tabs.query({ active: true, currentWindow: true }, (t) => resolve(t || []))
       );
@@ -414,7 +411,15 @@ async function handle(msg) {
         if (!resp.ok) throw new Error(resp.error || "Nothing to capture.");
         if (resp.generating) throw new Error("Still writing — wait for it to finish.");
 
+        // Guard the global rather than assuming the side-effect import ran.
+        // An unguarded read here would throw a bare TypeError — reintroducing
+        // the opaque failure this whole path exists to remove.
         const lastAnswer = globalThis.__mafsarLastAnswer;
+        if (!lastAnswer) {
+          const legacy = await askTab(tab.id, { type: "CAPTURE_LAST_ANSWER" });
+          if (!legacy?.ok) throw new Error(legacy?.error || "Couldn't read the last answer.");
+          return await saveAndGenerate(legacy.session);
+        }
         const result = lastAnswer.extractLastAnswer(resp.messages || []);
         if (!result.ok) {
           throw new Error(

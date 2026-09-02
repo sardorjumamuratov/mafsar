@@ -31,16 +31,27 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 22
-      # Pure-logic suites for the extension (readiness math, SM-2 clamping,
-      # weak-topic ranking, sync mapping, store tombstones/regression,
-      # share/team link formatting and parsing).
-      - run: node tests/client-logic.test.mjs
-      - run: node tests/sync-map.test.mjs
-      - run: node tests/store.test.mjs
-      - run: node tests/share-link.test.mjs
-      - run: node tests/teams-ui.test.mjs
-      - run: node tests/ui-static.test.mjs
-      - run: node tests/billing.test.mjs
+      # Every pure-logic suite for the extension — discovered, not listed.
+      # A hand-maintained list silently dropped six suites (coding, srs,
+      # quiz-lengths, google-signin, last-answer, messaging): they existed and
+      # passed locally while CI never ran them. Globbing makes a new suite
+      # covered the moment it is added.
+      - name: Extension logic suites
+        run: |
+          shopt -s nullglob
+          found=0
+          fail=0
+          for f in tests/*.test.mjs; do
+            found=$((found + 1))
+            echo "::group::$f"
+            node "$f" || fail=1
+            echo "::endgroup::"
+          done
+          if [ "$found" -eq 0 ]; then
+            echo "::error::No test suites matched tests/*.test.mjs"; exit 1
+          fi
+          echo "ran $found suite(s)"
+          exit $fail
       # Syntax-check every extension source file.
       - run: |
           fail=0

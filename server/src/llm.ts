@@ -260,7 +260,7 @@ async function callJson(system: string, user: string): Promise<any> {
       lastErr = e;
     }
   }
-  throw new Error(`Couldn't parse model response: ${lastErr instanceof Error ? lastErr.message : "unknown"}`);
+  throw new LLMError(`Couldn't parse model response: ${lastErr instanceof Error ? lastErr.message : "unknown"}`);
 }
 
 function transcript(messages: { role: string; text: string }[]): string {
@@ -293,7 +293,7 @@ export async function generateStudySet(messages: { role: string; text: string }[
     if (flashcards.length || quiz.length) return { flashcards, quiz, mode };
     lastErr = new Error("Model returned no usable cards.");
   }
-  throw new Error(`Generation failed: ${lastErr instanceof Error ? lastErr.message : "unknown"}`);
+  throw new LLMError(`Generation failed: ${lastErr instanceof Error ? lastErr.message : "unknown"}`);
 }
 
 export async function gradeAnswer(question: string, reference: string, answer: string) {
@@ -310,7 +310,7 @@ export async function gradeAnswer(question: string, reference: string, answer: s
 export async function generateHypothetical(concept: string, reference: string) {
   const user = `Concept (flashcard front):\n${concept}\n\nReference (flashcard back):\n${reference}\n\nWrite the exercise now.`;
   const parsed = await callJson(HYPOTHETICAL_PROMPT, user);
-  if (!parsed.scenario || !parsed.rubric) throw new Error("Model returned an incomplete exercise.");
+  if (!parsed.scenario || !parsed.rubric) throw new LLMError("Model returned an incomplete exercise.");
   return { scenario: String(parsed.scenario), rubric: String(parsed.rubric) };
 }
 
@@ -329,7 +329,7 @@ export async function setBlurb(title: string, cardFronts: string[]) {
   const user = `Set title: ${title || "(untitled)"}\n\nCard fronts:\n${fronts}\n\nWrite the blurb now.`;
   const parsed = await callJson(BLURB_PROMPT, user);
   const blurb = String(parsed.blurb || "").replace(/^["']|["']$/g, "").replace(/\.$/, "").trim();
-  if (!blurb) throw new Error("Model returned an empty blurb.");
+  if (!blurb) throw new LLMError("Model returned an empty blurb.");
   return { blurb: blurb.split(/\s+/).slice(0, 8).join(" ") };
 }
 
@@ -398,7 +398,7 @@ export async function generateCodingTask(concept: string, reference: string, lan
     .map((r: any) => String(r).trim())
     .filter(Boolean)
     .slice(0, 4);
-  if (!parsed.scenario || !rubric.length) throw new Error("Model returned an incomplete exercise.");
+  if (!parsed.scenario || !rubric.length) throw new LLMError("Model returned an incomplete exercise.");
 
   return {
     scenario: String(parsed.scenario),

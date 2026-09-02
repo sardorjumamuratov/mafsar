@@ -20,7 +20,9 @@ if (typeof chrome !== "undefined") {
 
   if (chrome.tabs && chrome.tabs.onUpdated) {
     chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
-      if (!tab.active) return;
+      // tab is optional in the onUpdated signature on some engines; an
+      // unguarded read throws inside the listener and kills the watcher.
+      if (!tab || !tab.active) return;
       if (changeInfo.url || changeInfo.status === "complete") {
         schedule();
       }
