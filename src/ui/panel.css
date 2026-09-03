@@ -27,10 +27,17 @@
   --r-lg: 16px;
   --r-md: 12px;
   --r-sm: 9px;
+
+  /* Native widgets — the date picker popup, scrollbars, form controls — are
+     painted by the browser and ignore the custom properties above. Declaring
+     color-scheme is the only way to make them follow the panel's theme instead
+     of Chrome's own UI theme. */
+  color-scheme: light;
 }
 
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) {
+    color-scheme: dark;
     --bg: #0c1312;
     --surface: #141d1b;
     --surface-2: #1c2725;
@@ -53,6 +60,7 @@
 }
 
 :root[data-theme="dark"] {
+  color-scheme: dark;
   --bg: #0c1312;
   --surface: #141d1b;
   --surface-2: #1c2725;
@@ -1030,6 +1038,20 @@ body {
 .date-input:focus-visible {
   outline: 2px solid var(--primary);
   outline-offset: 1px;
+}
+
+/* The calendar glyph is a browser-drawn icon; without a filter it can render
+   near-invisible against --surface-2. accent-color tints the picker's selected
+   day to match the app. */
+.date-input {
+  accent-color: var(--primary);
+}
+.date-input::-webkit-calendar-picker-indicator {
+  cursor: pointer;
+  opacity: 0.65;
+}
+.date-input::-webkit-calendar-picker-indicator:hover {
+  opacity: 1;
 }
 .exam-actions {
   display: flex;

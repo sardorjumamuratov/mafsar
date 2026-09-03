@@ -110,6 +110,46 @@ export async function getStudySets() {
     }));
 }
 
+// --- pure selectors over an already-loaded raw read ---------------------------
+// Same tombstone rules as the async getters above, but with no I/O, so a caller
+// that has done one multi-key read can derive everything without going back to
+// chrome.storage. Keep these and the getters in step: if a tombstone rule
+// changes in one, change it in the other.
+
+/** @param {any} raw result of readRaw([...]) */
+export function selectStudySets(raw) {
+  const sets = raw?.[KEYS.STUDY_SETS] || [];
+  return sets
+    .filter((s) => !s.deleted)
+    .map((s) => ({
+      ...s,
+      flashcards: (s.flashcards || []).filter((c) => !c.deleted),
+      quiz: (s.quiz || []).filter((q) => !q.deleted),
+    }));
+}
+
+/** @param {any} raw result of readRaw([...]) */
+export function selectSessions(raw) {
+  const sessions = raw?.[KEYS.SESSIONS] || [];
+  const sets = raw?.[KEYS.STUDY_SETS] || [];
+  const deleted = new Set(sets.filter((s) => s.deleted).map((s) => s.sessionId));
+  return sessions.filter((s) => !deleted.has(s.id));
+}
+
+/** @param {any} raw result of readRaw([...]) */
+export function selectSettings(raw) {
+  return { ...DEFAULT_SETTINGS, ...(raw?.[KEYS.SETTINGS] || {}) };
+}
+
+/** All five keys the panel's bundle() needs, in one read. */
+export const BUNDLE_KEYS = [
+  KEYS.SETTINGS,
+  KEYS.SESSIONS,
+  KEYS.STUDY_SETS,
+  KEYS.ACTIVITY,
+  KEYS.REVIEW_LOG,
+];
+
 export async function getStudySetForSession(sessionId) {
   const sets = await get(KEYS.STUDY_SETS, []);
   const found = sets.find((s) => s.sessionId === sessionId);

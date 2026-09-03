@@ -433,4 +433,44 @@ test("every slot refresher re-checks the slot after awaiting", () => {
   }
 });
 
+test("bundle() does one multi-key read, not six", () => {
+  const core = fs.readFileSync(join(__dirname, "../src/ui/core.js"), "utf8");
+  const start = core.indexOf("export async function bundle()");
+  assert.ok(start > -1, "bundle() not found");
+  const body = core.slice(start, core.indexOf("\n}", start));
+  assert.ok(body.includes("readRaw(BUNDLE_KEYS)"), "must use a single multi-key read");
+  for (const banned of ["getSessions()", "getStudySets()", "getReviewLog()", "getActivity()"]) {
+    assert.ok(!body.includes(banned), `bundle() must not call ${banned} — each is its own IPC`);
+  }
+});
+
+test("the in-flight coalescer is not a cache", () => {
+  const core = fs.readFileSync(join(__dirname, "../src/ui/core.js"), "utf8");
+  assert.ok(core.includes("bundleInFlight = null"), "must clear once the read settles");
+  assert.ok(core.includes("finally"), "clearing must be in a finally, so a failed read cannot wedge it");
+});
+
+test("the DOMParser is constructed once, not per render", () => {
+  const core = fs.readFileSync(join(__dirname, "../src/ui/core.js"), "utf8");
+  assert.equal((core.match(/new DOMParser\(\)/g) || []).length, 1, "exactly one construction");
+  assert.ok(!core.includes("new DOMParser().parseFromString"), "must not build one per call");
+});
+
+test("pure selectors apply the same tombstone rules as the async getters", () => {
+  const store = fs.readFileSync(join(__dirname, "../src/storage/store.js"), "utf8");
+  for (const name of ["selectStudySets", "selectSessions", "selectSettings", "BUNDLE_KEYS"]) {
+    assert.ok(store.includes(name), `${name} must be exported from store.js`);
+  }
+  const sel = store.slice(store.indexOf("export function selectStudySets"));
+  assert.ok(sel.includes("!c.deleted"), "selector must hide tombstoned cards");
+  assert.ok(sel.includes("!q.deleted"), "selector must hide tombstoned quiz rows");
+});
+
+test("native widgets follow the panel theme", () => {
+  const css = fs.readFileSync(join(__dirname, "../src/ui/panel.css"), "utf8");
+  assert.ok(css.includes("color-scheme: light"), "light theme must declare color-scheme");
+  assert.ok(css.includes("color-scheme: dark"), "dark theme must declare color-scheme");
+  assert.ok(css.includes("accent-color"), "the picker should use the app accent");
+});
+
 console.log(`\n${passed} tests passed`);

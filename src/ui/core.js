@@ -1,4 +1,4 @@
-import { getActivity, getReviewLog, getSessions, getSettings, getStudySets } from "../storage/store.js";
+import { BUNDLE_KEYS, readRaw, selectSessions, selectSettings, selectStudySets } from "../storage/store.js";
 import { isDue, masteryOf } from "../storage/srs.js";
 
 export const app = document.getElementById("app");
@@ -18,8 +18,12 @@ export const esc = (s) =>
 // fragment the callers insert. (Assigning to a live element's DOM-HTML would
 // be equally inert for scripts but is flagged by addons-linter, which can't
 // see the escaping above.)
+// One parser for the life of the panel — constructing one per render is pure
+// overhead, and it is stateless between parseFromString calls.
+const PARSER = new DOMParser();
+
 export function fragment(html) {
-  const parsed = new DOMParser().parseFromString(html, "text/html");
+  const parsed = PARSER.parseFromString(html, "text/html");
   const frag = document.createDocumentFragment();
   frag.append(...parsed.body.childNodes);
   return frag;
@@ -174,15 +178,40 @@ export function sourceLabel(session) {
 }
 
 // ---------------------------------------------------------------- data
+/**
+ * One multi-key storage read for a whole view render.
+ *
+ * This used to issue six separate chrome.storage.local.get calls — five here
+ * plus a second studySets read hidden inside getSessions() — deserialising the
+ * full card corpus twice per navigation. Each get is async IPC to the browser
+ * process, and that stack-up was the visible delay when switching tabs.
+ *
+ * Concurrent callers share one read: several helpers call bundle() while a
+ * single render is in flight, and there is no reason for each to pay again.
+ */
+let bundleInFlight = null;
+
 export async function bundle() {
-  const [sessions, studySets, activity, settings, reviewLog] = await Promise.all([
-    getSessions(),
-    getStudySets(),
-    getActivity(),
-    getSettings(),
-    getReviewLog(),
-  ]);
-  return { sessions, studySets, activity, settings, reviewLog };
+  if (bundleInFlight) return bundleInFlight;
+  bundleInFlight = (async () => {
+    const raw = await readRaw(BUNDLE_KEYS);
+    return {
+      sessions: selectSessions(raw),
+      studySets: selectStudySets(raw),
+      activity: raw.activity || {},
+      settings: selectSettings(raw),
+      reviewLog: raw.reviewLog || [],
+    };
+  })();
+  try {
+    return await bundleInFlight;
+  } finally {
+    // Cleared on the same tick the read settles, so the next navigation always
+    // reads fresh. This coalesces concurrent calls; it is NOT a cache, and it
+    // must not become one — a stale bundle would show a set the user just
+    // deleted.
+    bundleInFlight = null;
+  }
 }
 export const setFor = (sessionId, studySets) => studySets.find((s) => s.sessionId === sessionId) || null;
 
