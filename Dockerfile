@@ -3,7 +3,7 @@
 # takes precedence over Railpack/Nixpacks.
 FROM node:22-slim
 
-WORKDIR /app
+WORKDIR /app/server
 
 # Install deps first (better layer caching). libSQL ships prebuilt linux-x64-gnu
 # binaries, so node:22-slim (Debian/glibc) needs no compilers.
@@ -12,6 +12,7 @@ RUN npm ci
 
 # App source
 COPY server/ ./
+COPY landing/ ../landing/
 
 # Railway injects PORT; the app reads process.env.PORT.
 CMD ["npm", "start"]

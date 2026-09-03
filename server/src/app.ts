@@ -1,4 +1,5 @@
 import { Hono } from "hono";
+import { serveStatic } from "@hono/node-server/serve-static";
 import { cors } from "hono/cors";
 import { randomBytes, createHash, timingSafeEqual } from "node:crypto";
 import type { DB } from "./db.js";
@@ -22,6 +23,12 @@ export function createApp(db: DB) {
 
   // Public — required by the Chrome Web Store / Firefox Add-ons listings.
   app.get("/privacy", (c) => c.html(PRIVACY_HTML));
+
+  // Serve landing page and its assets
+  app.use("/assets/*", serveStatic({ root: "../landing" }));
+  app.get("/", serveStatic({ path: "../landing/index.html" }));
+  app.get("/s/:code", serveStatic({ path: "../landing/index.html" }));
+  app.get("/t/:code", serveStatic({ path: "../landing/index.html" }));
 
   app.use("/v1/*", async (c, next) => {
     // Auth routes are public; everything else under /v1 requires a token.
