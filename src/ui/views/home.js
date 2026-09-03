@@ -64,7 +64,10 @@ export async function renderHome() {
          </div>
          <label class="date-field">
            <span>Exam date</span>
-           <input type="text" placeholder="YYYY-MM-DD" id="homeExamDate" class="date-input" value="${dateInputValue(examDate)}" />
+           <div class="date-mask-wrap">
+             <div class="date-mask-ghost" id="homeExamDate-ghost"></div>
+             <input type="text" id="homeExamDate" class="date-input date-mask-input" value="${dateInputValue(examDate)}" />
+           </div>
          </label>
          <div class="exam-actions">
            <button class="btn btn-ghost btn-sm" data-action="exam-pick">Choose sets</button>
@@ -82,7 +85,10 @@ export async function renderHome() {
          </div>
          <label class="date-field">
            <span>Exam date</span>
-           <input type="text" placeholder="YYYY-MM-DD" id="homeExamDate" class="date-input" value="" />
+           <div class="date-mask-wrap">
+             <div class="date-mask-ghost" id="homeExamDate-ghost"></div>
+             <input type="text" id="homeExamDate" class="date-input date-mask-input" value="" />
+           </div>
          </label>
        </div>`;
 
@@ -165,6 +171,7 @@ export async function renderHome() {
   const hDate = document.getElementById("homeExamDate");
   if (hDate && window.flatpickr) {
     window.flatpickr(hDate, { disableMobile: true, allowInput: true });
+    mountMaskedDate("homeExamDate");
   }
 }
 
@@ -187,7 +194,11 @@ export async function openExamPicker() {
         <div class="h-title" style="font-size:16px">Exam sets</div><span style="width:32px"></span>
       </div>
       <div class="field"><label>Exam date</label>
-        <input type="text" placeholder="YYYY-MM-DD" id="pickerDate" class="date-input" value="${dateInputValue(examDraft.date)}" style="width:auto" /></div>
+        <div class="date-mask-wrap">
+          <div class="date-mask-ghost" id="pickerDate-ghost"></div>
+          <input type="text" id="pickerDate" class="date-input date-mask-input" value="${dateInputValue(examDraft.date)}" style="width:auto" />
+        </div>
+      </div>
       <div class="help" style="margin:0">Pick the sets this exam covers. Selected sets resurface cards before the date and count toward readiness.</div>
       <div class="block" style="padding:6px 14px">
         ${
@@ -217,6 +228,7 @@ export async function openExamPicker() {
   const pDate = document.getElementById("pickerDate");
   if (pDate && window.flatpickr) {
     window.flatpickr(pDate, { disableMobile: true, allowInput: true });
+    mountMaskedDate("pickerDate");
   }
 }
 
@@ -259,3 +271,35 @@ export let shareOpenFor = null; // sessionId whose share block is revealed (surv
 
 export function setExamDraft(v) { examDraft = v; }
 export function setShareOpenFor(v) { shareOpenFor = v; }
+function mountMaskedDate(inputId) {
+  const input = document.getElementById(inputId);
+  const ghost = document.getElementById(inputId + "-ghost");
+  if (!input || !ghost) return;
+  const d = new Date();
+  d.setMonth(d.getMonth() + 1);
+  // Default to 1 month from now
+  const targetDateStr = d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0") + "-" + String(d.getDate()).padStart(2, "0");
+
+  function renderGhost() {
+    const val = input.value;
+    let ghostHtml = "";
+    for (let i = 0; i < targetDateStr.length; i++) {
+      if (i < val.length) {
+        ghostHtml += '<span style="opacity:0">' + targetDateStr[i] + '</span>';
+      } else {
+        ghostHtml += targetDateStr[i];
+      }
+    }
+    setHTML(ghost, ghostHtml);
+  }
+
+  input.addEventListener("input", (e) => {
+    let v = input.value.replace(/[^\d]/g, "");
+    if (v.length > 4) v = v.slice(0, 4) + "-" + v.slice(4);
+    if (v.length > 7) v = v.slice(0, 7) + "-" + v.slice(7);
+    input.value = v.slice(0, 10);
+    renderGhost();
+  });
+  
+  renderGhost();
+}
