@@ -64,7 +64,7 @@ export async function renderHome() {
          </div>
          <label class="date-field">
            <span>Exam date</span>
-           <input type="date" id="homeExamDate" class="date-input" value="${dateInputValue(examDate)}" />
+           <input type="text" id="homeExamDate" class="date-input" value="${dateInputValue(examDate)}" />
          </label>
          <div class="exam-actions">
            <button class="btn btn-ghost btn-sm" data-action="exam-pick">Choose sets</button>
@@ -82,7 +82,7 @@ export async function renderHome() {
          </div>
          <label class="date-field">
            <span>Exam date</span>
-           <input type="date" id="homeExamDate" class="date-input" value="" />
+           <input type="text" id="homeExamDate" class="date-input" value="" />
          </label>
        </div>`;
 
@@ -161,6 +161,11 @@ export async function renderHome() {
       ${reviewedToday ? `<div style="text-align:center;font-size:12px;color:var(--faint)">${reviewedToday} cards reviewed today</div>` : ""}
     </div>`);
   topOfView();
+  
+  const hDate = document.getElementById("homeExamDate");
+  if (hDate && window.flatpickr) {
+    window.flatpickr(hDate, { disableMobile: true });
+  }
 }
 
 // --- Exam set picker (focus view): choose which sets count toward the exam ---
@@ -182,7 +187,7 @@ export async function openExamPicker() {
         <div class="h-title" style="font-size:16px">Exam sets</div><span style="width:32px"></span>
       </div>
       <div class="field"><label>Exam date</label>
-        <input type="date" id="pickerDate" class="date-input" value="${dateInputValue(examDraft.date)}" style="width:auto" /></div>
+        <input type="text" id="pickerDate" class="date-input" value="${dateInputValue(examDraft.date)}" style="width:auto" /></div>
       <div class="help" style="margin:0">Pick the sets this exam covers. Selected sets resurface cards before the date and count toward readiness.</div>
       <div class="block" style="padding:6px 14px">
         ${
@@ -208,6 +213,11 @@ export async function openExamPicker() {
     </div>`);
   topOfView();
   fillMissingBlurbs(withSets, studySets);
+  
+  const pDate = document.getElementById("pickerDate");
+  if (pDate && window.flatpickr) {
+    window.flatpickr(pDate, { disableMobile: true });
+  }
 }
 
 /** Fetch tiny AI blurbs for sets that don't have one; patch rows as they land. */
