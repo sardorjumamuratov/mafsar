@@ -132,6 +132,53 @@ body {
   display: contents;
 }
 
+/* --- skeletons ---------------------------------------------------------
+   Placeholders for slots waiting on the network. Two constraints:
+   - each skeleton must approximate the real content's height, or swapping
+     it out re-introduces the layout jump it exists to prevent;
+   - .skel fades in only after 150ms, so a fast response never flashes a
+     skeleton at the user. Do not reimplement that delay in JS. */
+.skel {
+  display: contents;
+  opacity: 0;
+  animation: sk-in 0.18s ease 0.15s forwards;
+}
+.sk {
+  background: var(--surface-2);
+  border-radius: var(--r-sm);
+  animation: sk-pulse 1.4s ease-in-out infinite;
+}
+/* .setrow without its hover/cursor affordances — nothing here is clickable. */
+.sk-row {
+  display: flex;
+  flex-direction: column;
+  gap: 9px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+  padding: 13px 14px;
+}
+.sk-block {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--r-lg);
+  padding: 16px;
+  margin-bottom: 12px;
+}
+@keyframes sk-in {
+  to {
+    opacity: 1;
+  }
+}
+@keyframes sk-pulse {
+  50% {
+    opacity: 0.45;
+  }
+}
+
 /* --- app header row --- */
 .ahd {
   display: flex;
@@ -909,9 +956,16 @@ body {
 @media (prefers-reduced-motion: reduce) {
   .bar > i,
   .spinner,
-  .genstep.run .tick {
+  .genstep.run .tick,
+  .sk {
     transition: none;
     animation: none;
+  }
+  /* .skel keeps no animation, so make it visible outright rather than
+     leaving it stuck at the opacity:0 the animation would have lifted. */
+  .skel {
+    animation: none;
+    opacity: 1;
   }
 }
 

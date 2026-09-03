@@ -51,7 +51,7 @@ export async function renderTeams() {
     <div class="view teams-view">
       <div class="ahd"><div class="h-title">Teams</div></div>
       <div class="help" style="margin:0">A team is a study group with a shared code: everyone joins, then the leaderboard compares mastered cards.</div>
-      <div id="teamsSlot"><div class="empty">Loading your teams…</div></div>
+      <div id="teamsSlot">${teamsSkeleton()}</div>
 ${teamActionsBlock}
     </div>`);
   topOfView();
@@ -62,6 +62,28 @@ ${teamActionsBlock}
 }
 
 let teamListToken = 0;
+
+/**
+ * One row, not three. A signed-in user with no teams sees this skeleton every
+ * time they open the tab, and it collapses to nothing when the response lands —
+ * so keep the collapse small. Do not "improve" this by adding more rows.
+ */
+function teamsSkeleton() {
+  return `
+    <div class="skel" role="status" aria-label="Loading your teams">
+      <div class="listhd"><div class="sk" style="height:11px;width:80px"></div></div>
+      <div class="sk-row" aria-hidden="true">
+        <div class="top">
+          <div class="sk" style="height:15px;width:48%"></div>
+          <div class="sk" style="height:15px;width:64px"></div>
+        </div>
+        <div class="prog-line">
+          <div class="sk" style="height:11px;width:34%"></div>
+          <div class="sk" style="height:11px;width:36px"></div>
+        </div>
+      </div>
+    </div>`;
+}
 
 /**
  * Fill #teamsSlot after the paint. The slot sits above the create/join actions,

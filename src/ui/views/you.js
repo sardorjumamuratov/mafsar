@@ -22,7 +22,7 @@ export async function renderYou() {
   const auth = await getAuth();
 
   const accountHtml = auth?.user
-    ? `<div id="billingSlot"></div><div class="block" style="display:flex;flex-direction:column;gap:10px">
+    ? `<div id="billingSlot">${billingSkeleton()}</div><div class="block" style="display:flex;flex-direction:column;gap:10px">
          <div style="display:flex;align-items:center;gap:10px">
            <span class="tag dot" style="color:var(--success)"></span>
            <div style="min-width:0">
@@ -72,6 +72,25 @@ export async function renderYou() {
 }
 
 let billingToken = 0;
+
+/**
+ * Approximates the free/plus billing block: title, usage caption, three meter
+ * rows, one button row. The Pro block is shorter, so a Pro user sees a small
+ * settle upward — acceptable, and far better than the empty slot's jump down.
+ */
+function billingSkeleton() {
+  return `
+    <div class="skel" role="status" aria-label="Loading your plan">
+      <div class="sk-block" aria-hidden="true">
+        <div class="sk" style="height:13px;width:96px"></div>
+        <div class="sk" style="height:11px;width:120px"></div>
+        <div class="sk" style="height:6px;width:100%"></div>
+        <div class="sk" style="height:6px;width:100%"></div>
+        <div class="sk" style="height:6px;width:100%"></div>
+        <div class="sk" style="height:31px;width:100%;border-radius:var(--r-md)"></div>
+      </div>
+    </div>`;
+}
 
 /** Backup is a paid feature; the slot renders once the plan is known. */
 function paintBackupSlot(plan) {

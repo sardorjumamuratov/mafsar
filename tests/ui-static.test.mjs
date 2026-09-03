@@ -473,4 +473,43 @@ test("native widgets follow the panel theme", () => {
   assert.ok(css.includes("accent-color"), "the picker should use the app accent");
 });
 
+test("slots show a skeleton, not a text placeholder", () => {
+  const teams = fs.readFileSync(join(__dirname, "../src/ui/views/teams.js"), "utf8");
+  assert.ok(teams.includes("teamsSkeleton()"), "the teams slot must start with a skeleton");
+  assert.ok(!teams.includes("Loading your teams…"), "the text placeholder should be gone");
+
+  const you = fs.readFileSync(join(__dirname, "../src/ui/views/you.js"), "utf8");
+  assert.ok(you.includes("billingSkeleton()"), "the billing slot must start with a skeleton");
+  // An empty billing slot is what makes the account block jump down.
+  assert.ok(
+    !/<div id="billingSlot"><\/div>/.test(you),
+    "billingSlot must not render empty — that is the layout jump this change removes"
+  );
+});
+
+test("skeletons are layout-neutral, delayed, and reduced-motion safe", () => {
+  const css = fs.readFileSync(join(__dirname, "../src/ui/panel.css"), "utf8");
+  const skel = css.slice(css.indexOf(".skel {"), css.indexOf(".sk-row"));
+  assert.ok(skel.includes("display: contents"), ".skel must not become a flex item and add a gap");
+  assert.ok(/animation:[^;]*0\.15s/.test(skel), "the skeleton must fade in on a delay so it cannot flash");
+
+  const rm = css.slice(css.indexOf("@media (prefers-reduced-motion: reduce)"));
+  const block = rm.slice(0, rm.indexOf("\n}\n") + 3);
+  assert.ok(block.includes(".sk"), "the pulse must stop under reduced motion");
+  assert.ok(
+    /\.skel\s*{[^}]*opacity:\s*1/.test(block),
+    "reduced motion kills the fade-in, so .skel needs an explicit opacity:1 or it stays invisible"
+  );
+});
+
+test("skeletons contain no interpolated values", () => {
+  for (const [file, fn] of [["../src/ui/views/teams.js", "teamsSkeleton"], ["../src/ui/views/you.js", "billingSkeleton"]]) {
+    const src = fs.readFileSync(join(__dirname, file), "utf8");
+    const start = src.indexOf(`function ${fn}(`);
+    assert.ok(start > -1, `${fn} not found`);
+    const body = src.slice(start, src.indexOf("\n}", start));
+    assert.ok(!body.includes("${"), `${fn} must be a static template — no unescaped values`);
+  }
+});
+
 console.log(`\n${passed} tests passed`);
