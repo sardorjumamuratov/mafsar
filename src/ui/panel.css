@@ -1557,6 +1557,113 @@ body {
 .or-divider::before, .or-divider::after { content: ''; flex: 1; border-bottom: 1px solid var(--border); }
 .or-divider:not(:empty)::before { margin-right: .5em; }
 .or-divider:not(:empty)::after { margin-left: .5em; }
-[ d a t a - t h e m e = " d a r k " ]   . f l a t p i c k r - c a l e n d a r   {   f i l t e r :   i n v e r t ( 1 )   h u e - r o t a t e ( 1 8 0 d e g )   ! i m p o r t a n t ;   }  
- @ m e d i a   ( p r e f e r s - c o l o r - s c h e m e :   d a r k )   {   : r o o t : n o t ( [ d a t a - t h e m e = " l i g h t " ] )   . f l a t p i c k r - c a l e n d a r   {   f i l t e r :   i n v e r t ( 0 . 9 3 )   h u e - r o t a t e ( 1 8 0 d e g ) ;   }   }   : r o o t [ d a t a - t h e m e = " d a r k " ]   . f l a t p i c k r - c a l e n d a r   {   f i l t e r :   i n v e r t ( 0 . 9 3 )   h u e - r o t a t e ( 1 8 0 d e g ) ;   }  
- 
+/* --- Flatpickr Beautiful Custom Theme --- */
+.flatpickr-calendar {
+  background: var(--surface) !important;
+  color: var(--ink) !important;
+  border: 1px solid var(--border) !important;
+  box-shadow: var(--shadow) !important;
+  border-radius: 12px !important;
+  padding: 6px !important;
+  width: 260px !important;
+  font-family: inherit !important;
+}
+.flatpickr-calendar.arrowTop:before, .flatpickr-calendar.arrowTop:after,
+.flatpickr-calendar.arrowBottom:before, .flatpickr-calendar.arrowBottom:after {
+  display: none !important;
+}
+.flatpickr-months {
+  padding: 2px 0 6px 0 !important;
+}
+.flatpickr-months .flatpickr-month {
+  color: var(--ink) !important;
+  fill: var(--ink) !important;
+  height: 28px !important;
+}
+.flatpickr-current-month {
+  font-size: 14px !important;
+  padding-top: 0 !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  gap: 4px;
+}
+.flatpickr-current-month .flatpickr-monthDropdown-months {
+  background: var(--surface) !important;
+  color: var(--ink) !important;
+  padding: 2px !important;
+  border-radius: 4px !important;
+  border: 1px solid transparent !important;
+  outline: none !important;
+}
+.flatpickr-current-month .flatpickr-monthDropdown-months:hover {
+  background: var(--surface-2) !important;
+}
+.flatpickr-current-month .flatpickr-monthDropdown-months .flatpickr-monthDropdown-month {
+  background-color: var(--surface) !important;
+}
+.flatpickr-current-month input.cur-year {
+  color: var(--ink) !important;
+  font-weight: 600 !important;
+}
+.flatpickr-months .flatpickr-prev-month, .flatpickr-months .flatpickr-next-month {
+  color: var(--ink) !important;
+  fill: var(--muted) !important;
+  height: 28px !important;
+  padding: 4px !important;
+}
+.flatpickr-months .flatpickr-prev-month:hover svg, .flatpickr-months .flatpickr-next-month:hover svg {
+  fill: var(--primary) !important;
+}
+.flatpickr-weekdays {
+  height: 24px !important;
+}
+span.flatpickr-weekday {
+  color: var(--muted) !important;
+  font-size: 11px !important;
+  font-weight: 600 !important;
+}
+.flatpickr-days {
+  width: 100% !important;
+}
+.dayContainer {
+  width: 100% !important;
+  min-width: 0 !important;
+  max-width: none !important;
+  justify-content: space-around !important;
+}
+.flatpickr-day {
+  max-width: 32px !important;
+  height: 32px !important;
+  line-height: 32px !important;
+  font-size: 13px !important;
+  color: var(--ink) !important;
+  border-radius: 8px !important;
+  margin: 1px 0 !important;
+  border: 1px solid transparent !important;
+}
+.flatpickr-day:hover, .flatpickr-day:focus {
+  background: var(--surface-2) !important;
+  border-color: var(--surface-2) !important;
+  color: var(--ink) !important;
+}
+.flatpickr-day.selected, .flatpickr-day.selected:hover, .flatpickr-day.selected:focus {
+  background: var(--primary) !important;
+  border-color: var(--primary) !important;
+  color: #fff !important;
+  font-weight: 600 !important;
+}
+.flatpickr-day.flatpickr-disabled, .flatpickr-day.prevMonthDay, .flatpickr-day.nextMonthDay {
+  color: var(--faint) !important;
+}
+.flatpickr-day.today {
+  border-color: var(--border) !important;
+}
+.flatpickr-day.today:hover, .flatpickr-day.today:focus {
+  border-color: var(--surface-2) !important;
+  background: var(--surface-2) !important;
+  color: var(--ink) !important;
+}
+.date-input[readonly] {
+  cursor: pointer !important;
+}
