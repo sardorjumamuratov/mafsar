@@ -12,6 +12,8 @@ export async function renderHome() {
   setNav("home");
   showChrome(true);
   const { sessions, studySets, activity, settings, reviewLog } = await bundle();
+  const d = new Date(); d.setMonth(d.getMonth() + 1);
+  const nextMonthStr = dateInputValue(d.getTime());
 
   let due = 0,
     mastered = 0,
@@ -64,7 +66,7 @@ export async function renderHome() {
          </div>
          <label class="date-field">
            <span>Exam date</span>
-           <input type="text" placeholder="YYYY-MM-DD" id="homeExamDate" class="date-input" value="${dateInputValue(examDate)}" />
+           <input type="text" placeholder="${nextMonthStr}" id="homeExamDate" class="date-input" value="${dateInputValue(examDate)}" />
          </label>
          <div class="exam-actions">
            <button class="btn btn-ghost btn-sm" data-action="exam-pick">Choose sets</button>
@@ -82,7 +84,7 @@ export async function renderHome() {
          </div>
          <label class="date-field">
            <span>Exam date</span>
-           <input type="text" placeholder="YYYY-MM-DD" id="homeExamDate" class="date-input" value="" />
+           <input type="text" placeholder="${nextMonthStr}" id="homeExamDate" class="date-input" value="" />
          </label>
        </div>`;
 
@@ -173,6 +175,8 @@ export let examDraft = null; // { date: ms|null, picked: Set<sessionId> }
 
 export async function openExamPicker() {
   const { sessions, studySets } = await bundle();
+  const d = new Date(); d.setMonth(d.getMonth() + 1);
+  const nextMonthStr = dateInputValue(d.getTime());
   const withSets = sessions.filter((s) => setFor(s.id, studySets));
   const examSets = studySets.filter((s) => s.examDate && s.examDate > Date.now());
   examDraft = {
@@ -187,7 +191,7 @@ export async function openExamPicker() {
         <div class="h-title" style="font-size:16px">Exam sets</div><span style="width:32px"></span>
       </div>
       <div class="field"><label>Exam date</label>
-        <input type="text" placeholder="YYYY-MM-DD" id="pickerDate" class="date-input" value="${dateInputValue(examDraft.date)}" style="width:auto" /></div>
+        <input type="text" placeholder="${nextMonthStr}" id="pickerDate" class="date-input" value="${dateInputValue(examDraft.date)}" style="width:auto" /></div>
       <div class="help" style="margin:0">Pick the sets this exam covers. Selected sets resurface cards before the date and count toward readiness.</div>
       <div class="block" style="padding:6px 14px">
         ${
