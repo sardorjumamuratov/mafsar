@@ -14,5 +14,7 @@ let registry = {};
 export function registerTabs(r) { registry = r; }
 /** Back-button target for focus views (set detail, exam picker, import): return to whichever bottom-nav tab was active before entering. */
 export function goToActiveTab() {
-  (registry[activeTab] || registry.home)();
+  // Returns the renderer's promise so callers can await the repaint — a
+  // capture holds its "Capturing…" message until the new set is on screen.
+  return (registry[activeTab] || registry.home)();
 }

@@ -53,12 +53,20 @@ export const GOOGLE_G = `<svg class="gicon" xmlns="http://www.w3.org/2000/svg" v
 export const COPY_SVG =
   '<svg class="ic" viewBox="0 0 24 24"><path d="M8 5H6a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-1M8 5a2 2 0 0 0 2 2h2a2 2 0 0 0 2-2M8 5a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2m0 0h2m-2 4h4m-4 4h4"/></svg>';
 
+/**
+ * Show a message. `ms <= 0` keeps it up indefinitely — use that for work whose
+ * duration you cannot predict (a capture waits on an LLM call), and replace it
+ * with a normal toast when the work finishes. Every sticky toast MUST have a
+ * guaranteed replacement on all paths, or it stays on screen forever.
+ */
 export function toast(msg, ms = 2600) {
   const t = document.getElementById("toast");
   t.textContent = msg;
   (/** @type {any} */ (t)).classList.remove("hidden");
   clearTimeout((/** @type {any} */ (toast))._t);
-  (/** @type {any} */ (toast))._t = setTimeout(() => (/** @type {any} */ (t)).classList.add("hidden"), ms);
+  if (ms > 0) {
+    (/** @type {any} */ (toast))._t = setTimeout(() => (/** @type {any} */ (t)).classList.add("hidden"), ms);
+  }
 }
 
 export function send(msg) {

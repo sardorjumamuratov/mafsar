@@ -1,9 +1,9 @@
 import { queryActiveTab, send, sendToTab, toast } from "./core.js";
-import { renderHome } from "./views/home.js";
+import { goToActiveTab } from "./nav.js";
 
 // ================================================================ capture current tab
 export async function captureCurrent() {
-  toast("Capturing…");
+  toast("Capturing…", 0);
   const tab = await queryActiveTab();
   if (!tab?.id) return toast("Open a page to capture first.");
   // Try the site adapter first (clean capture on AI-chat sites)…
@@ -16,9 +16,11 @@ export async function captureCurrent() {
       // …otherwise fall back to universal page-text capture on any site.
       r = await send({ type: "CAPTURE_UNIVERSAL" });
     }
+    // Repaint the view the user is already on, then report — so the message
+    // stays up until the new set is actually visible.
+    await goToActiveTab();
     if (r.generated) toast(`${r.cards} flashcards ready`);
-    else toast(r.reason || "Saved, but we couldn\'t make flashcards. Open the set to try again.");
-    renderHome();
+    else toast(r.reason || "Saved, but we couldn't make flashcards. Open the set to try again.");
   } catch (e) {
     toast(e.message);
   }
@@ -48,13 +50,13 @@ export async function captureLastAnswer(btnElement) {
     }
   }
 
-  toast("Capturing…");
+  toast("Capturing…", 0);
   try {
     const r = await send({ type: "CAPTURE_LAST_ANSWER_SMART" });
     const name = shortTitle(r.session?.title);
+    await goToActiveTab();
     if (r.generated) toast(`Saved "${name}" · ${r.cards} cards`);
     else toast(r.reason || `Saved "${name}", but we couldn't make flashcards.`);
-    renderHome();
   } catch (e) {
     toast(e.message);
   }

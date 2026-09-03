@@ -343,4 +343,27 @@ test("makersuite.google.com is never granted a host permission", () => {
   assert.ok(!all.some((h) => h.includes("makersuite")), "makersuite must not be in the manifest");
 });
 
+test("a sticky toast is only used where a replacement is guaranteed", () => {
+  const core = fs.readFileSync(join(__dirname, "../src/ui/core.js"), "utf8");
+  assert.ok(core.includes("if (ms > 0)"), "toast must support a non-expiring message");
+
+  const cap = fs.readFileSync(join(__dirname, "../src/ui/capture.js"), "utf8");
+  assert.ok(cap.includes('toast("Capturing…", 0)'), "capture should hold its message");
+  // Every sticky toast needs a finite one after it on every path.
+  assert.ok(cap.includes("} catch (e) {"), "capture must catch and replace the sticky toast");
+});
+
+test("capture repaints the current view instead of jumping to Home", () => {
+  const cap = fs.readFileSync(join(__dirname, "../src/ui/capture.js"), "utf8");
+  assert.ok(!cap.includes("renderHome()"), "capture must not navigate to Home");
+  assert.ok(cap.includes("await goToActiveTab()"), "capture must await the repaint");
+  assert.ok(!cap.includes("views/home.js"), "the home import should be gone");
+
+  const nav = fs.readFileSync(join(__dirname, "../src/ui/nav.js"), "utf8");
+  assert.ok(
+    nav.includes("return (registry[activeTab] || registry.home)()"),
+    "goToActiveTab must return the renderer promise so callers can await it"
+  );
+});
+
 console.log(`\n${passed} tests passed`);
