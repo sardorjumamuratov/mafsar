@@ -43,8 +43,19 @@ test("parses a bare code and uppercases it (user input is case-mixed)", () => {
   assert.equal(parseShareCode("  ab12 "), "AB12");
 });
 
+test("parses the code correctly even if the URL has multiple /s/ segments", () => {
+  assert.equal(parseShareCode("https://my-school.edu/s/course/s/7KX2M9QRTA"), "7KX2M9QRTA");
+});
+
+test("parses a code back out of a full /S/{code} URL (case-insensitive path)", () => {
+  assert.equal(parseShareCode("https://mafsar.app/S/7KX2M9QRTA"), "7KX2M9QRTA");
+});
+
+
+
 test("parses the legacy ?code= query form", () => {
   assert.equal(parseShareCode("https://mafsar.app/redeem?code=ab12"), "AB12");
+  assert.equal(parseShareCode("https://mafsar.app/redeem?CODE=cd34"), "CD34");
 });
 
 test("empty or missing input yields an empty string, never undefined", () => {

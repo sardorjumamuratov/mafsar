@@ -25,9 +25,9 @@ function trimBase(base) {
 export function parseShareCode(urlOrCode) {
   const raw = String(urlOrCode ?? "").trim();
   if (!raw) return "";
-  const slash = raw.match(/\/s\/([a-zA-Z0-9]+)/);
-  if (slash) return slash[1].toUpperCase();
-  const query = raw.match(/[?&]code=([a-zA-Z0-9]+)/);
+  const slashes = [...raw.matchAll(/\/s\/([a-zA-Z0-9]+)/gi)];
+  if (slashes.length > 0) return slashes[slashes.length - 1][1].toUpperCase();
+  const query = raw.match(/[?&]code=([a-zA-Z0-9]+)/i);
   if (query) return query[1].toUpperCase();
   return raw.toUpperCase();
 }
@@ -36,7 +36,7 @@ export function parseShareCode(urlOrCode) {
 export function parseTeamCode(urlOrCode) {
   const raw = String(urlOrCode ?? "").trim();
   if (!raw) return "";
-  const slash = raw.match(/\/t\/([a-zA-Z0-9]+)/);
-  if (slash) return slash[1].toUpperCase();
+  const slashes = [...raw.matchAll(/\/t\/([a-zA-Z0-9]+)/gi)];
+  if (slashes.length > 0) return slashes[slashes.length - 1][1].toUpperCase();
   return raw.toUpperCase();
 }
