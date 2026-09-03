@@ -66,7 +66,7 @@ export async function renderHome() {
          </div>
          <label class="date-field">
            <span>Exam date</span>
-           <input type="text" placeholder="${nextMonthStr}" id="homeExamDate" class="date-input" value="${dateInputValue(examDate)}" />
+           <input type="text" placeholder="YYYY-MM-DD" id="homeExamDate" class="date-input" value="${examDate ? dateInputValue(examDate) : nextMonthStr}" />
          </label>
          <div class="exam-actions">
            <button class="btn btn-ghost btn-sm" data-action="exam-pick">Choose sets</button>
@@ -84,7 +84,7 @@ export async function renderHome() {
          </div>
          <label class="date-field">
            <span>Exam date</span>
-           <input type="text" placeholder="${nextMonthStr}" id="homeExamDate" class="date-input" value="" />
+           <input type="text" placeholder="YYYY-MM-DD" id="homeExamDate" class="date-input" value="${nextMonthStr}" />
          </label>
        </div>`;
 
@@ -191,7 +191,7 @@ export async function openExamPicker() {
         <div class="h-title" style="font-size:16px">Exam sets</div><span style="width:32px"></span>
       </div>
       <div class="field"><label>Exam date</label>
-        <input type="text" placeholder="${nextMonthStr}" id="pickerDate" class="date-input" value="${dateInputValue(examDraft.date)}" style="width:auto" /></div>
+        <input type="text" placeholder="YYYY-MM-DD" id="pickerDate" class="date-input" value="${examDraft.date ? dateInputValue(examDraft.date) : nextMonthStr}" style="width:auto" /></div>
       <div class="help" style="margin:0">Pick the sets this exam covers. Selected sets resurface cards before the date and count toward readiness.</div>
       <div class="block" style="padding:6px 14px">
         ${
