@@ -471,6 +471,13 @@ test("native widgets follow the panel theme", () => {
   assert.ok(css.includes("color-scheme: light"), "light theme must declare color-scheme");
   assert.ok(css.includes("color-scheme: dark"), "dark theme must declare color-scheme");
   assert.ok(css.includes("accent-color"), "the picker should use the app accent");
+
+  const html = fs.readFileSync(join(__dirname, "../src/ui/panel.html"), "utf8");
+  assert.ok(html.includes('<meta name="color-scheme"'), "panel.html must declare color-scheme meta tag");
+  assert.ok(
+    css.includes(".date-input") && css.includes("color-scheme: light"),
+    "date-input must declare color-scheme for Firefox"
+  );
 });
 
 test("slots show a skeleton, not a text placeholder", () => {
