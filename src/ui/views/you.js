@@ -21,90 +21,8 @@ export async function renderYou() {
   const streak = computeStreak(activity);
   const auth = await getAuth();
 
-  let billingHtml = "";
-  let globalPlan = "free";
-  if (auth?.user) {
-    try {
-      const { authedFetch } = await import("../../sync/auth.js");
-      const meRes = await authedFetch('/v1/me');
-      const PLAN_COPY = `<div style="font-size:11px;color:var(--muted);text-align:center;margin-top:6px">Plus $2/month, Pro $6/month</div>`;
-        if (meRes.ok) {
-          const data = await meRes.json();
-          const plan = data.usage.plan;
-            globalPlan = plan;
-          const usage = data.usage;
-          if (plan === "free" || plan === "plus") {
-            const winText = usage.window === "day" ? "today" : "this month";
-            
-            const meter = (name, u, l) => {
-               if (l === null) return "";
-               const pct = Math.min(100, Math.max(0, (u / l) * 100));
-               return `
-                 <div style="font-size:12px;color:var(--muted);display:flex;justify-content:space-between">
-                   <span>${name}</span>
-                   <span>${u} of ${l}</span>
-                 </div>
-                 <div class="bar" style="margin-bottom:8px"><i style="width:${pct}%"></i></div>
-               `;
-            };
-
-            const metersHtml = meter("Set generations", usage.set.used, usage.set.limit) +
-                               meter("Coding exercises", usage.coding.used, usage.coding.limit) +
-                               meter("Practice gradings", usage.practice.used, usage.practice.limit);
-
-            const title = plan === "plus" ? "Mafsar Plus" : "Mafsar Free";
-            
-            let btnsHtml = "";
-            if (plan === "free") {
-              btnsHtml = `
-                <div style="display:flex;gap:8px">
-                  <button class="btn btn-primary" style="flex:1;padding:7px 10px;font-size:12.5px;" data-action="billing-checkout" data-plan="plus" data-current-plan="${plan}">Upgrade to Plus</button>
-                  <button class="btn btn-ghost" style="flex:1;padding:7px 10px;font-size:12.5px;" data-action="billing-checkout" data-plan="pro" data-current-plan="${plan}">Upgrade to Pro</button>
-                </div>
-                ${PLAN_COPY}
-              `;
-            } else if (plan === "plus") {
-              btnsHtml = `
-                <div style="display:flex;gap:8px">
-                  <button class="btn btn-ghost" style="flex:1;padding:7px 10px;font-size:12.5px;" data-action="billing-portal">Manage subscription</button>
-                  <button class="btn btn-primary" style="flex:1;padding:7px 10px;font-size:12.5px;" data-action="billing-checkout" data-plan="pro" data-current-plan="${plan}">Upgrade to Pro</button>
-                </div>
-                ${PLAN_COPY}
-              `;
-            }
-
-            billingHtml = `
-              <div class="block" style="display:flex;flex-direction:column;gap:6px;margin-bottom:12px">
-                <div style="font-weight:600;font-size:13px">${title}</div>
-                <div style="font-size:12px;color:var(--muted);margin-bottom:4px">Usage ${winText}</div>
-                ${metersHtml}
-                <div style="margin-top:6px">
-                  ${btnsHtml}
-                </div>
-              </div>
-            `;
-          } else {
-            billingHtml = `
-              <div class="block" style="display:flex;flex-direction:column;gap:10px;margin-bottom:12px">
-                <div style="font-weight:600;font-size:13px;display:flex;align-items:center;gap:6px">
-                  <svg class="ic" viewBox="0 0 24 24" style="color:var(--primary);width:16px;height:16px"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>
-                  Mafsar Pro
-                </div>
-                <div style="font-size:12px;color:var(--muted)">Unlimited generations</div>
-                <button class="btn btn-ghost btn-block" data-action="billing-portal">Manage subscription</button>
-              </div>
-            `;
-          }
-        }
-      } catch (e) {
-      // Session expiry is actionable; other errors (network, 500) shouldn't
-      // block the rest of the You tab from rendering, but the user should know.
-      if (e.message) toast(e.message);
-    }
-  }
-
   const accountHtml = auth?.user
-    ? `${billingHtml}<div class="block" style="display:flex;flex-direction:column;gap:10px">
+    ? `<div id="billingSlot"></div><div class="block" style="display:flex;flex-direction:column;gap:10px">
          <div style="display:flex;align-items:center;gap:10px">
            <span class="tag dot" style="color:var(--success)"></span>
            <div style="min-width:0">
@@ -145,13 +63,122 @@ export async function renderYou() {
       </div>
       ${accountHtml}
             <div class="listhd"><span class="t-label">Backup</span></div>
-      ${globalPlan === "plus" || globalPlan === "pro" ? `<div style="display:flex;gap:10px">
-        <button class="btn btn-ghost" style="flex:1" data-action="export-backup">⇩ Export JSON</button>
-        <button class="btn btn-ghost" style="flex:1" data-action="import-backup">⇪ Restore</button>
-      </div>` : `<div style="font-size:12px;color:var(--muted);text-align:center;padding:10px 0">Available on Plus and Pro plans.</div>`}
+      <div id="backupSlot"></div>
       <input type="file" id="backupFile" accept="application/json,.json" class="hidden" />
     </div>`);
   topOfView();
+  if (auth?.user) refreshBilling().catch(() => {});
+  else paintBackupSlot("free");
+}
+
+let billingToken = 0;
+
+/** Backup is a paid feature; the slot renders once the plan is known. */
+function paintBackupSlot(plan) {
+  const slot = document.getElementById("backupSlot");
+  if (!slot) return;
+  setHTML(
+    slot,
+    plan === "plus" || plan === "pro"
+      ? `<div style="display:flex;gap:10px">
+        <button class="btn btn-ghost" style="flex:1" data-action="export-backup">⇩ Export JSON</button>
+        <button class="btn btn-ghost" style="flex:1" data-action="import-backup">⇪ Restore</button>
+      </div>`
+      : `<div style="font-size:12px;color:var(--muted);text-align:center;padding:10px 0">Available on Plus and Pro plans.</div>`
+  );
+}
+
+/**
+ * Fetch /v1/me and fill the billing and backup slots. Runs after the paint:
+ * awaiting it inline used to hold the entire You tab behind a network round
+ * trip — two of them, when the access token needed refreshing.
+ */
+export async function refreshBilling() {
+  const token = ++billingToken;
+  let billingHtml = "";
+  let globalPlan = "free";
+  try {
+    const { authedFetch } = await import("../../sync/auth.js");
+    const meRes = await authedFetch('/v1/me');
+    const PLAN_COPY = `<div style="font-size:11px;color:var(--muted);text-align:center;margin-top:6px">Plus $2/month, Pro $6/month</div>`;
+      if (meRes.ok) {
+        const data = await meRes.json();
+        const plan = data.usage.plan;
+          globalPlan = plan;
+        const usage = data.usage;
+        if (plan === "free" || plan === "plus") {
+          const winText = usage.window === "day" ? "today" : "this month";
+          
+          const meter = (name, u, l) => {
+             if (l === null) return "";
+             const pct = Math.min(100, Math.max(0, (u / l) * 100));
+             return `
+               <div style="font-size:12px;color:var(--muted);display:flex;justify-content:space-between">
+                 <span>${name}</span>
+                 <span>${u} of ${l}</span>
+               </div>
+               <div class="bar" style="margin-bottom:8px"><i style="width:${pct}%"></i></div>
+             `;
+          };
+
+          const metersHtml = meter("Set generations", usage.set.used, usage.set.limit) +
+                             meter("Coding exercises", usage.coding.used, usage.coding.limit) +
+                             meter("Practice gradings", usage.practice.used, usage.practice.limit);
+
+          const title = plan === "plus" ? "Mafsar Plus" : "Mafsar Free";
+          
+          let btnsHtml = "";
+          if (plan === "free") {
+            btnsHtml = `
+              <div style="display:flex;gap:8px">
+                <button class="btn btn-primary" style="flex:1;padding:7px 10px;font-size:12.5px;" data-action="billing-checkout" data-plan="plus" data-current-plan="${plan}">Upgrade to Plus</button>
+                <button class="btn btn-ghost" style="flex:1;padding:7px 10px;font-size:12.5px;" data-action="billing-checkout" data-plan="pro" data-current-plan="${plan}">Upgrade to Pro</button>
+              </div>
+              ${PLAN_COPY}
+            `;
+          } else if (plan === "plus") {
+            btnsHtml = `
+              <div style="display:flex;gap:8px">
+                <button class="btn btn-ghost" style="flex:1;padding:7px 10px;font-size:12.5px;" data-action="billing-portal">Manage subscription</button>
+                <button class="btn btn-primary" style="flex:1;padding:7px 10px;font-size:12.5px;" data-action="billing-checkout" data-plan="pro" data-current-plan="${plan}">Upgrade to Pro</button>
+              </div>
+              ${PLAN_COPY}
+            `;
+          }
+
+          billingHtml = `
+            <div class="block" style="display:flex;flex-direction:column;gap:6px;margin-bottom:12px">
+              <div style="font-weight:600;font-size:13px">${title}</div>
+              <div style="font-size:12px;color:var(--muted);margin-bottom:4px">Usage ${winText}</div>
+              ${metersHtml}
+              <div style="margin-top:6px">
+                ${btnsHtml}
+              </div>
+            </div>
+          `;
+        } else {
+          billingHtml = `
+            <div class="block" style="display:flex;flex-direction:column;gap:10px;margin-bottom:12px">
+              <div style="font-weight:600;font-size:13px;display:flex;align-items:center;gap:6px">
+                <svg class="ic" viewBox="0 0 24 24" style="color:var(--primary);width:16px;height:16px"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>
+                Mafsar Pro
+              </div>
+              <div style="font-size:12px;color:var(--muted)">Unlimited generations</div>
+              <button class="btn btn-ghost btn-block" data-action="billing-portal">Manage subscription</button>
+            </div>
+          `;
+        }
+      }
+  } catch (e) {
+    // Session expiry is actionable; other errors (network, 500) shouldn't
+    // block the rest of the You tab from rendering, but the user should know.
+    if (e.message) toast(e.message);
+  }
+  if (token !== billingToken) return; // user navigated away mid-flight
+  const slot = document.getElementById("billingSlot");
+  if (!slot) return;
+  setHTML(slot, billingHtml);
+  paintBackupSlot(globalPlan);
 }
 
 // --- account actions ---------------------------------------------------------

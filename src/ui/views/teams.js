@@ -35,31 +35,8 @@ export async function renderTeams() {
     return;
   }
 
-  let teams = [];
-  let loadError = null;
-  try {
-    teams = (await send({ type: "TEAM_LIST" })).teams || [];
-  } catch (e) {
-    loadError = e.message;
-  }
-
-  const listHtml = loadError
-    ? `<div class="empty">Couldn't load your teams.<br><span style="font-size:12px;color:var(--muted)">${esc(loadError)}</span></div>`
-    : teams.length
-    ? teams
-        .map(
-          (t) => `
-        <div class="setrow" data-action="open-team" data-id="${esc((/** @type {any} */ (t)).id)}">
-          <div class="top"><div class="name">${esc(t.name)}</div><span class="tag">${t.memberCount} member${t.memberCount === 1 ? "" : "s"}</span></div>
-          <div class="prog-line"><span>Code ${esc(t.code)}</span><span>Open</span></div>
-        </div>`
-        )
-        .join("")
-    : "";
-
-  const teamsListBlock = teams.length || loadError ? `
-      <div class="listhd"><span class="t-label">Your teams</span></div>
-      ${listHtml}` : "";
+  // The team list comes from the server, so it must not gate the first paint.
+  // It lands in #teamsSlot via refreshTeamList() below.
 
   const teamActionsBlock = `
       <div class="team-actions">
@@ -74,12 +51,56 @@ export async function renderTeams() {
     <div class="view teams-view">
       <div class="ahd"><div class="h-title">Teams</div></div>
       <div class="help" style="margin:0">A team is a study group with a shared code: everyone joins, then the leaderboard compares mastered cards.</div>
-${teams.length ? teamsListBlock + "\n" + teamActionsBlock : teamActionsBlock + "\n" + teamsListBlock}
+      <div id="teamsSlot"><div class="empty">Loading your teams…</div></div>
+${teamActionsBlock}
     </div>`);
   topOfView();
   document.getElementById("teamCode")?.addEventListener("keydown", (e) => {
     if (e.key === "Enter") joinTeamFromInput();
   });
+  refreshTeamList().catch(() => {});
+}
+
+let teamListToken = 0;
+
+/**
+ * Fill #teamsSlot after the paint. The slot sits above the create/join actions,
+ * so with no teams it renders empty and the actions sit at the top — which is
+ * exactly what the old `teams.length ? list + actions : actions + list` swap
+ * achieved, without needing the list to be loaded first.
+ */
+export async function refreshTeamList() {
+  const token = ++teamListToken;
+  let teams = [];
+  let loadError = null;
+  try {
+    teams = (await send({ type: "TEAM_LIST" })).teams || [];
+  } catch (e) {
+    loadError = e.message;
+  }
+  // The user may have switched tabs while the request was in flight.
+  if (token !== teamListToken) return;
+  const slot = document.getElementById("teamsSlot");
+  if (!slot) return;
+
+  const listHtml = loadError
+    ? `<div class="empty">Couldn't load your teams.<br><span style="font-size:12px;color:var(--muted)">${esc(loadError)}</span></div>`
+    : teams
+        .map(
+          (t) => `
+        <div class="setrow" data-action="open-team" data-id="${esc((/** @type {any} */ (t)).id)}">
+          <div class="top"><div class="name">${esc(t.name)}</div><span class="tag">${t.memberCount} member${t.memberCount === 1 ? "" : "s"}</span></div>
+          <div class="prog-line"><span>Code ${esc(t.code)}</span><span>Open</span></div>
+        </div>`
+        )
+        .join("");
+
+  setHTML(
+    slot,
+    teams.length || loadError
+      ? `<div class="listhd"><span class="t-label">Your teams</span></div>${listHtml}`
+      : ""
+  );
 }
 
 export function renderTeamCreate() {

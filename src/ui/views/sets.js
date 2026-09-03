@@ -46,9 +46,9 @@ export async function renderSets() {
   setNav("sets");
   showChrome(true);
   const { sessions, studySets } = await bundle();
-  // Only offered on a supported chat tab — elsewhere there's no "last answer".
-  const chatTab = await isAIChatTab();
-  const originAttr = chatTab.url ? ` data-origin="${esc(new URL(chatTab.url).origin)}"` : "";
+  // The capture button starts hidden and is revealed after paint by
+  // refreshCaptureAnswerButton(). Awaiting isAIChatTab here used to block the
+  // whole list for up to 2s on a tab whose content script never answers.
 
   setHTML(app, `
     <div class="view">
@@ -65,10 +65,11 @@ export async function renderSets() {
         <input id="shareCode" type="text" placeholder="e.g. 7KX2M9QRTA or mafsar.../s/..." autocomplete="off" autocapitalize="off" /></div>
       <button class="btn btn-primary btn-block" data-action="share-lookup">Look up set</button>
       <div id="sharePreview"></div>
-      <button class="btn btn-ghost btn-block${chatTab.ok ? "" : " hidden"}" id="captureAnswerBtn" data-action="capture-last-answer"${originAttr}>✨ Capture last answer</button>
+      <button class="btn btn-ghost btn-block hidden" id="captureAnswerBtn" data-action="capture-last-answer">✨ Capture last answer</button>
       <button class="btn btn-ghost btn-block" data-action="capture-current">＋ Capture this page</button>
     </div>`);
   topOfView();
+  refreshCaptureAnswerButton().catch(() => {});
 }
 
 export async function lookupShare() {

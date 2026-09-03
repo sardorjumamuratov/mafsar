@@ -115,6 +115,15 @@ body {
   padding: 16px 14px 20px;
 }
 
+/* Async slots: filled after first paint (billing, teams list). display:contents
+   makes the wrapper produce no box, so the children lay out as direct flex
+   items of .view and an empty slot adds no gap. */
+#billingSlot,
+#backupSlot,
+#teamsSlot {
+  display: contents;
+}
+
 /* --- app header row --- */
 .ahd {
   display: flex;

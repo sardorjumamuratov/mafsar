@@ -366,4 +366,71 @@ test("capture repaints the current view instead of jumping to Home", () => {
   );
 });
 
+// A render function that awaits the network before its first setHTML leaves the
+// panel showing the *previous* tab until the response lands. That is the
+// "switching tabs is slow" bug; these guards keep the ordering correct.
+function bodyOf(src, name) {
+  const start = src.indexOf(`export async function ${name}(`);
+  assert.ok(start > -1, `${name} not found`);
+  const next = src.indexOf("\nexport ", start + 1);
+  return src.slice(start, next === -1 ? src.length : next);
+}
+
+test("views paint from local data before any network call", () => {
+  const cases = [
+    ["../src/ui/views/you.js", "renderYou", ["authedFetch("]],
+    ["../src/ui/views/teams.js", "renderTeams", ["TEAM_LIST"]],
+    ["../src/ui/views/sets.js", "renderSets", ["isAIChatTab("]],
+  ];
+  for (const [file, fn, forbidden] of cases) {
+    const body = bodyOf(fs.readFileSync(join(__dirname, file), "utf8"), fn);
+    const paintAt = body.indexOf("setHTML(app");
+    assert.ok(paintAt > -1, `${fn} must paint with setHTML(app, …)`);
+    for (const needle of forbidden) {
+      const at = body.indexOf(needle);
+      assert.ok(
+        at === -1 || at > paintAt,
+        `${fn} awaits ${needle} before painting — the panel stays on the previous tab until it resolves`
+      );
+    }
+  }
+});
+
+test("each async slot is filled after the paint and is layout-neutral", () => {
+  const css = fs.readFileSync(join(__dirname, "../src/ui/panel.css"), "utf8");
+  for (const id of ["#billingSlot", "#backupSlot", "#teamsSlot"]) {
+    assert.ok(css.includes(id), `${id} needs a display:contents rule or it adds a 14px flex gap`);
+  }
+  assert.ok(css.includes("display: contents"), "slots must not produce a box while empty");
+
+  const you = fs.readFileSync(join(__dirname, "../src/ui/views/you.js"), "utf8");
+  assert.ok(you.includes("refreshBilling()"), "You must fill its slot after painting");
+  assert.ok(you.includes("billingToken"), "a stale /v1/me response must not paint into another view");
+
+  const teams = fs.readFileSync(join(__dirname, "../src/ui/views/teams.js"), "utf8");
+  assert.ok(teams.includes("refreshTeamList()"), "Teams must fill its slot after painting");
+  assert.ok(teams.includes("teamListToken"), "a stale TEAM_LIST response must not paint into another view");
+
+  const sets = fs.readFileSync(join(__dirname, "../src/ui/views/sets.js"), "utf8");
+  assert.ok(
+    sets.includes("refreshCaptureAnswerButton().catch"),
+    "renderSets must reuse the existing post-paint refresher"
+  );
+});
+
+test("every slot refresher re-checks the slot after awaiting", () => {
+  const fns = [
+    ["../src/ui/views/you.js", "refreshBilling"],
+    ["../src/ui/views/teams.js", "refreshTeamList"],
+  ];
+  for (const [file, fn] of fns) {
+    const body = bodyOf(fs.readFileSync(join(__dirname, file), "utf8"), fn);
+    assert.ok(
+      /getElementById\((["'])\w+\1\)/.test(body),
+      `${fn} must look the slot up after awaiting — the view may be gone`
+    );
+    assert.ok(body.includes("if (!"), `${fn} must bail when the slot is missing`);
+  }
+});
+
 console.log(`\n${passed} tests passed`);
