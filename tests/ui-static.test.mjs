@@ -519,4 +519,55 @@ test("skeletons contain no interpolated values", () => {
   }
 });
 
+test("checkboxes are custom-drawn, not native", () => {
+  const css = fs.readFileSync(join(__dirname, "../src/ui/panel.css"), "utf8");
+  const start = css.indexOf('input[type="checkbox"] {');
+  assert.ok(start > -1, "a generic checkbox rule must exist");
+  const box = css.slice(start, css.indexOf(".pick-row .tag"));
+
+  assert.ok(box.includes("appearance: none"), "the native control must be replaced");
+  assert.ok(/clip-path:\s*polygon/.test(box), "the tick must be drawn by us");
+
+  // appearance:none deletes the native focus ring; losing this makes the
+  // control keyboard-invisible.
+  assert.ok(box.includes(":focus-visible"), "a custom checkbox owes a focus ring");
+  // Dark --primary is #35b7b4; a white tick on it is ~2.2:1.
+  assert.ok(
+    box.includes("box-shadow: inset 1em 1em var(--surface)"),
+    "the tick must use --surface so it stays readable on dark mode's brighter teal"
+  );
+  assert.ok(box.includes("forced-colors: active"), "High Contrast users need the native control back");
+  assert.ok(!/accent-color/.test(box), "accent-color is inert once appearance is none");
+});
+
+test("the checkbox rule covers both checkboxes in the panel", () => {
+  const css = fs.readFileSync(join(__dirname, "../src/ui/panel.css"), "utf8");
+  // Scoping the rule to .pick-row would leave Import's toggle looking native.
+  assert.ok(
+    !/\.pick-row input\[type="checkbox"\] \{\s*appearance/.test(css),
+    "the rule must not be scoped to .pick-row — Import has a checkbox too"
+  );
+  for (const f of ["../src/ui/views/home.js", "../src/ui/views/import.js"]) {
+    assert.ok(
+      fs.readFileSync(join(__dirname, f), "utf8").includes('type="checkbox"'),
+      `${f} still has a checkbox the rule must cover`
+    );
+  }
+});
+
+test("the picker count reflects selection without recolouring .tag globally", () => {
+  const css = fs.readFileSync(join(__dirname, "../src/ui/panel.css"), "utf8");
+  assert.ok(
+    css.includes('.pick-row input[type="checkbox"]:checked ~ .tag'),
+    "the count must respond to the checkbox via the sibling combinator"
+  );
+  assert.ok(!css.includes(":has("), ":has() is not needed here and raises the Firefox floor");
+  // .tag is shared with set rows, team rows and the exam header.
+  const generic = css.slice(css.indexOf(".tag {"), css.indexOf(".tag.dot"));
+  assert.ok(
+    !generic.includes("--primary-soft"),
+    "recolour .pick-row .tag only — the global .tag is used on other screens"
+  );
+});
+
 console.log(`\n${passed} tests passed`);

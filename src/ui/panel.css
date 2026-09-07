@@ -1271,10 +1271,78 @@ body {
 .pick-row:last-of-type {
   border-bottom: none;
 }
-.pick-row input[type="checkbox"] {
-  width: auto;
-  accent-color: var(--primary);
+/* --- checkboxes ---------------------------------------------------------
+   appearance:none hands us the whole control, so everything the browser used
+   to draw we now owe: the box, the tick, and the focus ring. Covers both the
+   exam picker rows and the Import screen's "clean HTML" toggle. */
+input[type="checkbox"] {
+  appearance: none;
+  -webkit-appearance: none;
+  width: 18px;
+  height: 18px;
   flex-shrink: 0;
+  margin: 0;
+  display: grid;
+  place-content: center;
+  background: var(--surface);
+  border: 1.5px solid var(--border);
+  border-radius: 6px;
+  cursor: pointer;
+  transition: background 0.15s ease, border-color 0.15s ease;
+}
+input[type="checkbox"]:hover:not(:checked) {
+  border-color: var(--primary);
+}
+input[type="checkbox"]:checked {
+  background: var(--primary);
+  border-color: var(--primary);
+}
+/* The tick is var(--surface), not #fff. Dark mode's --primary is #35b7b4 and a
+   white tick on it is ~2.2:1 — unreadable. --surface is #ffffff in light and
+   #141d1b in dark, which clears 6:1 against --primary in both themes.
+   box-shadow rather than background-color so the glyph survives forced-colors. */
+input[type="checkbox"]::before {
+  content: "";
+  width: 10px;
+  height: 10px;
+  transform: scale(0);
+  transition: transform 0.12s ease-in-out;
+  box-shadow: inset 1em 1em var(--surface);
+  clip-path: polygon(14% 44%, 0 65%, 50% 100%, 100% 16%, 80% 0%, 43% 62%);
+}
+input[type="checkbox"]:checked::before {
+  transform: scale(1);
+}
+/* appearance:none removed the native focus ring. Without this the control is
+   unreachable by keyboard in any visible sense. Matches .date-input:focus-visible. */
+input[type="checkbox"]:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: 1px;
+}
+/* Windows High Contrast overrides our colours entirely; give the OS its
+   control back rather than shipping an invisible box. */
+@media (forced-colors: active) {
+  input[type="checkbox"] {
+    appearance: auto;
+    -webkit-appearance: auto;
+  }
+}
+/* The count doubles as the selection indicator: muted while the set is not
+   picked, primary once it is. Driven by the sibling combinator rather than
+   has() so it works on older Firefox, which the sidebar build still targets. */
+.pick-row .tag {
+  font-variant-numeric: tabular-nums;
+  min-width: 30px;
+  justify-content: center;
+  transition: background 0.15s ease, color 0.15s ease;
+}
+.pick-row input[type="checkbox"]:checked ~ .tag {
+  background: var(--primary-soft);
+  color: var(--primary);
+}
+.pick-row:hover {
+  background: var(--surface-2);
+  border-radius: var(--r-sm);
 }
 .pick-row .name {
   display: block;
