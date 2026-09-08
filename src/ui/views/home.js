@@ -193,7 +193,7 @@ export async function openExamPicker() {
       <div class="field"><label>Exam date</label>
         <input type="text" placeholder="YYYY-MM-DD" id="pickerDate" class="date-input" value="${examDraft.date ? dateInputValue(examDraft.date) : nextMonthStr}" style="width:auto" /></div>
       <div class="help" style="margin:0">Pick the sets this exam covers. Selected sets resurface cards before the date and count toward readiness.</div>
-      <div class="block" style="padding:6px 14px">
+      <div class="block pick-block">
         ${
           withSets.length
             ? withSets
