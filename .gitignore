@@ -12,3 +12,6 @@ npm-debug.log*
 
 # Build output
 dist/
+
+# Local server database
+server/mafsar.db

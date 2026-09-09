@@ -495,7 +495,11 @@ test("slots show a skeleton, not a text placeholder", () => {
 });
 
 test("skeletons are layout-neutral, delayed, and reduced-motion safe", () => {
-  const css = fs.readFileSync(join(__dirname, "../src/ui/panel.css"), "utf8");
+  // Normalized: this test slices on "\n}\n" to find the end of the media block,
+  // and the working tree is CRLF on Windows (core.autocrlf), where that never
+  // matches. CI checks out LF, so an unnormalized read passes there and fails
+  // only on the machine doing the release build.
+  const css = fs.readFileSync(join(__dirname, "../src/ui/panel.css"), "utf8").replace(/\r\n/g, "\n");
   const skel = css.slice(css.indexOf(".skel {"), css.indexOf(".sk-row"));
   assert.ok(skel.includes("display: contents"), ".skel must not become a flex item and add a gap");
   assert.ok(/animation:[^;]*0\.15s/.test(skel), "the skeleton must fade in on a delay so it cannot flash");
