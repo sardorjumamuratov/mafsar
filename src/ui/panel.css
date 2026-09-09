@@ -1260,13 +1260,24 @@ body {
 }
 
 /* --- exam set picker --- */
+/* Rows bleed to this card's edges on hover, so the horizontal padding lives on
+   .pick-row rather than here, and overflow clips the band to the card's radius.
+   Without overflow:hidden the first and last row's hover square off the corners. */
+.pick-block {
+  padding: 6px 0;
+  overflow: hidden;
+}
 .pick-row {
   display: flex;
   align-items: center;
   gap: 10px;
-  padding: 10px 2px;
+  /* 16px matches where the content sat before: the card's old 14px padding
+     plus the row's old 2px. The row owns it now so the hover can reach the
+     card's edge. */
+  padding: 10px 16px;
   border-bottom: 1px solid var(--border);
   cursor: pointer;
+  transition: background 0.15s ease;
 }
 .pick-row:last-of-type {
   border-bottom: none;
@@ -1340,9 +1351,12 @@ input[type="checkbox"]:focus-visible {
   background: var(--primary-soft);
   color: var(--primary);
 }
-.pick-row:hover {
+/* No radius: a rounded highlight cannot share an edge with the row's square
+   divider. :focus-within gives keyboard users the same feedback as the mouse —
+   focus lands on the checkbox, but the whole label is the hit area. */
+.pick-row:hover,
+.pick-row:focus-within {
   background: var(--surface-2);
-  border-radius: var(--r-sm);
 }
 .pick-row .name {
   display: block;

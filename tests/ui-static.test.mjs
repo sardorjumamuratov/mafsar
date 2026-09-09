@@ -570,4 +570,34 @@ test("the picker count reflects selection without recolouring .tag globally", ()
   );
 });
 
+test("the picker row hover is a full-bleed band, not a floating pill", () => {
+  const css = fs.readFileSync(join(__dirname, "../src/ui/panel.css"), "utf8");
+  const hover = css.slice(css.indexOf(".pick-row:hover"), css.indexOf(".pick-row .name"));
+  // A rounded highlight cannot share an edge with the row's square divider.
+  assert.ok(!hover.includes("border-radius"), "the hover band must not be rounded");
+  assert.ok(hover.includes(":focus-within"), "keyboard focus must get the same feedback as hover");
+  // --primary-soft is the checked count chip's background; reusing it here
+  // would make the chip vanish into the row it sits on.
+  assert.ok(!hover.includes("--primary-soft"), "the hover must stay distinct from the checked chip");
+
+  const row = css.slice(css.indexOf(".pick-row {"), css.indexOf(".pick-row:last-of-type"));
+  assert.ok(!/padding:\s*10px 2px/.test(row), "2px of side padding leaves the tint hugging the text");
+  assert.ok(row.includes("transition"), "the band must fade in step with the checkbox animation");
+});
+
+test("the picker card clips the full-bleed hover to its own radius", () => {
+  const css = fs.readFileSync(join(__dirname, "../src/ui/panel.css"), "utf8");
+  const block = css.slice(css.indexOf(".pick-block {"), css.indexOf(".pick-row {"));
+  assert.ok(block.includes("overflow: hidden"), "without this the end rows square off the card corners");
+  assert.ok(/padding:\s*6px 0/.test(block), "horizontal padding belongs to the row now");
+
+  const home = fs.readFileSync(join(__dirname, "../src/ui/views/home.js"), "utf8");
+  assert.ok(home.includes('class="block pick-block"'), "the picker container must use the class");
+  assert.ok(!home.includes('style="padding:6px 14px"'), "the inline padding should be gone");
+
+  // .block is shared across many screens; some need overflow visible.
+  const generic = css.slice(css.indexOf(".block {"), css.indexOf(".block.tint"));
+  assert.ok(!generic.includes("overflow"), "do not put overflow on .block itself");
+});
+
 console.log(`\n${passed} tests passed`);
