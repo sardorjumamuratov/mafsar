@@ -17,7 +17,7 @@
       const nodes = document.querySelectorAll("user-query, model-response");
       nodes.forEach((n) => {
         const role = n.tagName.toLowerCase() === "user-query" ? "user" : "assistant";
-        const text = ((/** @type {any} */ (n)).innerText || "").trim();
+        const text = (/** @type {any} */ (window)).__mafsar.readText(n);
         if (text) out.push({ role, text });
       });
       if (out.length) return out;
@@ -26,8 +26,8 @@
       document.querySelectorAll(".conversation-container").forEach((c) => {
         const u = c.querySelector(".query-text, user-query");
         const a = c.querySelector(".model-response-text, message-content, model-response");
-        const ut = ((/** @type {any} */ (u))?.innerText || "").trim();
-        const at = ((/** @type {any} */ (a))?.innerText || "").trim();
+        const ut = (/** @type {any} */ (window)).__mafsar.readText(u);
+        const at = (/** @type {any} */ (window)).__mafsar.readText(a);
         if (ut) out.push({ role: "user", text: ut });
         if (at) out.push({ role: "assistant", text: at });
       });
@@ -45,7 +45,8 @@
       const active = document.querySelector(
         '[data-test-id="conversation"].selected, .conversation.selected .conversation-title'
       );
-      const t = ((/** @type {any} */ (active))?.innerText || "").trim();
+      // The selected sidebar row carries a more_vert menu button.
+      const t = (/** @type {any} */ (window)).__mafsar.readText(active);
       return t || (document.title || "Gemini conversation").replace(/\s*[-—|].*$/, "").trim();
     },
   });
