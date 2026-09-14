@@ -20,6 +20,10 @@
   },
   "include": [
     "src/**/*.js",
-    "tools/**/*.mjs"
+    "tools/**/*.mjs",
+    "types/**/*.d.ts"
+  ],
+  "exclude": [
+    "src/vendor/**"
   ]
 }
