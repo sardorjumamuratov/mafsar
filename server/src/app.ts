@@ -12,14 +12,41 @@ import { applySync, changesSince } from "./sync.js";
 import { nowISO, one, all, run, uid } from "./db.js";
 import { genTeamCode, leaderboardFor, learningFor } from "./teams.js";
 import { generateStudySet, gradeAnswer, generateHypothetical, summarizeConversation, setBlurb, generateCodingTask, gradeCode } from "./llm.js";
+import { DEFAULT_LIMITS, clientIp, corsOrigin, limitByIp, limitByUser, slidingWindow, tooMany, type IpSource } from "./ratelimit.js";
 import { PRIVACY_HTML } from "./privacy.js";
 import { getProvider, billingConfigured, requireQuota, usageSummary, effectivePlan, resolveOrigin, applyPlanChange, stripeProvider, paddleProvider, NoSubscriptionError } from "./billing/index.js";
 
 export function createApp(db: DB) {
   const app = new Hono<{ Variables: { userId: string } }>();
 
-  // The extension / future web app call the API cross-origin.
-  app.use("*", cors());
+  // CORS stops other websites from calling the API from a visitor's browser.
+  // The extension is exempt anyway (it holds a host permission for this origin),
+  // and server-to-server callers such as payment webhooks send no Origin.
+  app.use("*", cors({
+    origin: (origin) => corsOrigin(origin, process.env.PUBLIC_BASE_URL, process.env.NODE_ENV !== "production"),
+  }));
+
+  // Abuse limits: see src/ratelimit.ts. Created here so each app instance, and so
+  // each test, starts with clean counters.
+  const ipSource = (): IpSource => {
+    const v = process.env.CLIENT_IP_SOURCE;
+    return v === "xff-last" || v === "x-real-ip" ? v : "xff-first";
+  };
+  const requestIp = (c: any): string | null =>
+    clientIp(c.req.raw.headers, c.env?.incoming?.socket?.remoteAddress, ipSource());
+  const limits = {
+    loginPerIp: slidingWindow(DEFAULT_LIMITS.loginPerIp),
+    loginFailuresPerEmail: slidingWindow(DEFAULT_LIMITS.loginFailuresPerEmail),
+    registerPerIp: slidingWindow(DEFAULT_LIMITS.registerPerIp),
+    accountsPerIp: slidingWindow({
+      ...DEFAULT_LIMITS.accountsPerIp,
+      limit: Number(process.env.SIGNUP_ACCOUNTS_PER_IP_PER_DAY) || DEFAULT_LIMITS.accountsPerIp.limit,
+    }),
+    refreshPerIp: slidingWindow(DEFAULT_LIMITS.refreshPerIp),
+    googleStartPerIp: slidingWindow(DEFAULT_LIMITS.googleStartPerIp),
+    googlePollPerIp: slidingWindow(DEFAULT_LIMITS.googlePollPerIp),
+    llmPerUser: slidingWindow(DEFAULT_LIMITS.llmPerUser),
+  };
 
   // Public — required by the Chrome Web Store / Firefox Add-ons listings.
   app.get("/privacy", (c) => c.html(PRIVACY_HTML));
@@ -52,10 +79,22 @@ export function createApp(db: DB) {
     return c.json({ error: "internal" }, 500);
   });
 
-  app.post("/v1/auth/register", async (c) => {
+  app.post("/v1/auth/register", limitByIp(limits.registerPerIp, requestIp), async (c) => {
+    const ip = requestIp(c);
+    // Checked before hashing (cheap to refuse), recorded only once an account
+    // actually exists, so a duplicate or mistyped sign-up costs nothing.
+    if (ip && limits.accountsPerIp.blocked(ip)) {
+      return tooMany(
+        c,
+        limits.accountsPerIp.retryAfter(ip),
+        "Too many accounts were created from this network today. Try again tomorrow.",
+        "signup_limit"
+      );
+    }
     const body = registerSchema.parse(await c.req.json());
     const user = await register(db, body.email, body.password);
     if (!user) return c.json({ error: "email_taken" }, 409);
+    if (ip) limits.accountsPerIp.record(ip);
     return c.json({
       accessToken: await signAccessToken(user.id),
       refreshToken: await signRefreshToken(user.id),
@@ -63,10 +102,24 @@ export function createApp(db: DB) {
     });
   });
 
-  app.post("/v1/auth/login", async (c) => {
+  app.post("/v1/auth/login", limitByIp(limits.loginPerIp, requestIp), async (c) => {
     const body = loginSchema.parse(await c.req.json());
+    // Keyed on the submitted email whether or not the account exists, so the
+    // lock can't be used to find out which emails are registered.
+    const emailKey = body.email.trim().toLowerCase();
+    if (limits.loginFailuresPerEmail.blocked(emailKey)) {
+      return tooMany(
+        c,
+        limits.loginFailuresPerEmail.retryAfter(emailKey),
+        "Too many failed sign-ins for this email. Try again in a few minutes."
+      );
+    }
     const user = await login(db, body.email, body.password);
-    if (!user) return c.json({ error: "invalid_credentials" }, 401);
+    if (!user) {
+      limits.loginFailuresPerEmail.record(emailKey);
+      return c.json({ error: "invalid_credentials" }, 401);
+    }
+    limits.loginFailuresPerEmail.clear(emailKey);
     return c.json({
       accessToken: await signAccessToken(user.id),
       refreshToken: await signRefreshToken(user.id),
@@ -74,7 +127,7 @@ export function createApp(db: DB) {
     });
   });
 
-  app.post("/v1/auth/refresh", async (c) => {
+  app.post("/v1/auth/refresh", limitByIp(limits.refreshPerIp, requestIp), async (c) => {
     const { refreshToken } = await c.req.json<{ refreshToken?: string }>();
     if (!refreshToken) return c.json({ error: "unauthorized" }, 401);
     const { jwtVerify } = await import("jose");
@@ -87,7 +140,7 @@ export function createApp(db: DB) {
     }
   });
 
-  app.post("/v1/auth/google/start", async (c) => {
+  app.post("/v1/auth/google/start", limitByIp(limits.googleStartPerIp, requestIp), async (c) => {
     if (!googleConfigured()) return c.json({ error: "google_unavailable" }, 501);
     await run(db, "DELETE FROM pending_logins WHERE expires_at < ?", [nowISO()]);
     
@@ -138,7 +191,7 @@ export function createApp(db: DB) {
     }
   });
 
-  app.post("/v1/auth/google/poll", async (c) => {
+  app.post("/v1/auth/google/poll", limitByIp(limits.googlePollPerIp, requestIp), async (c) => {
     const { pollToken } = pollSchema.parse(await c.req.json());
     const pollHash = createHash("sha256").update(pollToken).digest("hex");
     
@@ -294,7 +347,7 @@ export function createApp(db: DB) {
     return c.json(await summarizeConversation(body.messages));
   });
 
-  app.post("/v1/blurb", async (c) => {
+  app.post("/v1/blurb", limitByUser(limits.llmPerUser), async (c) => {
     const body = blurbSchema.parse(await c.req.json());
     return c.json(await setBlurb(body.title, body.cardFronts));
   });
@@ -308,7 +361,7 @@ export function createApp(db: DB) {
     return c.json(await generateCodingTask(body.concept, body.reference, body.language));
   });
 
-  app.post("/v1/coding-grade", async (c) => {
+  app.post("/v1/coding-grade", limitByUser(limits.llmPerUser), async (c) => {
     const body = codingGradeSchema.parse(await c.req.json());
     return c.json(await gradeCode(body));
   });
@@ -332,14 +385,7 @@ export function createApp(db: DB) {
   // per-user cap a signed-in client could walk the code space. 30/min is far
   // above human use and far below brute-force speed. In-memory on purpose —
   // a deploy resetting the window is fine for a throttle.
-  const shareLookups = new Map<string, number[]>();
-  function shareRateLimited(userId: string): boolean {
-    const now = Date.now();
-    const hits = (shareLookups.get(userId) || []).filter((t) => now - t < 60_000);
-    hits.push(now);
-    shareLookups.set(userId, hits);
-    return hits.length > 30;
-  }
+  const shareLookups = slidingWindow({ limit: 30, windowMs: 60_000 });
 
   app.post("/v1/share", async (c) => {
     const userId = c.get("userId") as string;
@@ -364,7 +410,7 @@ export function createApp(db: DB) {
 
   app.get("/v1/share/:code", async (c) => {
     const userId = c.get("userId") as string;
-    if (shareRateLimited(userId)) {
+    if (!shareLookups.hit(userId).allowed) {
       return c.json({ error: "rate_limited", message: "Too many lookups — try again in a minute." }, 429);
     }
     const share = await one<{ set_id: string }>(
