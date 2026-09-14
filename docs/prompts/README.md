@@ -18,8 +18,11 @@ for example: *"Implement docs/prompts/02-abuse-protection.md. Follow AGENTS.md."
 
 **Running in parallel:** 02, 03, 05, 06, 07 and 08 all edit
 `server/src/app.ts`, and 03 to 08 all edit `server/src/privacy.ts`. Run those one
-at a time and merge each before starting the next. Only 01 and 04 are safe to run
-alongside another task.
+at a time, and merge each before starting the next. Two combinations are safe to
+run side by side:
+
+- **01 with any other task.** It touches neither file.
+- **02 with 04.** 02 edits only `app.ts` and 04 edits only `privacy.ts`.
 
 ## Steps no agent can do for you
 
