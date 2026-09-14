@@ -1,8 +1,8 @@
 import { setNav, showChrome } from "../nav.js";
 import { FLAME, app, bundle, dateInputValue, esc, examDaysLeft, greeting, nav, send, setFor, setHTML, summarize, toast, topOfView } from "../core.js";
 import { computeStreak, dayKey, setExamDate, weekActivity } from "../../storage/store.js";
-import { examReadiness, weakTopics } from "../../storage/readiness.js";
-import { review } from "../../storage/srs.js";
+import { examReadiness, weakTopics } from "../../../shared/readiness.js";
+import { review } from "../../../shared/srs.js";
 import { setRow } from "../views/sets.js";
 import { detail } from "../views/set-detail.js";
 import { LANDING_BASE } from "../../config.js";

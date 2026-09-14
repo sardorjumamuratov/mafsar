@@ -31,7 +31,7 @@ globalThis.chrome = {
 
 const assert = (await import("node:assert/strict")).default;
 const store = await import("../src/storage/store.js");
-const { initSchedule } = await import("../src/storage/srs.js");
+const { initSchedule } = await import("../shared/srs.js");
 
 let passed = 0;
 async function test(name, fn) {
@@ -126,7 +126,7 @@ await test("updateCard stamps updatedAt on card and set", async () => {
 console.log("SRS persistence round-trip (grade → storage → re-read)");
 
 await test("updateCard persists a graded schedule that isDue() agrees with", async () => {
-  const { review, isDue } = await import("../src/storage/srs.js");
+  const { review, isDue } = await import("../shared/srs.js");
   const session = await store.addSession({ source: "chatgpt", title: "T", messages: [] });
   const now = Date.now();
   const card = { id: "c1", front: "Q", back: "A", easiness: 2.5, interval: 0, repetitions: 0, dueDate: now };
@@ -138,9 +138,9 @@ await test("updateCard persists a graded schedule that isDue() agrees with", asy
   const reread = (await store.getStudySetForSession(session.id)).flashcards[0];
   assert.equal(reread.dueDate, upd.dueDate, "dueDate survived the storage round-trip");
   assert.equal(reread.repetitions, 1);
-  assert.equal(reread.interval, 1);
+  assert.equal(reread.interval, 2);
   assert.equal(isDue(reread, now), false, "graded card is not due at grading time");
-  assert.equal(isDue(reread, now + 25 * 60 * 60 * 1000), true, "becomes due a day later");
+  assert.equal(isDue(reread, now + 49 * 60 * 60 * 1000), true, "becomes due two days later");
 
   // Grade "Again" the next day: schedule resets, and (panel-level) requeue
   // relies on the stored card still being findable by id.

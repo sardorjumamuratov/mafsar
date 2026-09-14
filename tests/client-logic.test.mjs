@@ -2,8 +2,8 @@
 // clamping, weak-topic ranking). Run: node tests/client-logic.test.mjs
 
 import assert from "node:assert/strict";
-import { review } from "../src/storage/srs.js";
-import { examReadiness, nextExam, weakTopics } from "../src/storage/readiness.js";
+import { review } from "../shared/srs.js";
+import { examReadiness, nextExam, weakTopics } from "../shared/readiness.js";
 
 const DAY = 24 * 60 * 60 * 1000;
 let passed = 0;

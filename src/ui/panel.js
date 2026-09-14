@@ -6,7 +6,7 @@ import { onActiveTabChange } from "./tab-watch.js";
 import { currentDetail, makeSet, openDetailTab, paintDetail, promptAddCard, renderSetDetail, saveCardEdit, saveNewCard, setEditingCardId, startQuizForCurrentSet } from "./views/set-detail.js";
 import { captureCurrent, captureLastAnswer } from "./capture.js";
 import { deleteCard, deleteSession, saveStudySet, setExamDate } from "../storage/store.js";
-import { review } from "../storage/srs.js";
+import { review } from "../../shared/srs.js";
 import { applyNext, goReturn, gradeCard, revealCard, startGlobalReview, startSetReview } from "./flows/review.js";
 import { authGoogle, authSubmit, exportBackup, exportSetTsv, generateSummary, googleAbortController, importBackupFile, renderAuthGate, renderYou } from "./views/you.js";
 import { checkApply, startApply } from "./flows/apply.js";

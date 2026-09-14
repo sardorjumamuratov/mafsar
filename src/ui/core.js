@@ -1,5 +1,5 @@
 import { BUNDLE_KEYS, readRaw, selectSessions, selectSettings, selectStudySets } from "../storage/store.js";
-import { isDue, masteryOf } from "../storage/srs.js";
+import { isDue, masteryOf } from "../../shared/srs.js";
 
 export const app = document.getElementById("app");
 export const nav = document.getElementById("bottomNav");

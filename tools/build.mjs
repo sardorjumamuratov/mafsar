@@ -67,6 +67,10 @@ function collect(manifest, target) {
     if (EXCLUDE[target].includes(rel)) continue;
     files.push([rel, readFileSync(full)]);
   }
+  for (const full of walk(join(ROOT, "shared"))) {
+    const rel = relative(ROOT, full).split(sep).join("/");
+    files.push([rel, readFileSync(full)]);
+  }
   for (const name of SHIPPED_ICONS) {
     files.push([`icons/${name}`, readFileSync(join(ROOT, "icons", name))]);
   }

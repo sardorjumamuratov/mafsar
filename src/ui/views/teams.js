@@ -3,7 +3,7 @@ import { getAuth } from "../../sync/auth.js";
 import { app, esc, nav, send, setHTML, toast, topOfView } from "../core.js";
 import { parseTeamCode, teamLinkFor } from ".././share-link.js";
 import { LANDING_BASE } from "../../config.js";
-import { review } from "../../storage/srs.js";
+import { review } from "../../../shared/srs.js";
 import { copyRowHtml } from "../share.js";
 
 // ================================================================ TEAMS

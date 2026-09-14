@@ -121,8 +121,7 @@ describe("protected routes", () => {
       ["GET", "/v1/me"],
       ["POST", "/v1/sync"],
       ["POST", "/v1/generate"],
-      ["GET", "/v1/insights"],
-    ] as const) {
+          ] as const) {
       const res = await app.request(path, { method, headers: json, ...(method !== "GET" ? { body: "{}" } : {}) });
       expect(res.status, `${method} ${path}`).toBe(401);
     }
@@ -250,14 +249,3 @@ describe("LLM proxy endpoints", () => {
   });
 });
 
-describe("later-phase stubs", () => {
-  it("return documented 501s (teams is implemented — see teams.test.ts)", async () => {
-    const { token } = await newUser("stub@mafsar.dev");
-    for (const [method, path] of [
-      ["GET", "/v1/insights"],
-    ] as const) {
-      const res = await app.request(path, { method, headers: auth(token), ...(method !== "GET" ? { body: "{}" } : {}) });
-      expect(res.status, `${method} ${path}`).toBe(501);
-    }
-  });
-});

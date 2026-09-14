@@ -1,7 +1,7 @@
 import { paintReviewCard, qIdx, queue, setQIdx } from "../flows/review.js";
 import { XBTN, app, esc, send, setHTML, toast } from "../core.js";
 import { appendReviewLog, bumpActivity, uid } from "../../storage/store.js";
-import { review } from "../../storage/srs.js";
+import { review } from "../../../shared/srs.js";
 
 export let applyState = null; // { item, hypothetical, phase }
 
@@ -68,6 +68,7 @@ export async function checkApply() {
     await Promise.all([
       bumpActivity(1),
       appendReviewLog({
+        kind: "apply", stability: item.card.stability, difficulty: item.card.difficulty,
         id: uid(), cardId: item.card.id, sessionId: item.sessionId,
         grade: r.grading.correct ? 4 : 1, prevInterval: 0, newInterval: 0,
         reviewedAt: new Date().toISOString(),

@@ -8,7 +8,9 @@ const DAY_MS = 24 * 60 * 60 * 1000;
  * @param {{examDate:number, total:number, mastered:number, due:number, now?:number}} arg
  * @returns {{daysLeft:number, progress:number, onTrack:boolean, dailyTarget:number, status:"on-track"|"behind"|"today"|"past"}}
  */
-export function examReadiness({ examDate, total, mastered, due, now = Date.now() }) {
+import { retrievability } from "./srs.js";
+
+export function examReadiness({ examDate, total, mastered, due, cards = [], now = Date.now() }) {
   const daysLeft = Math.ceil((examDate - now) / DAY_MS);
   const progress = total ? Math.round((mastered / total) * 100) : 0;
   const remaining = Math.max(0, total - mastered);
@@ -19,7 +21,16 @@ export function examReadiness({ examDate, total, mastered, due, now = Date.now()
   // Behind when the required pace exceeds a sustainable ~20 cards/day, or the
   // exam is imminent with most of the set still untouched.
   else if (dailyTarget > 20 || (daysLeft <= 2 && remaining > total * 0.5)) status = "behind";
-  return { daysLeft, progress, onTrack: status === "on-track", dailyTarget, status: /** @type {"today" | "on-track" | "past" | "behind"} */ (status) };
+    let predictedRecallAtExam;
+  const fsrsCards = cards.filter(c => c.stability !== undefined || c.repetitions > 0);
+  if (examDate > now && fsrsCards.length >= Math.max(5, cards.length * 0.2)) {
+    let sum = 0;
+    for (const c of fsrsCards) {
+      sum += (retrievability(c, examDate) || 0);
+    }
+    predictedRecallAtExam = Number((sum / fsrsCards.length).toFixed(2));
+  }
+  return { daysLeft, progress, onTrack: status === "on-track", dailyTarget, status: /** @type {"today" | "on-track" | "past" | "behind"} */ (status), predictedRecallAtExam };
 }
 
 /**
@@ -61,13 +72,38 @@ export function weakTopics(reviewLog, cards, now = Date.now()) {
     if (!card) continue;
     const avg = e.grades.reduce((a, b) => a + b, 0) / e.grades.length;
     // Forget-risk: shaky history (low easiness) and due within 3 days.
-    const dueSoon = (card.dueDate ?? 0) - now <= 3 * DAY_MS;
+    const recallNow = retrievability(card, now);
+    let forgetRisk = false;
+    let recall = null;
+    let forgetBy = null;
+    if (recallNow !== null) {
+      recall = Number(recallNow.toFixed(2));
+      const recall3d = retrievability(card, now + 3 * DAY_MS);
+      forgetRisk = recall3d < 0.8;
+      
+      const DECAY = -0.1542;
+      const FACTOR = Math.exp((1 / DECAY) * Math.log(0.9)) - 1;
+      const s_val = card.stability || Math.max(1, card.interval || 1);
+      const targetT = (s_val / FACTOR) * (Math.pow(0.8, 1 / DECAY) - 1);
+      let lastReview = card.lastReview;
+      if (lastReview === undefined) {
+        if (card.dueDate && card.interval) lastReview = card.dueDate - card.interval * DAY_MS;
+        else lastReview = now;
+      }
+      forgetBy = Math.round(lastReview + targetT * DAY_MS);
+    } else {
+      const dueSoon = (card.dueDate ?? 0) - now <= 3 * DAY_MS;
+      forgetRisk = avg < 3.5 && (card.easiness ?? 2.5) < 2.5 && dueSoon;
+    }
+
     out.push({
       cardId,
       front: card.front,
       fails: e.fails,
       avgGrade: Number(avg.toFixed(2)),
-      forgetRisk: avg < 3.5 && (card.easiness ?? 2.5) < 2.5 && dueSoon,
+      forgetRisk,
+      recall,
+      forgetBy,
     });
   }
   // Most fails first, then lowest average grade.

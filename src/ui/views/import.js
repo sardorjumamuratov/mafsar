@@ -1,7 +1,7 @@
 import { showChrome } from "../nav.js";
 import { app, esc, nav, setHTML, sourceLabel, toast, topOfView } from "../core.js";
 import { addSession, saveStudySet, uid } from "../../storage/store.js";
-import { initSchedule } from "../../storage/srs.js";
+import { initSchedule } from "../../../shared/srs.js";
 import { renderHome } from "../views/home.js";
 
 // ================================================================ IMPORT

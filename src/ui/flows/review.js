@@ -1,5 +1,5 @@
 import { showChrome } from "../nav.js";
-import { byDue, isDue, review } from "../../storage/srs.js";
+import { byDue, isDue, review } from "../../../shared/srs.js";
 import { XBTN, app, bundle, esc, replaceHTML, setFor, setHTML, toast } from "../core.js";
 import { appendReviewLog, bumpActivity, uid, updateCard } from "../../storage/store.js";
 import { syncNow } from "../../sync/sync.js";
@@ -68,7 +68,7 @@ export async function gradeCard(g) {
   await updateCard(item.sessionId, item.card.id, upd);
   await Promise.all([
     bumpActivity(1),
-    appendReviewLog({
+    appendReviewLog({ kind: "flashcard", stability: upd.stability, difficulty: upd.difficulty, 
       id: uid(), cardId: item.card.id, sessionId: item.sessionId, grade: g,
       prevInterval, newInterval: upd.interval, reviewedAt: new Date().toISOString(),
     }),
@@ -153,3 +153,4 @@ export async function startSetReview(sessionId) {
 export function applyNext() { qIdx++; paintReviewCard(); }
 export function setFocusReturn(v) { focusReturn = v; }
 export function setQIdx(v) { qIdx = v; }
+

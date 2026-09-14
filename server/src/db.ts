@@ -170,7 +170,35 @@ const MIGRATIONS: string[] = [
     ALTER TABLE users ADD COLUMN billing_provider TEXT;
     UPDATE users SET billing_customer_id = stripe_customer_id, billing_provider = 'stripe' WHERE stripe_customer_id IS NOT NULL;
     CREATE INDEX idx_users_billing_customer ON users(billing_customer_id);
+    `,
     `
+    ALTER TABLE sets ADD COLUMN server_updated_at TEXT;
+    UPDATE sets SET server_updated_at = updated_at;
+    CREATE INDEX idx_sets_user_server_updated ON sets(user_id, server_updated_at);
+    
+    ALTER TABLE cards ADD COLUMN server_updated_at TEXT;
+    UPDATE cards SET server_updated_at = updated_at;
+    CREATE INDEX idx_cards_user_server_updated ON cards(user_id, server_updated_at);
+    
+    ALTER TABLE quiz ADD COLUMN server_updated_at TEXT;
+    UPDATE quiz SET server_updated_at = updated_at;
+    CREATE INDEX idx_quiz_user_server_updated ON quiz(user_id, server_updated_at);
+    
+    ALTER TABLE review_log ADD COLUMN received_at TEXT;
+    UPDATE review_log SET received_at = reviewed_at;
+    CREATE INDEX idx_review_log_user_received ON review_log(user_id, received_at);
+    
+    UPDATE cards SET due_date = strftime('%Y-%m-%dT%H:%M:%f', CAST(due_date AS NUMERIC)/1000.0, 'unixepoch') || 'Z' WHERE due_date NOT LIKE '%-%' AND due_date IS NOT NULL;
+    `
+,
+    `ALTER TABLE cards ADD COLUMN stability REAL;
+    ALTER TABLE cards ADD COLUMN difficulty REAL;
+    ALTER TABLE cards ADD COLUMN state TEXT;
+    ALTER TABLE cards ADD COLUMN lapses INTEGER NOT NULL DEFAULT 0;
+    ALTER TABLE cards ADD COLUMN last_review TEXT;
+    ALTER TABLE review_log ADD COLUMN kind TEXT NOT NULL DEFAULT 'flashcard';
+    ALTER TABLE review_log ADD COLUMN stability REAL;
+    ALTER TABLE review_log ADD COLUMN difficulty REAL;`
 ];
 
 export async function migrate(db: DB): Promise<void> {

@@ -2,7 +2,7 @@
 //   node tests/sync-map.test.mjs
 
 import assert from "node:assert/strict";
-import { toServer, applyServer } from "../src/sync/map.js";
+import { toServer, applyServer } from "../shared/sync-map.js";
 
 let passed = 0;
 function test(name, fn) {

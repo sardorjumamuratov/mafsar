@@ -3,7 +3,7 @@ import { setNav, showChrome } from "../nav.js";
 import { parseShareCode } from ".././share-link.js";
 import { setSharedPreview, sharedPreview } from "../views/teams.js";
 import { addSession, saveStudySet, uid } from "../../storage/store.js";
-import { initSchedule } from "../../storage/srs.js";
+import { initSchedule } from "../../../shared/srs.js";
 import { syncNow } from "../../sync/sync.js";
 import { renderSetDetail } from "../views/set-detail.js";
 

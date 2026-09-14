@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach } from "vitest";
-import { openDB, migrate, type DB } from "../src/db.js";
+import { openDB, migrate, one, type DB } from "../src/db.js";
 import { register } from "../src/auth.js";
 import { applySync, changesSince, shouldWrite } from "../src/sync.js";
 
@@ -73,12 +73,13 @@ describe("card-level last-write-wins", () => {
 
   it("preserves SM-2 schedule fields through a round-trip", async () => {
     const uid = await newUser();
+    const isoDue = new Date(1799999999999).toISOString();
     await applySync(db, uid, body({
-      cards: [card({ easiness: 1.7, interval: 21, repetitions: 4, dueDate: 1799999999999 })],
+      cards: [card({ easiness: 1.7, interval: 21, repetitions: 4, dueDate: isoDue })],
     }));
 
     const { cards } = await changesSince(db, uid);
-    expect(cards[0]).toMatchObject({ easiness: 1.7, interval: 21, repetitions: 4, dueDate: 1799999999999 });
+    expect(cards[0]).toMatchObject({ easiness: 1.7, interval: 21, repetitions: 4, dueDate: isoDue });
   });
 });
 
@@ -170,8 +171,9 @@ describe("changesSince boundaries", () => {
     const uid = await newUser();
     const t = "2026-01-02T00:00:00.000Z";
     await applySync(db, uid, body({ cards: [card({ updatedAt: t })] }));
+    const serverT = (await one<{ server_updated_at: string }>(db, "SELECT server_updated_at FROM cards WHERE id = 'c1'"))!.server_updated_at;
 
-    expect((await changesSince(db, uid, t)).cards).toHaveLength(0);
+    expect((await changesSince(db, uid, serverT)).cards).toHaveLength(0);
     expect((await changesSince(db, uid, "2026-01-01T23:59:59.999Z")).cards).toHaveLength(1);
   });
 

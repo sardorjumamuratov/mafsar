@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach, vi } from "vitest";
 import { SignJWT } from "jose";
-import { openDB, migrate, type DB } from "../src/db.js";
+import { openDB, migrate, one, type DB } from "../src/db.js";
 import { createApp } from "../src/app.js";
 import { register, signAccessToken, secretKey } from "../src/auth.js";
 import { shouldWrite, applySync, changesSince } from "../src/sync.js";
@@ -58,7 +58,8 @@ describe("changesSince boundaries", () => {
     const { user } = await newUser("b1@mafsar.dev");
     const t = "2026-01-02T00:00:00.000Z";
     await applySync(db, user.id, base({ sets: [{ id: "s1", title: "T", createdAt: t, updatedAt: t }] }));
-    expect((await changesSince(db, user.id, t)).sets).toHaveLength(0);
+    const serverT = (await one<{ server_updated_at: string }>(db, "SELECT server_updated_at FROM sets WHERE id = 's1'"))!.server_updated_at;
+    expect((await changesSince(db, user.id, serverT)).sets).toHaveLength(0);
     expect((await changesSince(db, user.id, "2026-01-01T23:59:59.999Z")).sets).toHaveLength(1);
   });
 

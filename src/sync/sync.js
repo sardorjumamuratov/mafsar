@@ -4,7 +4,7 @@
 
 import { readRaw, uid } from "../storage/store.js";
 import { getAuth, setAuth, authedFetch } from "./auth.js";
-import { toServer, applyServer } from "./map.js";
+import { toServer, applyServer } from "../../shared/sync-map.js";
 
 const KEYS = ["sessions", "studySets", "activity", "reviewLog"];
 let syncing = false;

@@ -1,5 +1,5 @@
 import { XBTN, app, bundle, esc, send, setFor, setHTML, toast } from "../core.js";
-import { isDue } from "../../storage/srs.js";
+import { isDue } from "../../../shared/srs.js";
 import { setFocusReturn } from "../flows/review.js";
 import { showChrome } from "../nav.js";
 import { appendReviewLog, bumpActivity, uid } from "../../storage/store.js";
@@ -61,6 +61,7 @@ export async function checkTyped() {
     await Promise.all([
       bumpActivity(1),
       appendReviewLog({
+        kind: "typed", stability: card.stability, difficulty: card.difficulty,
         id: uid(), cardId: card.id, sessionId: typedState.sessionId,
         grade: r.grading.correct ? 4 : 1, prevInterval: 0, newInterval: 0,
         reviewedAt: new Date().toISOString(),

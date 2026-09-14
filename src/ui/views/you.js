@@ -5,7 +5,7 @@ import { getAuth, googleSignIn, login, register } from "../../sync/auth.js";
 import { renderHome } from "../views/home.js";
 import { syncNow } from "../../sync/sync.js";
 import { renderSetDetail } from "../views/set-detail.js";
-import { review } from "../../storage/srs.js";
+import { review } from "../../../shared/srs.js";
 
 export async function renderYou() {
   setNav("you");

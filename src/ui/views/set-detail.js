@@ -1,8 +1,8 @@
 import { showChrome } from "../nav.js";
 import { app, bundle, esc, insertHTMLBefore, nav, send, setFor, setHTML, sourceLabel, summarize, timeUntil, toast, topOfView } from "../core.js";
 import { renderHome, shareOpenFor } from "../views/home.js";
-import { examReadiness } from "../../storage/readiness.js";
-import { isDue, masteryOf, review } from "../../storage/srs.js";
+import { examReadiness } from "../../../shared/readiness.js";
+import { isDue, masteryOf, review } from "../../../shared/srs.js";
 import { quizLengths } from ".././quiz-lengths.js";
 import { shuffled, startQuiz } from "../flows/quiz.js";
 import { shareBlockHtml } from "../share.js";

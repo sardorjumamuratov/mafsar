@@ -28,9 +28,20 @@ export const cardSchema = z.object({
   easiness: z.number().default(2.5),
   interval: z.number().default(0),
   repetitions: z.number().int().default(0),
-  dueDate: z.string().nullable().optional(),
+  dueDate: z.union([z.string(), z.number()])
+    .transform(val => {
+      if (typeof val === "number") return new Date(val).toISOString();
+      if (!Number.isNaN(Number(val)) && val.trim() !== "") return new Date(Number(val)).toISOString();
+      return val;
+    })
+    .nullable().optional(),
   updatedAt: z.string(),
   deleted: z.boolean().optional(),
+  stability: z.number().nullable().optional(),
+  difficulty: z.number().nullable().optional(),
+  state: z.string().nullable().optional(),
+  lapses: z.number().int().nullable().optional(),
+  lastReview: z.string().nullable().optional(),
 });
 
 export const quizSchema = z.object({
@@ -42,6 +53,11 @@ export const quizSchema = z.object({
   explain: z.string().nullable().optional(),
   updatedAt: z.string(),
   deleted: z.boolean().optional(),
+  stability: z.number().nullable().optional(),
+  difficulty: z.number().nullable().optional(),
+  state: z.string().nullable().optional(),
+  lapses: z.number().int().nullable().optional(),
+  lastReview: z.string().nullable().optional(),
 });
 
 export const activitySchema = z.object({
@@ -56,6 +72,9 @@ export const reviewSchema = z.object({
   prevInterval: z.number().default(0),
   newInterval: z.number().default(0),
   reviewedAt: z.string(),
+  kind: z.string().default("flashcard"),
+  stability: z.number().nullable().optional(),
+  difficulty: z.number().nullable().optional(),
 });
 
 export const syncSchema = z.object({

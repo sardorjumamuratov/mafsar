@@ -11,7 +11,7 @@ import {
   saveStudySet,
   uid,
 } from "../storage/store.js";
-import { initSchedule } from "../storage/srs.js";
+import { initSchedule } from "../../shared/srs.js";
 import {
   backendGenerate,
   backendGrade,
@@ -71,9 +71,9 @@ async function saveGeneratedStudySet(session, generated) {
   );
   const flashcards = generated.flashcards.map((c) => {
     const old = byFront.get(String(c.front).trim().toLowerCase());
-    return old
-      ? { ...c, easiness: old.easiness, interval: old.interval, repetitions: old.repetitions, dueDate: old.dueDate }
-      : c;
+      return old
+        ? { ...c, easiness: old.easiness, interval: old.interval, repetitions: old.repetitions, dueDate: old.dueDate, stability: old.stability, difficulty: old.difficulty, state: old.state, lapses: old.lapses, lastReview: old.lastReview }
+        : c;
   });
   return saveStudySet({
     sessionId: session.id,

@@ -44,6 +44,11 @@ export function toServer({ sessions, studySets, activity, reviewLog }, lastSync)
           interval: c.interval ?? 0,
           repetitions: c.repetitions ?? 0,
           dueDate: c.dueDate != null ? iso(c.dueDate) : null,
+          stability: c.stability,
+          difficulty: c.difficulty,
+          state: c.state,
+          lapses: c.lapses,
+          lastReview: c.lastReview != null ? iso(c.lastReview) : null,
           updatedAt: c.updatedAt,
           deleted: !!c.deleted,
         });
@@ -135,6 +140,11 @@ export function applyServer(resp, local, uid = () => Math.random().toString(36).
       interval: card.interval ?? 0,
       repetitions: card.repetitions ?? 0,
       dueDate: card.dueDate != null ? ms(card.dueDate) : null,
+      stability: card.stability,
+      difficulty: card.difficulty,
+      state: card.state,
+      lapses: card.lapses,
+      lastReview: card.lastReview != null ? ms(card.lastReview) : null,
       updatedAt: card.updatedAt,
       deleted: !!card.deleted,
     };
@@ -170,3 +180,4 @@ export function applyServer(resp, local, uid = () => Math.random().toString(36).
 
   return state;
 }
+

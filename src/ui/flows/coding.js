@@ -1,5 +1,5 @@
 import { XBTN, app, bundle, esc, send, setFor, setHTML, toast } from "../core.js";
-import { isDue, review } from "../../storage/srs.js";
+import { isDue, review } from "../../../shared/srs.js";
 import { goReturn, setFocusReturn } from "../flows/review.js";
 import { showChrome } from "../nav.js";
 import { MAX_CODE_CHARS, codeSize } from "../../storage/coding.js";
@@ -147,6 +147,7 @@ export async function checkCode() {
     await Promise.all([
       bumpActivity(1),
       appendReviewLog({
+        kind: "coding", stability: card.stability, difficulty: card.difficulty,
         id: uid(), cardId: card.id, sessionId,
         grade: r.grading.correct ? 4 : 1, prevInterval: 0, newInterval: 0,
         reviewedAt: new Date().toISOString(),
