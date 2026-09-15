@@ -1758,3 +1758,45 @@ span.flatpickr-weekday {
 .btn-danger:disabled { opacity: .5; cursor: not-allowed; }
 .danger-block { border-color: var(--danger); background: var(--danger-soft); }
 .danger-list { margin: 8px 0 0; padding-left: 18px; font-size: 12.5px; line-height: 1.5; color: var(--ink); }
+
+
+/* --- teach it back (Feynman) -------------------------------------------- */
+.teach-lead { margin: 6px 0 0; font-size: 13.5px; line-height: 1.5; color: var(--ink); }
+.teach-ideas { margin: 6px 0 0; padding-left: 18px; font-size: 13px; line-height: 1.6; color: var(--muted); }
+.teach-thread { display: flex; flex-direction: column; gap: 8px; margin: 10px 0; max-height: 52vh; overflow-y: auto; }
+.bubble { max-width: 85%; padding: 9px 12px; border-radius: var(--r-md); font-size: 13.5px; line-height: 1.45; white-space: pre-wrap; overflow-wrap: anywhere; }
+.bubble.learner { align-self: flex-end; background: var(--primary-soft); color: var(--ink); border-bottom-right-radius: 4px; }
+.bubble.student { align-self: flex-start; background: var(--surface); border: 1px solid var(--border); border-bottom-left-radius: 4px; }
+.bubble.hint { border-color: var(--warm); background: var(--warm-soft); }
+.bubble-tag { display: block; font-size: 10.5px; font-weight: 650; letter-spacing: .08em; text-transform: uppercase; color: var(--warm); margin-bottom: 2px; }
+.bubble.typing { display: inline-flex; gap: 4px; }
+.bubble.typing span { width: 6px; height: 6px; border-radius: 50%; background: var(--faint); animation: teach-dot 1s ease-in-out infinite; }
+.bubble.typing span:nth-child(2) { animation-delay: .15s; }
+.bubble.typing span:nth-child(3) { animation-delay: .3s; }
+@keyframes teach-dot { 50% { opacity: .3; transform: translateY(-2px); } }
+.teach-actions { display: flex; gap: 8px; margin: 8px 0; }
+.teach-actions .btn { flex: 1; }
+.teach-score { display: flex; align-items: center; gap: 14px; }
+.idea-row { padding: 10px 2px; border-bottom: 1px solid var(--border); }
+.idea-row:last-child { border-bottom: none; }
+.idea-top { display: flex; justify-content: space-between; align-items: flex-start; gap: 10px; }
+.idea-top .name { font-size: 13px; font-weight: 600; }
+.idea-chip { font-size: 11px; font-weight: 600; padding: 2px 8px; border-radius: 999px; white-space: nowrap; background: var(--surface-2); color: var(--muted); }
+.idea-chip.ok { background: var(--success-soft); color: var(--success); }
+.idea-chip.warn { background: var(--warm-soft); color: var(--warm); }
+.idea-chip.no { background: var(--danger-soft); color: var(--danger); }
+.idea-note { margin-top: 4px; font-size: 12px; color: var(--muted); line-height: 1.45; }
+.teach-jargon { display: flex; flex-wrap: wrap; gap: 6px; }
+.teach-model { margin-top: 6px; font-size: 13.5px; line-height: 1.55; white-space: pre-wrap; }
+
+
+cd server && npx vitest run && npx tsc --noEmit
+
+
+for f in tests/*.test.mjs; do node "$f" > /dev/null || echo "FAIL $f"; done
+
+
+npm run typecheck
+
+
+node tools/build.mjs

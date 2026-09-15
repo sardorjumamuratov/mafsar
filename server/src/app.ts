@@ -7,7 +7,7 @@ import type { DB } from "./db.js";
 import {
   register, login, requireAuth, signAccessToken, signRefreshToken, upsertGoogleUser, verifyPassword,
 } from "./auth.js";
-import { syncSchema, registerSchema, loginSchema, generateSchema, gradeSchema, hypotheticalSchema, summarizeSchema, blurbSchema, codingTaskSchema, codingGradeSchema, shareCreateSchema, shareRevokeSchema, teamCreateSchema, teamJoinSchema, pollSchema, deleteAccountSchema } from "./schema.js";
+import { syncSchema, registerSchema, loginSchema, generateSchema, gradeSchema, hypotheticalSchema, summarizeSchema, blurbSchema, codingTaskSchema, teachTurnSchema, teachEvaluateSchema, codingGradeSchema, shareCreateSchema, shareRevokeSchema, teamCreateSchema, teamJoinSchema, pollSchema, deleteAccountSchema } from "./schema.js";
 import { googleConfigured, buildAuthUrl, pkcePair, exchangeCode, verifyIdToken } from "./google.js";
 import { applySync, changesSince } from "./sync.js";
 import { deleteUserData } from "./account.js";
@@ -15,8 +15,9 @@ import { nowISO, one, all, run, uid } from "./db.js";
 import { genTeamCode, leaderboardFor, learningFor } from "./teams.js";
 import { generateStudySet, gradeAnswer, generateHypothetical, summarizeConversation, setBlurb, generateCodingTask, gradeCode } from "./llm.js";
 import { DEFAULT_LIMITS, clientIp, corsOrigin, limitByIp, limitByUser, slidingWindow, tooMany, type IpSource } from "./ratelimit.js";
+import { MAX_STUDENT_TURNS, evaluateTeaching, studentTurns, teachTurn } from "./teach.js";
 import { PRIVACY_HTML } from "./privacy.js";
-import { getProvider, billingConfigured, requireQuota, usageSummary, effectivePlan, resolveOrigin, applyPlanChange, stripeProvider, paddleProvider, NoSubscriptionError } from "./billing/index.js";
+import { getProvider, billingConfigured, consumeQuota, refundQuota, requireQuota, usageSummary, effectivePlan, resolveOrigin, applyPlanChange, stripeProvider, paddleProvider, NoSubscriptionError } from "./billing/index.js";
 
 export function createApp(db: DB) {
   const app = new Hono<{ Variables: { userId: string } }>();
@@ -421,6 +422,32 @@ export function createApp(db: DB) {
   app.post("/v1/coding-grade", limitByUser(limits.llmPerUser), async (c) => {
     const body = codingGradeSchema.parse(await c.req.json());
     return c.json(await gradeCode(body));
+  });
+
+// Teach it back. A session costs one practice unit, charged on its first turn;
+  // later turns are bounded by the turn cap and the per-user limit instead.
+  app.post("/v1/teach/turn", limitByUser(limits.llmPerUser), async (c) => {
+    const body = teachTurnSchema.parse(await c.req.json());
+    if (studentTurns(body.messages) >= MAX_STUDENT_TURNS) {
+      return c.json({ error: "too_many_turns", message: "This session is finished. Tap Finish to see how you did." }, 400);
+    }
+    let eventId: string | null = null;
+    if (!body.messages.some((m) => m.role === "student")) {
+      const q = await consumeQuota(db, c.get("userId") as string, "practice");
+      if (!q.ok) return c.json(q.body, 402);
+      eventId = q.eventId;
+    }
+    try {
+      return c.json(await teachTurn(body));
+    } catch (e) {
+      if (eventId) await refundQuota(db, eventId);
+      throw e;
+    }
+  });
+
+  app.post("/v1/teach/evaluate", limitByUser(limits.llmPerUser), async (c) => {
+    const body = teachEvaluateSchema.parse(await c.req.json());
+    return c.json(await evaluateTeaching(body));
   });
 
   // --- Phase 3: analytics — TODO ---

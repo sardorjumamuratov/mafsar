@@ -106,6 +106,7 @@ export function paintDetail() {
             : '<div class="empty">No flashcards.</div>'
         }
       </div>
+<button class="btn btn-ghost btn-block" data-action="start-teach" data-id="${esc(session.id)}">🧒 Teach it back</button>
       ${studySet.mode === "coding" ? `<button class="btn btn-ghost btn-block" data-action="start-coding" data-id="${esc(session.id)}">⌨️ Coding exercises</button>` : ""}
       <div style="display:flex;gap:10px">
         <button class="btn btn-ghost" style="flex:1" data-action="add-card" data-id="${esc(session.id)}">＋ Card</button>

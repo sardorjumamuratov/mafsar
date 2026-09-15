@@ -604,4 +604,19 @@ test("the picker card clips the full-bleed hover to its own radius", () => {
   assert.ok(!generic.includes("overflow"), "do not put overflow on .block itself");
 });
 
+test("Teach it back is wired end to end", () => {
+  const read = (p) => fs.readFileSync(join(__dirname, p), "utf8").replace(/\r\n/g, "\n");
+  assert.ok(read("../src/ui/views/set-detail.js").includes('data-action="start-teach"'), "set detail needs the Teach it back button");
+  const panel = read("../src/ui/panel.js");
+  for (const a of ["start-teach", "teach-persona", "teach-send", "teach-hint", "teach-finish"]) {
+    assert.ok(panel.includes(`case "${a}"`), `panel.js must handle ${a}`);
+  }
+  const flow = read("../src/ui/flows/teach.js");
+  assert.ok(flow.includes('aria-live="polite"'), "the conversation must announce new replies to screen readers");
+  assert.ok(flow.includes('kind: "teach"'), "review-log rows must be marked so they don't reschedule cards");
+  assert.ok(read("../src/ui/flows/review.js").includes("setTeachState(null)"), "leaving a session must drop its state");
+  const sw = read("../src/background/service-worker.js");
+  assert.ok(sw.includes('case "TEACH_TURN"') && sw.includes('case "TEACH_EVALUATE"'), "the worker must route both messages");
+});
+
 console.log(`\n${passed} tests passed`);

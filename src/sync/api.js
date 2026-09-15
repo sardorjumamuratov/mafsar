@@ -134,3 +134,12 @@ export async function backendDeleteAccount({ password }) {
   if (!res.ok) throw new Error(deletionErrorMessage(data, res.status));
   return data;
 }
+
+
+export function backendTeachTurn(payload) {
+  return post("/v1/teach/turn", payload);
+}
+
+export function backendTeachEvaluate(payload) {
+  return post("/v1/teach/evaluate", payload);
+}
