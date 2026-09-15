@@ -2,6 +2,7 @@ import { serve } from "@hono/node-server";
 import { readFileSync, existsSync } from "node:fs";
 import { openDB, migrate } from "./db.js";
 import { createApp } from "./app.js";
+import { initSentry } from "./observability.js";
 
 // .env loading without a dependency: KEY=VALUE lines, nothing fancier.
 if (existsSync(".env")) {
@@ -10,6 +11,8 @@ if (existsSync(".env")) {
     if (m && !process.env[m[1]]) process.env[m[1]] = m[2];
   }
 }
+
+await initSentry(); // no-op unless SENTRY_DSN is set
 
 const db = openDB();
 await migrate(db); // creates tables on first boot (Turso or local file)
