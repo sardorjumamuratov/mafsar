@@ -4,11 +4,12 @@ import { cors } from "hono/cors";
 import { randomBytes, createHash, timingSafeEqual } from "node:crypto";
 import type { DB } from "./db.js";
 import {
-  register, login, requireAuth, signAccessToken, signRefreshToken, upsertGoogleUser,
+  register, login, requireAuth, signAccessToken, signRefreshToken, upsertGoogleUser, verifyPassword,
 } from "./auth.js";
-import { syncSchema, registerSchema, loginSchema, generateSchema, gradeSchema, hypotheticalSchema, summarizeSchema, blurbSchema, codingTaskSchema, codingGradeSchema, shareCreateSchema, shareRevokeSchema, teamCreateSchema, teamJoinSchema, pollSchema } from "./schema.js";
+import { syncSchema, registerSchema, loginSchema, generateSchema, gradeSchema, hypotheticalSchema, summarizeSchema, blurbSchema, codingTaskSchema, codingGradeSchema, shareCreateSchema, shareRevokeSchema, teamCreateSchema, teamJoinSchema, pollSchema, deleteAccountSchema } from "./schema.js";
 import { googleConfigured, buildAuthUrl, pkcePair, exchangeCode, verifyIdToken } from "./google.js";
 import { applySync, changesSince } from "./sync.js";
+import { deleteUserData } from "./account.js";
 import { nowISO, one, all, run, uid } from "./db.js";
 import { genTeamCode, leaderboardFor, learningFor } from "./teams.js";
 import { generateStudySet, gradeAnswer, generateHypothetical, summarizeConversation, setBlurb, generateCodingTask, gradeCode } from "./llm.js";
@@ -30,10 +31,22 @@ export function createApp(db: DB) {
   app.get("/s/:code", serveStatic({ path: "../landing/index.html" }));
   app.get("/t/:code", serveStatic({ path: "../landing/index.html" }));
 
+  const isPublicV1 = (path: string) => path.startsWith("/v1/auth/") || path.startsWith("/v1/webhooks/");
+
   app.use("/v1/*", async (c, next) => {
     // Auth routes are public; everything else under /v1 requires a token.
-    if (c.req.path.startsWith("/v1/auth/") || c.req.path.startsWith("/v1/webhooks/")) return next();
+    if (isPublicV1(c.req.path)) return next();
     return requireAuth()(c, next);
+  });
+
+  // Tokens are stateless and outlive a deleted account (access 15 min, refresh
+  // 30 days). One primary-key lookup per request keeps a deleted user from syncing
+  // their data back into existence through any route.
+  app.use("/v1/*", async (c, next) => {
+    if (isPublicV1(c.req.path)) return next();
+    const live = await one(db, "SELECT 1 AS x FROM users WHERE id = ?", [c.get("userId") as string]);
+    if (!live) return c.json({ error: "unauthorized" }, 401);
+    return next();
   });
 
   app.onError((err, c) => {
@@ -81,6 +94,8 @@ export function createApp(db: DB) {
     try {
       const { payload } = await jwtVerify(refreshToken, (await import("./auth.js")).secretKey());
       if (payload.typ !== "refresh") throw new Error("wrong token type");
+      const live = await one(db, "SELECT 1 AS x FROM users WHERE id = ?", [payload.sub as string]);
+      if (!live) throw new Error("deleted");
       return c.json({ accessToken: await signAccessToken(payload.sub as string) });
     } catch {
       return c.json({ error: "unauthorized" }, 401);
@@ -171,15 +186,48 @@ export function createApp(db: DB) {
 
   app.get("/v1/me", async (c) => {
     const userId = c.get("userId") as string;
-    const user = await one<{ id: string; email: string; created_at: string; plan: string }>(
-      db, "SELECT id, email, created_at, plan FROM users WHERE id = ?", [userId]
+    const row = await one<{ id: string; email: string; created_at: string; plan: string; password_hash: string | null }>(
+      db, "SELECT id, email, created_at, plan, password_hash FROM users WHERE id = ?", [userId]
     );
-    if (!user) return c.json({ error: "not_found" }, 404);
+    const { password_hash, ...user } = row ?? ({} as any);
+    if (!row) return c.json({ error: "not_found" }, 404);
     // Report the plan the user is actually served, so an admin's panel shows
     // unlimited rather than a free-tier meter they will never hit.
     const plan = effectivePlan(user.plan, user.email);
     const usage = await usageSummary(db, userId, plan);
-    return c.json({ user, usage: { ...usage, plan } });
+    return c.json({ user, hasPassword: !!password_hash, usage: { ...usage, plan } });
+  });
+
+  app.delete("/v1/account", async (c) => {
+    const userId = c.get("userId") as string;
+    const body = deleteAccountSchema.parse(await c.req.json().catch(() => ({})));
+    const user = await one<{ password_hash: string | null; billing_customer_id: string | null; billing_provider: string | null }>(
+      db, "SELECT password_hash, billing_customer_id, billing_provider FROM users WHERE id = ?", [userId]
+    );
+    if (!user) return c.json({ error: "unauthorized" }, 401);
+
+    // Re-authenticate password accounts: an access token alone is not enough
+    // for the one irreversible action in the API.
+    if (user.password_hash) {
+      if (!body.password || !(await verifyPassword(body.password, user.password_hash))) {
+        return c.json({ error: "wrong_password", message: "That password isn't right." }, 403);
+      }
+    }
+
+    // Cancel billing first. If that fails, delete nothing: a deleted account
+    // must never still be charged.
+    if (user.billing_customer_id) {
+      try {
+        const provider = getProvider(user.billing_provider || undefined);
+        if (!provider.configured()) throw new Error("billing provider not configured");
+        await provider.cancelSubscriptions({ db, userId });
+      } catch (e: any) {
+        return c.json({ error: "billing_cancel_failed", message: e.message }, 502);
+      }
+    }
+
+    await deleteUserData(db, userId);
+    return c.json({ ok: true });
   });
 
   app.post("/v1/sync", async (c) => {

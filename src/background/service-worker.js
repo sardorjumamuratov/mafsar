@@ -27,7 +27,7 @@ import {
   backendTeamJoin,
   backendTeamList,
   backendTeamGet,
-  backendTeamLeave,
+  backendTeamLeave, backendDeleteAccount,
   backendCodingTask,
   backendCodingGrade,
 } from "../sync/api.js";
@@ -566,6 +566,13 @@ async function handle(msg) {
     case "BILLING_CHECKOUT": {
       const { url } = await backendBillingCheckout(msg.plan);
       return { url };
+    }
+    case "DELETE_ACCOUNT": {
+      await backendDeleteAccount({ password: msg.password ? String(msg.password) : "" });
+      // The account is gone; nothing local is useful without it, and leaving the
+      // auth tokens behind would keep a dead session around.
+      await chrome.storage.local.clear();
+      return { deleted: true };
     }
     case "BILLING_PORTAL": {
       const { url } = await backendBillingPortal();

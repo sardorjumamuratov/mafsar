@@ -84,6 +84,8 @@ export async function applySubscriptionStatus(
   ]);
 }
 
+import { one } from "../db.js";
+
 export const stripeProvider: BillingProvider = {
   name: "stripe",
 
@@ -93,6 +95,19 @@ export const stripeProvider: BillingProvider = {
       (process.env.STRIPE_PRICE_ID_PLUS || process.env.STRIPE_PRICE_ID_PRO || process.env.STRIPE_PRICE_ID) &&
       process.env.STRIPE_WEBHOOK_SECRET
     );
+  },
+
+  async cancelSubscriptions({ db, userId }) {
+    const user = await one<{ billing_customer_id: string | null }>(
+      db, "SELECT billing_customer_id FROM users WHERE id = ?", [userId]
+    );
+    if (!user?.billing_customer_id) return;
+    const stripe = stripeClient();
+    for await (const sub of stripe.subscriptions.list({ customer: user.billing_customer_id, status: "all" })) {
+      if (["active", "trialing", "past_due", "unpaid", "incomplete"].includes(sub.status)) {
+        await stripe.subscriptions.cancel(sub.id);
+      }
+    }
   },
 
   async createCheckout({ db, userId, email, plan, origin }) {

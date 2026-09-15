@@ -58,6 +58,12 @@ export const reviewSchema = z.object({
   reviewedAt: z.string(),
 });
 
+export const deleteAccountSchema = z.object({
+  // Exact and case-sensitive: this is the one irreversible call in the API.
+  confirm: z.literal("DELETE"),
+  password: z.string().max(200).optional(),
+});
+
 export const syncSchema = z.object({
   since: z.string().optional(),
   sets: z.array(setSchema).default([]),
