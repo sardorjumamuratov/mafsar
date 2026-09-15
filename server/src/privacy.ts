@@ -50,6 +50,10 @@ underlying model provider, such as Google) solely to generate study material. We
 configure that service not to allow your text to be used for model training, and
 we do not share it for advertising or analytics.</p>
 
+<p>The same applies to what you write in practice modes (typed answers, coding
+exercises and Teach it back conversations): it is sent to the AI service only to
+grade or reply, and is not stored on our servers.</p>
+
 <h2>Where data is stored</h2>
 <p>Account and synced study data is stored in a hosted SQLite database (Turso)
 accessed by our backend (hosted on Railway). Data is transmitted over HTTPS.</p>

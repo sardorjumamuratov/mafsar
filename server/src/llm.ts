@@ -250,7 +250,7 @@ export function extractJson(raw: string): any {
   return JSON.parse(candidate.slice(start, end + 1));
 }
 
-async function callJson(system: string, user: string): Promise<any> {
+export async function callJson(system: string, user: string): Promise<any> {
   let lastErr: unknown;
   for (let attempt = 0; attempt < 2; attempt++) {
     const raw = await callLLM(system, user);

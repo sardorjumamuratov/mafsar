@@ -12,6 +12,7 @@ import { applyNext, goReturn, gradeCard, revealCard, startGlobalReview, startSet
 import { authGoogle, authSubmit, exportBackup, exportSetTsv, generateSummary, googleAbortController, importBackupFile, renderAuthGate, renderYou } from "./views/you.js";
 import { checkApply, startApply } from "./flows/apply.js";
 import { checkCode, codingNext, startCodingPractice } from "./flows/coding.js";
+import { startTeach, setTeachPersona, sendTeach, finishTeach } from "./flows/teach.js";
 import { copyShareCode, revokeShareFor, toggleSetShare } from "./share.js";
 import { createTeamFromForm, joinTeamFromInput, leaveTeam, renderTeam, renderTeamCreate, renderTeams } from "./views/teams.js";
 import { checkTyped, startTypedPractice, typedNext } from "./flows/typed.js";
@@ -97,6 +98,11 @@ document.addEventListener("click", (e) => {
       })().catch(e => toast(e.message));
       break;
     case "start-coding": startCodingPractice(id); break;
+case "start-teach": startTeach(id); break;
+    case "teach-persona": setTeachPersona((/** @type {any} */ (t)).dataset.persona); break;
+    case "teach-send": sendTeach(false); break;
+    case "teach-hint": sendTeach(true); break;
+    case "teach-finish": finishTeach(); break;
     case "set-share": toggleSetShare(id); break;
     case "share-copy": copyShareCode((/** @type {any} */ (t)).dataset.code, t); break;
     case "share-revoke": revokeShareFor((/** @type {any} */ (t)).dataset.id); break;

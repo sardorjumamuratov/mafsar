@@ -27,7 +27,7 @@ import {
   backendTeamJoin,
   backendTeamList,
   backendTeamGet,
-  backendTeamLeave, backendDeleteAccount,
+  backendTeamLeave, backendDeleteAccount, backendTeachTurn, backendTeachEvaluate,
   backendCodingTask,
   backendCodingGrade,
 } from "../sync/api.js";
@@ -567,6 +567,27 @@ async function handle(msg) {
       const { url } = await backendBillingCheckout(msg.plan);
       return { url };
     }
+case "TEACH_TURN": {
+      const turn = await backendTeachTurn({
+        topic: String(msg.topic || ""),
+        persona: msg.persona === "beginner" ? "beginner" : "child",
+        cards: Array.isArray(msg.cards) ? msg.cards : [],
+        messages: Array.isArray(msg.messages) ? msg.messages : [],
+        wantHint: !!msg.wantHint,
+      });
+      return { turn };
+    }
+
+    case "TEACH_EVALUATE": {
+      const evaluation = await backendTeachEvaluate({
+        topic: String(msg.topic || ""),
+        persona: msg.persona === "beginner" ? "beginner" : "child",
+        cards: Array.isArray(msg.cards) ? msg.cards : [],
+        messages: Array.isArray(msg.messages) ? msg.messages : [],
+      });
+      return { evaluation };
+    }
+
     case "DELETE_ACCOUNT": {
       await backendDeleteAccount({ password: msg.password ? String(msg.password) : "" });
       // The account is gone; nothing local is useful without it, and leaving the
