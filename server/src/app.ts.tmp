@@ -1,6 +1,3 @@
-import { Hono } from "hono";
-import { serveStatic } from "@hono/node-server/serve-static";
-import { reportError } from "./observability.js";
 import { cors } from "hono/cors";
 import { randomBytes, createHash, timingSafeEqual } from "node:crypto";
 import type { DB } from "./db.js";
@@ -45,15 +42,11 @@ export function createApp(db: DB) {
     // LLM failures are operational (missing key, retired model, upstream
     // outage), not bugs — report the reason so the user sees something
     // actionable rather than "generation failed".
-    const where = { method: c.req.method, path: c.req.path, userId: c.get("userId") as string | undefined };
     if (e.name === "LLMError") {
       console.error("LLM:", e.message);
-      const status = (e.status ?? 502) as 502;
-      reportError(err, { ...where, level: "warning", status });
-      return c.json({ error: "llm_error", message: e.message }, status);
+      return c.json({ error: "llm_error", message: e.message }, (e.status ?? 502) as 502);
     }
     console.error(err);
-    reportError(err, { ...where, status: 500 });
     return c.json({ error: "internal" }, 500);
   });
 
@@ -213,7 +206,6 @@ export function createApp(db: DB) {
     } catch (e: any) {
       if (e.message === "billing_not_configured") return c.json({ error: "billing_not_configured" }, 501);
       console.error("Checkout error:", e.stack);
-      reportError(e, { method: c.req.method, path: c.req.path, userId: c.get("userId") as string | undefined });
       return c.json({ error: "internal" }, 500);
     }
   });
@@ -229,7 +221,6 @@ export function createApp(db: DB) {
     } catch (e: any) {
       if (e instanceof NoSubscriptionError) return c.json({ error: "no_subscription" }, 404);
       console.error("Portal error:", e.stack);
-      reportError(e, { method: c.req.method, path: c.req.path, userId: c.get("userId") as string | undefined });
       return c.json({ error: "internal" }, 500);
     }
   });
@@ -248,7 +239,6 @@ export function createApp(db: DB) {
       return c.json({});
     } catch (e: any) {
       console.error(e.stack);
-      reportError(e, { method: c.req.method, path: c.req.path, userId: c.get("userId") as string | undefined });
       return c.json({ error: "internal" }, 500);
     }
   });
@@ -267,7 +257,6 @@ export function createApp(db: DB) {
       return c.json({});
     } catch (e: any) {
       console.error(e.stack);
-      reportError(e, { method: c.req.method, path: c.req.path, userId: c.get("userId") as string | undefined });
       return c.json({ error: "internal" }, 500);
     }
   });

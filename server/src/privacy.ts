@@ -70,6 +70,13 @@ extension. To delete your account and all associated server-side data, email
 <a href="mailto:sardoralien@gmail.com">sardoralien@gmail.com</a> from the
 account's registered address and we'll remove it within 7 days.</p>
 
+<h2>Error reports</h2>
+<p>When our backend hits an unexpected error, it sends a report to Sentry, our
+error-monitoring service. The report contains the error message and technical
+details, the part of our API involved, and your random account ID. It never
+includes your email address, password, sign-in tokens, or the content you
+capture.</p>
+
 <h2>Children's privacy</h2>
 <p>Mafsar is not directed at children under 13, and we do not knowingly
 collect data from them.</p>
