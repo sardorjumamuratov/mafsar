@@ -84,8 +84,6 @@ export async function applySubscriptionStatus(
   ]);
 }
 
-import { one } from "../db.js";
-
 export const stripeProvider: BillingProvider = {
   name: "stripe",
 

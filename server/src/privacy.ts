@@ -64,7 +64,10 @@ accessed by our backend (hosted on Railway). Data is transmitted over HTTPS.</p>
 
 <h2>Data deletion</h2>
 <p>You can delete individual study sets and cards at any time from the
-extension. To delete your account and all associated server-side data, email
+extension. To delete your account and all associated server-side data, open
+the You tab and choose <strong>Delete account</strong>. Deletion is immediate
+and permanent, and any active subscription is cancelled at the same time. If
+you can't sign in, email
 <a href="mailto:sardoralien@gmail.com">sardoralien@gmail.com</a> from the
 account's registered address and we'll remove it within 7 days.</p>
 

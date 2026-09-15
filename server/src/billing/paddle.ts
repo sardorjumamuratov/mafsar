@@ -69,8 +69,6 @@ export function planForPaddlePriceId(priceId: string): "plus" | "pro" | null {
   return null;
 }
 
-import { one } from "../db.js";
-
 export const paddleProvider: BillingProvider = {
   name: "paddle",
 

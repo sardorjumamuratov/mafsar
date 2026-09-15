@@ -11,7 +11,7 @@ let passed = 0;
 function test(name, fn) {
   fn();
   passed++;
-  console.log(`  ? ${name}`);
+  console.log(`  ✓ ${name}`);
 }
 
 test("the store listing doesn't claim offline use", () => {

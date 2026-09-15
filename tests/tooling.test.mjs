@@ -14,7 +14,7 @@ let passed = 0;
 function test(name, fn) {
   fn();
   passed++;
-  console.log(`  ? ${name}`);
+  console.log(`  ✓ ${name}`);
 }
 
 test("CI runs the extension type check", () => {

@@ -63,7 +63,7 @@ export async function confirmDeleteAccount() {
   if (!canConfirmDeletion({ typed, password, hasPassword })) return;
   const btn = /** @type {HTMLButtonElement} */ (app.querySelector('[data-action="delete-account-confirm"]'));
   btn.disabled = true;
-  btn.textContent = "Deleting…";
+  btn.textContent = "Deletingâ€¦";
   try {
     await send({ type: "DELETE_ACCOUNT", password: hasPassword ? password : "" });
     toast("Your account was deleted.");
