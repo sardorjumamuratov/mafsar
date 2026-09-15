@@ -98,7 +98,7 @@ document.addEventListener("click", (e) => {
       })().catch(e => toast(e.message));
       break;
     case "start-coding": startCodingPractice(id); break;
-case "start-teach": startTeach(id); break;
+    case "start-teach": startTeach(id); break;
     case "teach-persona": setTeachPersona((/** @type {any} */ (t)).dataset.persona); break;
     case "teach-send": sendTeach(false); break;
     case "teach-hint": sendTeach(true); break;

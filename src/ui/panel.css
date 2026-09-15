@@ -1473,7 +1473,6 @@ input[type="checkbox"]:focus-visible {
   color: var(--ink);
 }
 
-
 /* --- study mode selector --- */
 .modes {
   display: flex;
@@ -1759,7 +1758,6 @@ span.flatpickr-weekday {
 .danger-block { border-color: var(--danger); background: var(--danger-soft); }
 .danger-list { margin: 8px 0 0; padding-left: 18px; font-size: 12.5px; line-height: 1.5; color: var(--ink); }
 
-
 /* --- teach it back (Feynman) -------------------------------------------- */
 .teach-lead { margin: 6px 0 0; font-size: 13.5px; line-height: 1.5; color: var(--ink); }
 .teach-ideas { margin: 6px 0 0; padding-left: 18px; font-size: 13px; line-height: 1.6; color: var(--muted); }
@@ -1788,15 +1786,6 @@ span.flatpickr-weekday {
 .idea-note { margin-top: 4px; font-size: 12px; color: var(--muted); line-height: 1.45; }
 .teach-jargon { display: flex; flex-wrap: wrap; gap: 6px; }
 .teach-model { margin-top: 6px; font-size: 13.5px; line-height: 1.55; white-space: pre-wrap; }
-
-
-cd server && npx vitest run && npx tsc --noEmit
-
-
-for f in tests/*.test.mjs; do node "$f" > /dev/null || echo "FAIL $f"; done
-
-
-npm run typecheck
-
-
-node tools/build.mjs
+@media (prefers-reduced-motion: reduce) {
+  .bubble.typing span { animation: none; }
+}

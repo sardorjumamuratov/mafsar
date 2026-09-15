@@ -424,7 +424,7 @@ export function createApp(db: DB) {
     return c.json(await gradeCode(body));
   });
 
-// Teach it back. A session costs one practice unit, charged on its first turn;
+  // Teach it back. A session costs one practice unit, charged on its first turn;
   // later turns are bounded by the turn cap and the per-user limit instead.
   app.post("/v1/teach/turn", limitByUser(limits.llmPerUser), async (c) => {
     const body = teachTurnSchema.parse(await c.req.json());

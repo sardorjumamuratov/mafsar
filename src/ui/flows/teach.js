@@ -1,5 +1,5 @@
 import { XBTN, app, bundle, esc, send, setFor, setHTML, toast } from "../core.js";
-import { isDue } from "../../storage/srs.js"; // ← use the same path coding.js uses
+import { isDue } from "../../storage/srs.js";
 import { setFocusReturn } from "../flows/review.js";
 import { showChrome } from "../nav.js";
 import { appendReviewLog, bumpActivity, uid } from "../../storage/store.js";

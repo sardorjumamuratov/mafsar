@@ -134,7 +134,6 @@ export const teamJoinSchema = z.object({ code: z.string().trim().min(1).max(32) 
 
 export const pollSchema = z.object({ pollToken: z.string().min(20).max(200) });
 
-
 // Teach it back. The client sends the whole conversation on every turn (nothing
 // is stored server-side), so every size is capped here.
 export const MAX_TEACH_MESSAGES = 24;

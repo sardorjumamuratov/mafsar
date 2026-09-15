@@ -567,7 +567,7 @@ async function handle(msg) {
       const { url } = await backendBillingCheckout(msg.plan);
       return { url };
     }
-case "TEACH_TURN": {
+    case "TEACH_TURN": {
       const turn = await backendTeachTurn({
         topic: String(msg.topic || ""),
         persona: msg.persona === "beginner" ? "beginner" : "child",

@@ -135,7 +135,6 @@ export async function backendDeleteAccount({ password }) {
   return data;
 }
 
-
 export function backendTeachTurn(payload) {
   return post("/v1/teach/turn", payload);
 }
