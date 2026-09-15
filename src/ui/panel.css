@@ -1749,3 +1749,14 @@ span.flatpickr-weekday {
 .date-input[readonly] {
   cursor: pointer !important;
 }
+
+ / *   - - -   d e s t r u c t i v e   a c t i o n s   - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -   * / 
+ . b t n - d a n g e r   {   c o l o r :   v a r ( - - d a n g e r ) ;   } 
+ / *   - - s u r f a c e ,   n o t   # f f f ,   f o r   t h e   l a b e l :   d a r k   m o d e ' s   - - d a n g e r   i s   l i g h t   e n o u g h   t h a t 
+       w h i t e   t e x t   o n   i t   f a i l s   c o n t r a s t .   * / 
+ . b t n . b t n - p r i m a r y . b t n - d a n g e r   {   b a c k g r o u n d :   v a r ( - - d a n g e r ) ;   b o r d e r - c o l o r :   v a r ( - - d a n g e r ) ;   c o l o r :   v a r ( - - s u r f a c e ) ;   } 
+ . b t n - d a n g e r : d i s a b l e d   {   o p a c i t y :   . 5 ;   c u r s o r :   n o t - a l l o w e d ;   } 
+ . d a n g e r - b l o c k   {   b o r d e r - c o l o r :   v a r ( - - d a n g e r ) ;   b a c k g r o u n d :   v a r ( - - d a n g e r - s o f t ) ;   } 
+ . d a n g e r - l i s t   {   m a r g i n :   8 p x   0   0 ;   p a d d i n g - l e f t :   1 8 p x ;   f o n t - s i z e :   1 2 . 5 p x ;   l i n e - h e i g h t :   1 . 5 ;   c o l o r :   v a r ( - - i n k ) ;   } 
+  
+ 

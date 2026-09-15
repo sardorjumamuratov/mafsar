@@ -1,3 +1,4 @@
+import { confirmDeleteAccount, renderDeleteAccount } from "./views/delete-account.js";
 import { doImport, previewImport, renderImport } from "./views/import.js";
 import { app, bundle, nav, send, setFor, toast } from "./core.js";
 import { goToActiveTab, registerTabs } from "./nav.js";
@@ -142,6 +143,8 @@ document.addEventListener("click", (e) => {
     case "auth-google-cancel":
       if (googleAbortController) googleAbortController.abort();
       break;
+    case "delete-account-open": renderDeleteAccount(); break;
+    case "delete-account-confirm": confirmDeleteAccount(); break;
     case "auth-signout":
       logout().then(() => {
         toast("Signed out. Your sets stay on this device.");

@@ -56,7 +56,7 @@ test("in-place repaints never reset scroll", () => {
   // home, exam picker, sets, set detail, make-set, import, teams (two exits:
   // signed-out early return + normal path), team detail, you, auth gate.
   const callSites = src.split("topOfView();").length - 1;
-  assert.equal(callSites, 12, "exactly the view-renderer exits reset scroll");
+  assert.equal(callSites, 13, "exactly the view-renderer exits reset scroll");
 });
 
 console.log("quiz length picker wiring (item 1)");

@@ -3,6 +3,7 @@
 // signed-in account token.
 
 import { authedFetch } from "./auth.js";
+import { DELETE_CONFIRM_WORD, deletionErrorMessage } from "../storage/account.js";
 
 async function post(path, body) {
   const res = await authedFetch(path, {
@@ -121,4 +122,15 @@ export function backendTeamGet(id) {
 /** id -> { ok } — remove the caller from the team. */
 export function backendTeamLeave(id) {
   return post(`/v1/teams/${encodeURIComponent(id)}/leave`, {});
+}
+
+/** Permanently deletes the account on the server. Throws with a user-facing message. */
+export async function backendDeleteAccount({ password }) {
+  const res = await authedFetch("/v1/account", {
+    method: "DELETE",
+    body: JSON.stringify({ confirm: DELETE_CONFIRM_WORD, password: password || undefined }),
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(deletionErrorMessage(data, res.status));
+  return data;
 }
