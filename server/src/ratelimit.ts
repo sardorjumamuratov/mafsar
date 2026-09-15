@@ -51,6 +51,18 @@ export function slidingWindow({ limit, windowMs }: { limit: number; windowMs: nu
     return valid;
   };
 
+  // Keys are IPs and emails, which an attacker can mint without limit. Every
+  // 1000 writes, drop keys whose hits have all expired, or the map grows forever.
+  let writes = 0;
+  const save = (key: string, hits: number[]) => {
+    store.set(key, hits);
+    if (++writes % 1000 !== 0) return;
+    const now = Date.now();
+    for (const [k, v] of store) {
+      if (!v.length || now - v[v.length - 1] >= windowMs) store.delete(k);
+    }
+  };
+
   return {
     hit: (key: string) => {
       const now = Date.now();
@@ -64,7 +76,7 @@ export function slidingWindow({ limit, windowMs }: { limit: number; windowMs: nu
       }
 
       hits.push(now);
-      store.set(key, hits);
+      save(key, hits);
       return { allowed: true, retryAfterMs: 0 };
     },
     
@@ -80,7 +92,7 @@ export function slidingWindow({ limit, windowMs }: { limit: number; windowMs: nu
       const now = Date.now();
       const hits = cleanup(now, store.get(key) || []);
       hits.push(now);
-      store.set(key, hits);
+      save(key, hits);
     },
 
     retryAfter: (key: string) => {
@@ -93,6 +105,8 @@ export function slidingWindow({ limit, windowMs }: { limit: number; windowMs: nu
     clear: (key: string) => {
       store.delete(key);
     },
+
+    size: () => store.size,
   };
 }
 

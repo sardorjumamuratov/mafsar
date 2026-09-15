@@ -39,6 +39,16 @@ describe("slidingWindow", () => {
     expect(w.hit("b").allowed).toBe(true); // b has its own bucket
     expect(w.hit("a").allowed).toBe(false);
   });
+
+  it("forgets expired keys, so minting new IPs can't grow memory forever", () => {
+    vi.useFakeTimers({ now: 0 });
+    const w = slidingWindow({ limit: 5, windowMs: 1000 });
+    for (let i = 0; i < 999; i++) w.hit(`old-${i}`);
+    vi.setSystemTime(5000);
+    w.hit("fresh"); // the 1000th write triggers the sweep
+    expect(w.size()).toBe(1);
+    vi.useRealTimers();
+  });
 });
 
 describe("clientIp", () => {
