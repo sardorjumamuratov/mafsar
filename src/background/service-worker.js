@@ -220,7 +220,7 @@ function extractLastAnswerGeneric() {
     for (let j = 0; j < el.children.length; j++) {
       const child = el.children[j];
       if (child.getClientRects().length === 0) continue;
-      const text = (child.innerText || "").trim();
+      const text = ((/** @type {HTMLElement} */ (child)).innerText || "").trim();
       if (text.length > 30) score++;
     }
 
@@ -251,7 +251,7 @@ function extractLastAnswerGeneric() {
   for (let i = bestContainer.children.length - 1; i >= 0; i--) {
     const child = bestContainer.children[i];
     if (child.getClientRects().length === 0) continue;
-    const text = (child.innerText || "").trim();
+    const text = ((/** @type {HTMLElement} */ (child)).innerText || "").trim();
     if (!text) continue;
 
     if (answer === null) {
