@@ -36,7 +36,7 @@ export async function renderYou() {
        </div>`
     : `<div class="block" style="display:flex;flex-direction:column;gap:10px">
          <div style="font-weight:600;font-size:13px">Back up and sync</div>
-         <div style="font-size:12px;color:var(--muted);line-height:1.5">Sign in to sync your sets across devices. Everything works offline without an account.</div>
+         <div style="font-size:12px;color:var(--muted);line-height:1.5">Sign in to generate study sets and sync them across your devices.</div>
          <button class="btn btn-ghost btn-block" data-action="auth-google">${GOOGLE_G} Continue with Google</button>
          <div class="or-divider">or</div>
          <div class="field"><label>Email</label><input id="youEmail" type="email" placeholder="you@example.com" autocomplete="email" /></div>
@@ -51,7 +51,7 @@ export async function renderYou() {
     <div class="view">
       <div class="ahd"><div class="wordmark">Maf<b>sar</b></div></div>
       <div class="block" style="text-align:center;padding:20px">
-        <div style="font-size:13px;color:var(--muted)">${auth?.user ? "Your sets are backed up" : "Everything stays on this device"}</div>
+        <div style="font-size:13px;color:var(--muted)">${auth?.user ? "Your sets are backed up" : "Sign in to back up your sets"}</div>
         <div style="display:flex;justify-content:center;gap:8px;margin-top:12px">
           <span class="streak">${FLAME}${streak}-day streak</span>
         </div>
