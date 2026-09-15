@@ -170,6 +170,65 @@ test("never reformats code", () => {
   assert.equal(cleanAnswerText(code), code);
 });
 
+console.log("icon glyph names (Google UIs)");
+
+// Gemini and AI Studio draw icons with Material Symbols, so innerText of a turn
+// contains "edit", "more_vert", "thumb_up"... A question read that way became
+// the set title "edit more_vert".
+
+test("an icon-name line never becomes the title", () => {
+  const r = extractLastAnswer([
+    { role: "user", text: "edit\nmore_vert\nWhat is TCP?" },
+    { role: "assistant", text: long() },
+  ]);
+  assert.equal(r.title, "What is TCP?");
+  assert.equal(r.question, "What is TCP?");
+});
+
+test("icon names flattened onto one line are dropped from the question", () => {
+  const r = extractLastAnswer([
+    { role: "user", text: "edit more_vert\nWhat is TCP?" },
+    { role: "assistant", text: long() },
+  ]);
+  assert.equal(r.title, "What is TCP?");
+});
+
+test("a question that is only icon names falls back to the answer", () => {
+  const r = extractLastAnswer([
+    { role: "user", text: "edit more_vert" },
+    { role: "assistant", text: "A monad is a monoid in the category of endofunctors. " + long() },
+  ]);
+  assert.equal(r.question, null);
+  assert.equal(r.title, "A monad is a monoid in the category of endofunctors.");
+});
+
+test("per-turn icon rows are stripped from the answer", () => {
+  const r = extractLastAnswer([
+    { role: "user", text: "q" },
+    { role: "assistant", text: long("BODY ") + "\nthumb_up\nthumb_down\nmore_vert" },
+  ]);
+  assert.ok(r.ok);
+  assert.ok(!/thumb_up|thumb_down|more_vert/.test(r.answer), r.answer.slice(-40));
+});
+
+test("an answer that is only icon names is not captured", () => {
+  const r = extractLastAnswer([
+    { role: "user", text: "q" },
+    { role: "assistant", text: "content_copy\nthumb_up" },
+  ]);
+  assert.equal(r.ok, false);
+});
+
+test("keeps a code line made of snake_case identifiers", () => {
+  const code = "user_id\norder_id";
+  assert.equal(cleanAnswerText(code), code);
+});
+
+test("keeps a sentence that mentions an icon name", () => {
+  const s = "Click more_vert to open the menu.";
+  assert.equal(cleanAnswerText(s), s);
+});
+
 console.log("answerMessages");
 
 test("sends the question and answer as a pair", () => {

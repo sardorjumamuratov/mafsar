@@ -26,6 +26,32 @@
    */
   const CHROME_LINES = new Set(["copy", "copy code", "copy to clipboard", "edit"]);
 
+  /**
+   * Material Symbols names Google's chat UIs attach to each turn. The DOM layer
+   * (window.__mafsar.readText in adapters/adapter.js) strips the ones it can
+   * see; this list is the backstop for text that arrives without that pass.
+   * Explicit names only: matching any snake_case token would eat a line of
+   * code like `user_id`.
+   */
+  const ICON_TOKENS = new Set([
+    "edit", "edit_note", "more_vert", "more_horiz", "content_copy",
+    "thumb_up", "thumb_down", "restart_alt", "volume_up",
+    "expand_more", "expand_less", "keyboard_arrow_up", "keyboard_arrow_down",
+    "drag_indicator",
+  ]);
+
+  /**
+   * Site UI rather than content: an exact chrome phrase, or a run of icon
+   * names ("edit more_vert") that innerText flattened onto one line.
+   * @param {string} line
+   */
+  function isChromeLine(line) {
+    const t = line.trim().toLowerCase();
+    if (!t) return false;
+    if (CHROME_LINES.has(t)) return true;
+    return t.split(/\s+/).every((tok) => ICON_TOKENS.has(tok));
+  }
+
   /** @param {string} s */
   function collapse(s) {
     return String(s == null ? "" : s).replace(/\s+/g, " ").trim();
@@ -42,7 +68,7 @@
     const lines = String(text == null ? "" : text).split(/\r?\n/);
     const kept = [];
     for (const line of lines) {
-      if (CHROME_LINES.has(line.trim().toLowerCase())) continue;
+      if (isChromeLine(line)) continue;
       kept.push(line);
     }
     return kept.join("\n").replace(/\n{3,}/g, "\n\n").trim();
@@ -99,7 +125,9 @@
     let answerAt = -1;
     for (let i = list.length - 1; i >= 0; i--) {
       const m = list[i];
-      if (m && m.role === "assistant" && collapse(m.text)) {
+      // Cleaned before testing: a turn that is nothing but icon names is UI,
+      // not an answer, and must not shadow the real one before it.
+      if (m && m.role === "assistant" && collapse(cleanAnswerText(m.text))) {
         answerAt = i;
         break;
       }
@@ -109,11 +137,14 @@
     const answer = cleanAnswerText(list[answerAt].text);
     if (answer.length < MIN_ANSWER_CHARS) return { ok: false, reason: "too-short" };
 
+    // The question is cleaned too — it becomes the set title, and uncleaned it
+    // was titling sets "edit more_vert" on Gemini and AI Studio.
     let question = null;
     for (let i = answerAt - 1; i >= 0; i--) {
       const m = list[i];
-      if (m && m.role === "user" && collapse(m.text)) {
-        question = collapse(m.text);
+      const q = m && m.role === "user" ? collapse(cleanAnswerText(m.text)) : "";
+      if (q) {
+        question = q;
         break;
       }
     }

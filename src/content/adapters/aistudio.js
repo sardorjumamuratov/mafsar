@@ -40,7 +40,7 @@
           }
 
           if (role) {
-            const text = ((/** @type {any} */ (n)).innerText || "").trim();
+            const text = (/** @type {any} */ (window)).__mafsar.readText(n);
             if (text) out.push({ role, text });
           }
         });
@@ -52,7 +52,7 @@
       fallbackNodes.forEach((n) => {
         const attr = n.getAttribute('data-turn-role');
         const role = attr === "User" ? "user" : "assistant";
-        const text = ((/** @type {any} */ (n)).innerText || "").trim();
+        const text = (/** @type {any} */ (window)).__mafsar.readText(n);
         if (text) out.push({ role, text });
       });
 
