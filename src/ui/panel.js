@@ -33,6 +33,24 @@ document.addEventListener("click", (e) => {
     case "nav-back": goToActiveTab(); break;
     case "nav-sets": renderSets(); break;
     case "open-set": renderSetDetail(id); break;
+    case "open-weak":
+      (async () => {
+        const sessionId = (/** @type {any} */ (t)).dataset.id;
+        const cardId = (/** @type {any} */ (t)).dataset.card;
+        const { sessions } = await bundle();
+        if (!sessions.find(s => s.id === sessionId)) {
+          toast("That set was deleted");
+          return;
+        }
+        await renderSetDetail(sessionId, "cards");
+        const cardRow = app.querySelector(`[data-card-id="${cardId}"]`);
+        if (cardRow) {
+          cardRow.scrollIntoView({ block: "center" });
+          cardRow.classList.add("flash-highlight");
+          setTimeout(() => cardRow.classList.remove("flash-highlight"), 1500);
+        }
+      })().catch(e => toast(e.message));
+      break;
     case "make-set": makeSet(id); break;
     case "capture-current": captureCurrent(); break;
     case "capture-last-answer": captureLastAnswer(t); break;

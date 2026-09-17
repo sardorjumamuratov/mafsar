@@ -94,7 +94,7 @@ export function paintDetail() {
             ? studySet.flashcards
                 .map(
                   (c) =>
-                    `<div class="cardrow"><span class="sdot ${masteryOf(c)}"></span><span class="q">${esc(c.front)}</span><span class="due">${
+                    `<div class="cardrow" data-card-id="${esc(c.id)}"><span class="sdot ${masteryOf(c)}"></span><span class="q">${esc(c.front)}</span><span class="due">${
                       isDue(c) ? "Due now" : timeUntil(c.dueDate)
                     }</span>
                      <span class="rowbtns">

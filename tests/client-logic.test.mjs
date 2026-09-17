@@ -72,41 +72,55 @@ test("next exam picks the soonest future date", () => {
 });
 
 // --- weak-topic ranking -------------------------------------------------------
+
+
 console.log("weak topics");
 const cards = [
-  { id: "c1", front: "Negligence elements", easiness: 2.1, dueDate: now + DAY },
-  { id: "c2", front: "Strict liability", easiness: 2.7, dueDate: now + 30 * DAY },
-  { id: "c3", front: "Duty of care", easiness: 1.4, dueDate: now },
+  { id: "c1", front: "One", due: 0, easiness: 1.5, repetitions: 2, sessionId: "set1" },
+  { id: "c2", front: "Two", due: 0, easiness: 2.5, repetitions: 1, sessionId: "set2" },
+  { id: "c3", front: "Three", due: 0, easiness: 2.5, repetitions: 1, sessionId: "set3" },
 ];
-test("ranks most-failed concepts first", () => {
-  const log = [
-    { cardId: "c1", grade: 1, at: now },
-    { cardId: "c1", grade: 2, at: now },
-    { cardId: "c3", grade: 0, at: now },
-    { cardId: "c2", grade: 5, at: now },
-  ];
+
+test("A card rated only Hard is included, with misses === 0 and hards === 1", () => {
+  const log = [{ cardId: "c1", grade: 3, at: now }];
   const weak = weakTopics(log, cards, now);
-  assert.equal(weak.length, 3);
-  assert.equal(weak[0].cardId, "c1"); // 2 fails
-  assert.equal(weak[1].cardId, "c3"); // 1 fail, lower avg next
-  assert.ok(!weak.some((w) => w.cardId === "missing"));
+  assert.equal(weak.length, 1);
+  assert.equal(weak[0].misses, 0);
+  assert.equal(weak[0].hards, 1);
+  assert.equal(weak[0].sessionId, "set1");
 });
 
-test("forgetRisk flags shaky cards due soon", () => {
+test("A card rated only Good or Easy is not included", () => {
+  const log = [{ cardId: "c1", grade: 4, at: now }, { cardId: "c2", grade: 5, at: now }, { cardId: "c3", grade: 5, at: now }];
+  assert.equal(weakTopics(log, cards, now).length, 0);
+});
+
+test("A card with an early Again followed by two Goods is excluded (recovered)", () => {
+  const log = [{ cardId: "c3", grade: 0, at: now }, { cardId: "c3", grade: 4, at: now + 1 }, { cardId: "c3", grade: 5, at: now + 2 }];
+  assert.equal(weakTopics(log, cards, now).length, 0);
+});
+
+test("Only the last 5 rows count: 6 old Agains followed by 5 Goods means excluded", () => {
   const log = [
-    { cardId: "c3", grade: 2, at: now },
-    { cardId: "c2", grade: 4, at: now },
+    { cardId: "c3", grade: 0, at: 1 },
+    { cardId: "c3", grade: 0, at: 2 },
+    { cardId: "c3", grade: 0, at: 3 },
+    { cardId: "c3", grade: 0, at: 4 },
+    { cardId: "c3", grade: 0, at: 5 },
+    { cardId: "c3", grade: 0, at: 6 },
+    { cardId: "c3", grade: 4, at: 7 },
+    { cardId: "c3", grade: 4, at: 8 },
+    { cardId: "c3", grade: 4, at: 9 },
+    { cardId: "c3", grade: 4, at: 10 },
+    { cardId: "c3", grade: 4, at: 11 }
   ];
-  const weak = weakTopics(log, cards, now);
-  const c3 = weak.find((w) => w.cardId === "c3");
-  const c2 = weak.find((w) => w.cardId === "c2");
-  assert.equal(c3.forgetRisk, true); // low easiness + due now + avg < 3.5
-  assert.equal(c2.forgetRisk, false); // healthy card
+  assert.equal(weakTopics(log, cards, now).length, 0);
 });
 
 test("ignores log entries for deleted cards", () => {
-  const weak = weakTopics([{ cardId: "gone", grade: 0, at: now }], cards, now);
-  assert.equal(weak.length, 0);
+  const log = [{ cardId: "gone", grade: 0, at: now }];
+  assert.equal(weakTopics(log, cards, now).length, 0);
 });
 
 console.log(`\n${passed} tests passed`);
+

@@ -620,6 +620,8 @@ test("Teach it back is wired end to end", () => {
 });
 
 
+const read = (p) => fs.readFileSync(new URL(p, import.meta.url), "utf8");
+
 test("custom sheet (item A)", () => {
   const read = (p) => fs.readFileSync(new URL(p, import.meta.url), "utf8");
   const panelHtml = read("../src/ui/panel.html");
@@ -630,6 +632,15 @@ test("custom sheet (item A)", () => {
   const sheetJs = read("../src/ui/sheet.js");
   assert.ok(sheetJs.includes("export function showSheet"), "sheet.js must export showSheet");
   assert.ok(sheetJs.includes("keydown"), "must listen for keydown (Escape)");
+});
+
+
+test("weak topics (item B)", () => {
+  const home = read("../src/ui/views/home.js");
+  assert.ok(!home.includes("0 miss"), "home.js never renders 0 miss");
+  assert.ok(home.includes("data-action=\"open-weak\""), "Insight rows use data-action=open-weak");
+  const panelJs = read("../src/ui/panel.js");
+  assert.ok(panelJs.includes("case \"open-weak\":"), "panel.js handles open-weak");
 });
 
 console.log(`\n${passed} tests passed`);

@@ -88,7 +88,7 @@ export async function renderHome() {
          </label>
        </div>`;
 
-  const allCards = studySets.flatMap((s) => s.flashcards || []);
+  const allCards = studySets.flatMap((s) => (s.flashcards || []).map((c) => ({ ...c, sessionId: s.sessionId })));
   const weak = weakTopics(reviewLog, allCards);
   const insightsCard = weak.length
     ? `<div class="listhd"><span class="t-label">Needs work</span></div>
@@ -97,11 +97,11 @@ export async function renderHome() {
            .slice(0, 3)
            .map(
              (w) =>
-               `<div class="insight-row"><span class="q">${esc(w.front)}</span>${
-                 w.forgetRisk
-                   ? `<span class="tag dot" style="color:var(--warm)">forget soon</span>`
-                   : `<span class="tag">${w.fails} miss${w.fails === 1 ? "" : "es"}</span>`
-               }</div>`
+               `<button type="button" class="insight-row rowbtn" data-action="open-weak" data-id="${esc(w.sessionId)}" data-card="${esc(w.cardId)}" style="display:flex;align-items:center;width:100%;background:transparent;border:none;padding:8px 0;cursor:pointer;font:inherit;color:inherit;text-align:left;gap:8px;">
+                   <span class="q" style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${esc(w.front)}</span>
+                   ${w.forgetRisk ? `<span class="tag dot" style="color:var(--warm)">Forget soon</span>` : w.misses > 0 ? `<span class="tag">Missed ${w.misses}&times;</span>` : `<span class="tag">Felt hard</span>`}
+                   <svg class="chevron" viewBox="0 0 24 24" style="width:16px;height:16px;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;opacity:0.3;flex-shrink:0;"><path d="M9 5l7 7-7 7"/></svg>
+                 </button>`
            )
            .join("")}
        </div>`

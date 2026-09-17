@@ -1789,3 +1789,6 @@ span.flatpickr-weekday {
 @media (prefers-reduced-motion: reduce) {
   .bubble.typing span { animation: none; }
 }
+
+.flash-highlight { background-color: var(--border); transition: background-color 1.5s ease-out; }
+@media (prefers-reduced-motion: reduce) { .flash-highlight { transition: none; } }
