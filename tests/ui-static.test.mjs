@@ -652,4 +652,16 @@ test("version update (item C)", () => {
   assert.ok(auth.includes("x-mafsar-version"), "auth.js sends x-mafsar-version");
 });
 
+
+test("delete account (item D)", () => {
+  const you = read("../src/ui/views/you.js");
+  assert.ok(!you.includes("btn-danger"), "you.js no longer contains btn-danger");
+  assert.ok(!you.includes("\uFFFD"), "you.js does not contain replacement character");
+  
+  const del = read("../src/ui/views/delete-account.js");
+  assert.ok(del.includes("data-action=\"nav-back\""), "delete-account has nav-back");
+  assert.ok(del.includes("data-action=\"export-backup\""), "delete-account has export-backup");
+  assert.ok(!del.includes("\uFFFD"), "delete-account does not contain replacement character");
+});
+
 console.log(`\n${passed} tests passed`);

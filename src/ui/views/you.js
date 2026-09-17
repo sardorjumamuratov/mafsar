@@ -33,7 +33,7 @@ export async function renderYou() {
            </div>
          </div>
          <button class="btn btn-ghost btn-block" data-action="auth-signout">Sign out</button>
-        <button class="btn btn-ghost btn-block btn-danger" data-action="delete-account-open">Delete account…</button>
+        
        </div>`
     : `<div class="block" style="display:flex;flex-direction:column;gap:10px">
          <div style="font-weight:600;font-size:13px">Back up and sync</div>
