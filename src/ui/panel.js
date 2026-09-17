@@ -9,6 +9,7 @@ import { captureCurrent, captureLastAnswer } from "./capture.js";
 import { deleteCard, deleteSession, saveStudySet, setExamDate } from "../storage/store.js";
 import { review } from "../storage/srs.js";
 import { applyNext, goReturn, gradeCard, revealCard, startGlobalReview, startSetReview } from "./flows/review.js";
+import { showSheet } from "./sheet.js";
 import { authGoogle, authSubmit, exportBackup, exportSetTsv, generateSummary, googleAbortController, importBackupFile, renderAuthGate, renderYou } from "./views/you.js";
 import { checkApply, startApply } from "./flows/apply.js";
 import { checkCode, codingNext, startCodingPractice } from "./flows/coding.js";
@@ -37,7 +38,7 @@ document.addEventListener("click", (e) => {
     case "capture-last-answer": captureLastAnswer(t); break;
     case "tab": openDetailTab((/** @type {any} */ (t)).dataset.tab); break;
     case "delete-set":
-      if (confirm("Delete this set and its cards?")) deleteSession(id).then(goToActiveTab).catch(e => toast(e.message));
+      showSheet("Delete set?", "This removes the set and all its flashcards. This can't be undone.", "Delete set", true, () => { deleteSession(id).then(goToActiveTab).catch(e => toast(e.message)); });
       break;
     case "start-review": startGlobalReview(); break;
     case "set-review": startSetReview(id); break;
@@ -137,7 +138,7 @@ document.addEventListener("click", (e) => {
       }).catch(e => toast(e.message));
       break;
     case "card-del":
-      if (confirm("Delete this card?")) deleteCard(currentDetail().session.id, id).then(() => paintDetail()).catch(e => toast(e.message));
+      showSheet("Delete card?", "This removes the flashcard permanently.", "Delete card", true, () => { deleteCard(currentDetail().session.id, id).then(() => paintDetail()).catch(e => toast(e.message)); });
       break;
     // case "export-tsv": exportSetTsv(id); break; // paused with the export button
     case "gen-summary": generateSummary(id); break;

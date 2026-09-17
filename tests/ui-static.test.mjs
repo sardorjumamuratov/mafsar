@@ -619,4 +619,17 @@ test("Teach it back is wired end to end", () => {
   assert.ok(sw.includes('case "TEACH_TURN"') && sw.includes('case "TEACH_EVALUATE"'), "the worker must route both messages");
 });
 
+
+test("custom sheet (item A)", () => {
+  const read = (p) => fs.readFileSync(new URL(p, import.meta.url), "utf8");
+  const panelHtml = read("../src/ui/panel.html");
+  assert.ok(panelHtml.includes("sheet-overlay"), "sheet-overlay must exist");
+  assert.ok(panelHtml.indexOf("sheet-overlay") > panelHtml.indexOf("</main>"), "sheet-overlay must be outside #app");
+  const panelJs = read("../src/ui/panel.js");
+  assert.ok(!panelJs.includes("confirm("), "panel.js must not contain the word confirm");
+  const sheetJs = read("../src/ui/sheet.js");
+  assert.ok(sheetJs.includes("export function showSheet"), "sheet.js must export showSheet");
+  assert.ok(sheetJs.includes("keydown"), "must listen for keydown (Escape)");
+});
+
 console.log(`\n${passed} tests passed`);
