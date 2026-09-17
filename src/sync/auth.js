@@ -28,7 +28,7 @@ export async function logout() {
 async function postJson(path, body) {
   const res = await fetch(API_BASE + path, {
     method: "POST",
-    headers: { "content-type": "application/json" },
+    headers: { "content-type": "application/json", "x-mafsar-version": chrome.runtime.getManifest().version },
     body: JSON.stringify(body),
   });
   const data = await res.json().catch(() => ({}));
@@ -53,7 +53,7 @@ async function refreshAccessToken() {
   if (!auth?.refreshToken) throw new Error("signed out");
   const res = await fetch(API_BASE + "/v1/auth/refresh", {
     method: "POST",
-    headers: { "content-type": "application/json" },
+    headers: { "content-type": "application/json", "x-mafsar-version": chrome.runtime.getManifest().version },
     body: JSON.stringify({ refreshToken: auth.refreshToken }),
   });
   if (!res.ok) {
@@ -76,6 +76,7 @@ export async function authedFetch(path, opts = {}) {
         ...(opts.headers || {}),
         "content-type": "application/json",
         authorization: `Bearer ${token}`,
+          "x-mafsar-version": chrome.runtime.getManifest().version,
       },
     });
   let res = await doFetch(auth.accessToken);
@@ -107,7 +108,7 @@ export async function googleSignIn({ onTab, cancelSignal }) {
     try {
       pollRes = await fetch(API_BASE + '/v1/auth/google/poll', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', "x-mafsar-version": chrome.runtime.getManifest().version },
         body: JSON.stringify({ pollToken })
       });
     } catch (e) {

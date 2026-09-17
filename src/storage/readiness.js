@@ -43,9 +43,9 @@ export function nextExam(studySets, sessions, now = Date.now()) {
  * Rank weak concepts from the review log. Weakness = low grades weighted by
  * recency; ties broken by card easiness (lower = struggled more).
  * @param {Array<{cardId:string, grade:number, at:number}>} reviewLog
- * @param {Array<{id:string, front:string, back:string, easiness?:number, dueDate?:number}>} cards flat list of all cards
+ * @param {Array<{id:string, front:string, back:string, easiness?:number, dueDate?:number, sessionId?:string}>} cards flat list of all cards
  * @param {number} now
- * @returns {Array<{cardId, front, fails:number, avgGrade:number, forgetRisk:boolean}>} worst first
+ * @returns {Array<{cardId:string, sessionId:string, front:string, misses:number, hards:number, avgGrade:number, forgetRisk:boolean}>} worst first
  */
 export function weakTopics(reviewLog, cards, now = Date.now()) {
   const byCard = new Map();

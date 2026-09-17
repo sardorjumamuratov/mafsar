@@ -30,6 +30,13 @@ document.addEventListener("click", (e) => {
   const id = (/** @type {any} */ (t)).dataset.id;
   switch (a) {
     case "open-import": renderImport(); break;
+    case "apply-update":
+      chrome.runtime.sendMessage({ action: "APPLY_UPDATE" });
+      break;
+    case "dismiss-update":
+      sessionStorage.setItem("updateDismissed", "1");
+      goToActiveTab();
+      break;
     case "nav-back": goToActiveTab(); break;
     case "nav-sets": renderSets(); break;
     case "open-set": renderSetDetail(id); break;

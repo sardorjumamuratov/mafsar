@@ -96,7 +96,14 @@ if (sp?.setPanelBehavior) {
   sp.setPanelBehavior({ openPanelOnActionClick: true }).catch(() => {});
 }
 
-chrome.runtime.onInstalled.addListener(() => {
+chrome.runtime.onUpdateAvailable.addListener((details) => {
+  chrome.storage.local.set({ updateReady: details.version });
+});
+
+chrome.runtime.onInstalled.addListener((details) => {
+  if (details.reason === "update") {
+    chrome.storage.local.remove("updateReady");
+  }
   registerContextMenus();
 });
 

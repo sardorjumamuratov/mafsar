@@ -643,4 +643,13 @@ test("weak topics (item B)", () => {
   assert.ok(panelJs.includes("case \"open-weak\":"), "panel.js handles open-weak");
 });
 
+
+test("version update (item C)", () => {
+  const sw = read("../src/background/service-worker.js");
+  assert.ok(sw.includes("APPLY_UPDATE"), "worker handles APPLY_UPDATE");
+  assert.ok(sw.includes("onUpdateAvailable"), "worker listens to onUpdateAvailable");
+  const auth = read("../src/sync/auth.js");
+  assert.ok(auth.includes("x-mafsar-version"), "auth.js sends x-mafsar-version");
+});
+
 console.log(`\n${passed} tests passed`);

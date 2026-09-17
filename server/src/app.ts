@@ -1,4 +1,5 @@
 import { Hono } from "hono";
+import { compareVersions } from "./version.js";
 import { serveStatic } from "@hono/node-server/serve-static";
 import { reportError } from "./observability.js";
 import { cors } from "hono/cors";
@@ -26,6 +27,7 @@ export function createApp(db: DB) {
   // The extension is exempt anyway (it holds a host permission for this origin),
   // and server-to-server callers such as payment webhooks send no Origin.
   app.use("*", cors({
+    allowHeaders: ["Content-Type", "Authorization", "x-mafsar-version"],
     origin: (origin) => corsOrigin(origin, process.env.PUBLIC_BASE_URL, process.env.NODE_ENV !== "production"),
   }));
 
@@ -61,6 +63,18 @@ export function createApp(db: DB) {
   app.get("/t/:code", serveStatic({ path: "../landing/index.html" }));
 
   const isPublicV1 = (path: string) => path.startsWith("/v1/auth/") || path.startsWith("/v1/webhooks/");
+
+  app.use("/v1/*", async (c, next) => {
+    if (c.req.path.startsWith("/v1/webhooks/")) return next();
+    const minVersion = process.env.MIN_CLIENT_VERSION;
+    if (minVersion) {
+      const clientVersion = c.req.header("x-mafsar-version");
+      if (clientVersion && compareVersions(clientVersion, minVersion) < 0) {
+        return c.json({ error: "client_outdated", minVersion, message: "This version of Mafsar is out of date. Update it to keep syncing." }, 426);
+      }
+    }
+    return next();
+  });
 
   app.use("/v1/*", async (c, next) => {
     // Auth routes are public; everything else under /v1 requires a token.
