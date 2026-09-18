@@ -171,4 +171,29 @@ test("applyServer does not mutate its input", () => {
   assert.equal(JSON.stringify(local()), before);
 });
 
+test("FSRS memory state survives a push and pull between devices", () => {
+  const st = local();
+  const lr = 1755300000000;
+  Object.assign(st.studySets[0].flashcards[0], { stability: 12.5, difficulty: 4.2, state: "review", lapses: 1, lastReview: lr });
+  const pushed = toServer(st, "").cards.find((c) => c.id === "c1");
+  assert.equal(pushed.stability, 12.5);
+  assert.equal(pushed.lastReview, new Date(lr).toISOString(), "server speaks ISO");
+
+  const fresh = { sessions: [], studySets: [], activity: {}, reviewLog: [] };
+  const pulled = applyServer({ sets: [], cards: [{ ...pushed, updatedAt: "2026-09-01T00:00:00.000Z" }], quiz: [], activity: [], reviews: [] }, fresh);
+  const card = pulled.studySets[0].flashcards[0];
+  assert.equal(card.stability, 12.5);
+  assert.equal(card.difficulty, 4.2);
+  assert.equal(card.lapses, 1);
+  assert.equal(card.lastReview, lr, "back to epoch ms locally");
+});
+
+test("cards never scheduled by FSRS pull back with undefined, not null", () => {
+  const fresh = { sessions: [], studySets: [], activity: {}, reviewLog: [] };
+  const pulled = applyServer({ sets: [], cards: [{ id: "x", setId: "s", front: "F", back: "B", updatedAt: T, stability: null, difficulty: null, state: null, lastReview: null }], quiz: [], activity: [], reviews: [] }, fresh);
+  const card = pulled.studySets[0].flashcards[0];
+  assert.equal(card.stability, undefined);
+  assert.equal(card.lastReview, undefined);
+});
+
 console.log(`\n${passed} tests passed`);

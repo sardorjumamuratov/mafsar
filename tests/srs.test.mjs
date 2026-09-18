@@ -7,7 +7,7 @@ let passed = 0;
 function test(name, fn) {
   fn();
   passed++;
-  console.log(`  ? ${name}`);
+  console.log(`  ✓ ${name}`);
 }
 
 console.log("grade sequences (success path)");
@@ -127,6 +127,32 @@ test("retrievability is 0.9 at t = stability", () => {
   const card = { state: "review", stability: s, lastReview: now - s * DAY };
   const r = retrievability(card, now);
   assert.ok(Math.abs(r - 0.9) < 0.001, `Expected ~0.9, got ${r}`);
+});
+
+console.log("inputs from other sources");
+test("null FSRS fields (as the server sends them) migrate instead of producing NaN", () => {
+  const now = Date.now();
+  const card = { easiness: 2.5, interval: 10, repetitions: 3, dueDate: now, stability: null, difficulty: null, state: null, lapses: null, lastReview: null };
+  const next = review(card, 4, now);
+  assert.ok(Number.isFinite(next.stability) && Number.isFinite(next.difficulty), "no NaN");
+  assert.ok(next.interval > 10, "keeps its progress: " + next.interval);
+});
+
+test("a brand-new card with null fields is scheduled as new", () => {
+  const now = Date.now();
+  const next = review({ repetitions: 0, stability: null, difficulty: null, state: null }, 4, now);
+  assert.equal(next.state, "review");
+  assert.ok(Number.isFinite(next.difficulty));
+});
+
+test("ISO and numeric-string dates (SQLite on mobile) work like numbers", () => {
+  const now = Date.parse("2026-09-18T12:00:00.000Z");
+  const base = { state: "review", stability: 10, difficulty: 5, repetitions: 3, interval: 10 };
+  const a = review({ ...base, lastReview: now - 10 * DAY, dueDate: now }, 4, now);
+  const b = review({ ...base, lastReview: new Date(now - 10 * DAY).toISOString(), dueDate: String(now) }, 4, now);
+  assert.equal(a.interval, b.interval);
+  assert.equal(isDue({ dueDate: new Date(now - 1000).toISOString() }, now), true);
+  assert.equal(isDue({ dueDate: new Date(now + DAY).toISOString() }, now), false);
 });
 
 console.log(`\n${passed} tests passed`);

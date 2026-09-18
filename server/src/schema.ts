@@ -20,6 +20,13 @@ export const setSchema = z.object({
   deleted: z.boolean().optional(),
 });
 
+/** Epoch ms (number or numeric string) or an ISO string → ISO string. */
+const isoDate = z.union([z.string(), z.number()]).transform((val) => {
+  if (typeof val === "number") return new Date(val).toISOString();
+  if (!Number.isNaN(Number(val)) && val.trim() !== "") return new Date(Number(val)).toISOString();
+  return val;
+});
+
 export const cardSchema = z.object({
   id: z.string().min(1),
   setId: z.string().min(1),
@@ -28,20 +35,14 @@ export const cardSchema = z.object({
   easiness: z.number().default(2.5),
   interval: z.number().default(0),
   repetitions: z.number().int().default(0),
-  dueDate: z.union([z.string(), z.number()])
-    .transform(val => {
-      if (typeof val === "number") return new Date(val).toISOString();
-      if (!Number.isNaN(Number(val)) && val.trim() !== "") return new Date(Number(val)).toISOString();
-      return val;
-    })
-    .nullable().optional(),
+  dueDate: isoDate.nullable().optional(),
   updatedAt: z.string(),
   deleted: z.boolean().optional(),
   stability: z.number().nullable().optional(),
   difficulty: z.number().nullable().optional(),
   state: z.string().nullable().optional(),
   lapses: z.number().int().nullable().optional(),
-  lastReview: z.string().nullable().optional(),
+  lastReview: isoDate.nullable().optional(),
 });
 
 export const quizSchema = z.object({
@@ -53,11 +54,6 @@ export const quizSchema = z.object({
   explain: z.string().nullable().optional(),
   updatedAt: z.string(),
   deleted: z.boolean().optional(),
-  stability: z.number().nullable().optional(),
-  difficulty: z.number().nullable().optional(),
-  state: z.string().nullable().optional(),
-  lapses: z.number().int().nullable().optional(),
-  lastReview: z.string().nullable().optional(),
 });
 
 export const activitySchema = z.object({

@@ -51,6 +51,13 @@ export function toServer({ sessions, studySets, activity, reviewLog }, lastSync)
           dueDate: c.dueDate != null ? iso(c.dueDate) : null,
           updatedAt: c.updatedAt,
           deleted: !!c.deleted,
+          // FSRS memory state. Without it another device can only guess the
+          // schedule back from interval (see migrateLegacy in shared/srs.js).
+          stability: c.stability ?? null,
+          difficulty: c.difficulty ?? null,
+          state: c.state ?? null,
+          lapses: c.lapses ?? 0,
+          lastReview: c.lastReview != null ? iso(ms(c.lastReview)) : null,
         });
       }
     }
@@ -142,6 +149,13 @@ export function applyServer(resp, local, uid = () => Math.random().toString(36).
       dueDate: card.dueDate != null ? ms(card.dueDate) : null,
       updatedAt: card.updatedAt,
       deleted: !!card.deleted,
+      // null from the server means "never scheduled by FSRS": keep it undefined
+      // locally so the scheduler migrates the card from its SM-2 fields.
+      stability: card.stability ?? undefined,
+      difficulty: card.difficulty ?? undefined,
+      state: card.state ?? undefined,
+      lapses: card.lapses ?? 0,
+      lastReview: card.lastReview != null ? ms(card.lastReview) : undefined,
     };
     if (existing) Object.assign(existing, mapped);
     else st.flashcards.push(mapped);

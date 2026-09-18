@@ -35,6 +35,37 @@ export function initSchedule(now = Date.now()) {
   };
 }
 
+/** Epoch ms from a number, a numeric string, or an ISO string; null if absent. */
+function toMs(v) {
+  if (v == null || v === "") return null;
+  if (typeof v === "number") return v;
+  const n = Number(v);
+  if (!Number.isNaN(n)) return n;
+  const t = Date.parse(v);
+  return Number.isNaN(t) ? null : t;
+}
+
+/**
+ * Cards reach the scheduler from local storage, the server (null for unset
+ * fields) and SQLite on mobile (ISO or numeric strings). Normalize once so
+ * "never reviewed with FSRS" is always stability == null, and times are ms.
+ */
+function normalize(card) {
+  const stability = card.stability == null ? null : Number(card.stability);
+  const difficulty = card.difficulty == null ? null : Number(card.difficulty);
+  return {
+    stability: Number.isFinite(stability) && stability > 0 ? stability : null,
+    difficulty: Number.isFinite(difficulty) ? difficulty : null,
+    state: card.state || "new",
+    lapses: Number(card.lapses) || 0,
+    lastReview: toMs(card.lastReview),
+    dueDate: toMs(card.dueDate),
+    repetitions: Number(card.repetitions) || 0,
+    easiness: Number(card.easiness) || 2.5,
+    interval: Number(card.interval) || 0,
+  };
+}
+
 function easinessToDifficulty(easiness) {
   if (easiness >= 3.0) return 1;
   if (easiness >= 2.5) {
@@ -52,23 +83,18 @@ export function review(card, grade, now = Date.now(), examDate) {
   if (grade === 3) fsrsGrade = 2; // Hard
   if (grade >= 4) fsrsGrade = grade - 1; // 4->3(Good), 5->4(Easy)
 
-  // Migrate SM-2 to FSRS
-  let { stability, difficulty, state = "new", lapses = 0, lastReview, repetitions = 0, easiness = 2.5, interval = 0 } = card;
-  
-  if (repetitions > 0 && stability === undefined) {
+  const n = normalize(card);
+  let { stability, difficulty, state, lapses, repetitions, easiness } = n;
+  const { lastReview, interval, dueDate: prevDue } = n;
+
+  // Migrate SM-2 to FSRS: a card reviewed before FSRS existed has no stability.
+  if (stability == null && repetitions > 0) {
     stability = Math.max(1, interval || 1);
     difficulty = clamp(easinessToDifficulty(easiness), 1, 10);
     state = "review";
   }
-
-  // Calculate elapsed days 't'
-  let t = 0;
-  if (lastReview !== undefined) {
-    t = Math.max(0, (now - lastReview) / DAY_MS);
-  } else if (card.dueDate && interval) {
-    t = Math.max(0, (now - (card.dueDate - interval * DAY_MS)) / DAY_MS);
-  }
-  if (state === "new") t = 0;
+  // Anything else without a memory state is treated as new.
+  if (stability == null || difficulty == null) state = "new";
 
   const w = FSRS_WEIGHTS;
   let new_s, new_d;
@@ -79,7 +105,7 @@ export function review(card, grade, now = Date.now(), examDate) {
     state = fsrsGrade === 1 ? "learning" : "review";
   } else {
     // Retrievability
-    const r = retrievability({ stability, state, lastReview, dueDate: card.dueDate, interval, repetitions }, now) || 0;
+    const r = retrievability({ stability, state, lastReview, dueDate: prevDue, interval, repetitions }, now) ?? 0;
     
     // Next Difficulty
     const delta_d = -w[6] * (fsrsGrade - 3);
@@ -125,6 +151,7 @@ export function review(card, grade, now = Date.now(), examDate) {
   if (easiness < 1.3) easiness = 1.3;
 
   let dueDate = now + nextInterval * DAY_MS;
+  examDate = toMs(examDate);
   if (examDate && examDate > now) {
     const latest = Math.max(examDate - DAY_MS / 2, now + 10 * 60 * 1000);
     dueDate = Math.min(dueDate, latest);
@@ -144,27 +171,29 @@ export function review(card, grade, now = Date.now(), examDate) {
 }
 
 export function retrievability(card, now = Date.now()) {
-  let { stability, state, interval, dueDate, lastReview } = card;
-  if (stability === undefined && card.repetitions > 0) {
+  const n = normalize(card);
+  let { stability } = n;
+  const { state, interval, dueDate, lastReview } = n;
+  if (stability == null && n.repetitions > 0) {
     stability = Math.max(1, interval || 1);
   }
-  if (!stability || state === "new") return null;
-  
+  if (!stability || (state === "new" && n.repetitions === 0)) return null;
+
   let t = 0;
-  if (lastReview !== undefined) {
+  if (lastReview != null) {
     t = Math.max(0, (now - lastReview) / DAY_MS);
-  } else if (dueDate && interval) {
+  } else if (dueDate != null && interval) {
     t = Math.max(0, (now - (dueDate - interval * DAY_MS)) / DAY_MS);
   }
   return Math.pow(1 + (FACTOR * t) / stability, DECAY);
 }
 
 export function isDue(card, now = Date.now()) {
-  return (card.dueDate ?? 0) <= now;
+  return (toMs(card.dueDate) ?? 0) <= now;
 }
 
 export function byDue(a, b) {
-  return (a.dueDate ?? 0) - (b.dueDate ?? 0);
+  return (toMs(a.dueDate) ?? 0) - (toMs(b.dueDate) ?? 0);
 }
 
 export function masteryOf(card) {
@@ -172,7 +201,7 @@ export function masteryOf(card) {
   
   const reps = card.repetitions ?? 0;
   const interval = card.interval ?? 0;
-  if (card.stability === undefined) {
+  if (card.stability == null) {
     if (reps >= 3 || (reps >= 2 && interval >= 6)) return "mastered";
   }
   

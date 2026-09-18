@@ -1,18 +1,37 @@
 import type { DB } from "./db.js";
 import { one, all, run, nowISO } from "./db.js";
 import type { SyncBody } from "./schema.js";
-import { toServer, applyServer } from "../../shared/sync-map.js";
+
+// Offline-first sync: apply client mutations with last-write-wins on
+// updated_at (tombstones win the same way), then return everything the
+// server has changed since `since`. Idempotent: replaying the same batch
+// is a no-op because rows are upserted by primary key.
+//
+// `since` is compared with server_updated_at (when the SERVER stored the row),
+// not the client-supplied updated_at. A device whose clock runs behind would
+// otherwise write rows that other devices never pull.
 
 interface Row {
   updated_at: string;
   deleted?: number;
 }
 
+/** True when the incoming row should overwrite the stored one. */
 export function shouldWrite(stored: Row | undefined, incoming: Row): boolean {
   if (!stored) return true;
   return incoming.updated_at > stored.updated_at;
 }
 
+/**
+ * Every upsert below carries `WHERE <table>.user_id = excluded.user_id`.
+ * Row ids are client-generated, and the primary key is the id alone, so
+ * without that guard an authenticated user could overwrite another user's
+ * row by pushing a colliding id — the ownership check in the preceding
+ * SELECT passes vacuously (it finds nothing for *this* user) and the
+ * ON CONFLICT branch then edits the other user's row in place. With the
+ * guard the conflicting write is a no-op. A composite (id, user_id) primary
+ * key would express this in the schema, but that needs a data migration.
+ */
 export async function applySync(db: DB, userId: string, body: SyncBody): Promise<void> {
   const now = nowISO();
 
@@ -34,6 +53,8 @@ export async function applySync(db: DB, userId: string, body: SyncBody): Promise
     );
   }
 
+  // Cards/quizzes reference a set; ensure the set row exists even if the
+  // client didn't send it in this batch (FK integrity).
   for (const c of body.cards) {
     await run(
       db,
@@ -79,6 +100,8 @@ export async function applySync(db: DB, userId: string, body: SyncBody): Promise
     );
   }
 
+  // Activity is a max-merge per day, not LWW — reviewing on two devices
+  // on the same day should keep the larger count.
   for (const a of body.activity) {
     await run(
       db,
@@ -88,6 +111,7 @@ export async function applySync(db: DB, userId: string, body: SyncBody): Promise
     );
   }
 
+  // Append-only review log; re-inserting the same id is a no-op.
   for (const r of body.reviews) {
     await run(
       db,
@@ -98,6 +122,7 @@ export async function applySync(db: DB, userId: string, body: SyncBody): Promise
   }
 }
 
+/** Server-side rows changed since the given ISO timestamp, in client shapes. */
 export async function changesSince(db: DB, userId: string, since?: string) {
   const sinceEffective = since ?? "1970-01-01T00:00:00.000Z";
   const sets = (await all<any>(
@@ -112,6 +137,9 @@ export async function changesSince(db: DB, userId: string, since?: string) {
   )).map((r) => ({
     id: r.id, setId: r.set_id, front: r.front, back: r.back,
     easiness: r.easiness, interval: r.interval, repetitions: r.repetitions,
+    // Stored as ISO (the server_updated_at migration converted legacy epoch-ms strings). The old
+    // Number() coercion turned ISO into NaN, i.e. null: every pulled card
+    // looked due immediately on a new device.
     dueDate: r.due_date,
     updatedAt: r.updated_at, deleted: !!r.deleted,
     stability: r.stability, difficulty: r.difficulty, state: r.state, lapses: r.lapses, lastReview: r.last_review,
