@@ -80,6 +80,21 @@ export const paddleProvider: BillingProvider = {
     );
   },
 
+  async cancelSubscriptions({ db, userId }) {
+    const user = await one<{ billing_customer_id: string | null }>(
+      db, "SELECT billing_customer_id FROM users WHERE id = ?", [userId]
+    );
+    if (!user?.billing_customer_id) return;
+    const paddle = paddleClient();
+    const subs = paddle.subscriptions.list({
+      customerId: [user.billing_customer_id],
+      status: ["active", "trialing", "past_due", "paused"],
+    });
+    for await (const sub of subs) {
+      await paddle.subscriptions.cancel(sub.id, { effectiveFrom: "immediately" });
+    }
+  },
+
   async createCheckout({ db, userId, email, plan, origin }) {
     const priceId = plan === "plus"
       ? process.env.PADDLE_PRICE_ID_PLUS

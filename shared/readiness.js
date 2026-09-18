@@ -43,34 +43,64 @@ export function nextExam(studySets, sessions, now = Date.now()) {
  * Rank weak concepts from the review log. Weakness = low grades weighted by
  * recency; ties broken by card easiness (lower = struggled more).
  * @param {Array<{cardId:string, grade:number, at:number}>} reviewLog
- * @param {Array<{id:string, front:string, back:string, easiness?:number, dueDate?:number}>} cards flat list of all cards
+ * @param {Array<{id:string, front:string, back:string, easiness?:number, dueDate?:number, sessionId?:string}>} cards flat list of all cards
  * @param {number} now
- * @returns {Array<{cardId, front, fails:number, avgGrade:number, forgetRisk:boolean}>} worst first
+ * @returns {Array<{cardId:string, sessionId:string, front:string, misses:number, hards:number, avgGrade:number, forgetRisk:boolean}>} worst first
  */
 export function weakTopics(reviewLog, cards, now = Date.now()) {
   const byCard = new Map();
   for (const r of reviewLog) {
-    const e = byCard.get(r.cardId) || { fails: 0, grades: [] };
-    if (r.grade < 3) e.fails++;
-    e.grades.push(r.grade);
-    byCard.set(r.cardId, e);
+    const arr = byCard.get(r.cardId) || [];
+    arr.push(r);
+    byCard.set(r.cardId, arr);
   }
   const out = [];
-  for (const [cardId, e] of byCard) {
+  for (const [cardId, entries] of byCard) {
     const card = cards.find((c) => c.id === cardId);
     if (!card) continue;
-    const avg = e.grades.reduce((a, b) => a + b, 0) / e.grades.length;
-    // Forget-risk: shaky history (low easiness) and due within 3 days.
-    const dueSoon = (card.dueDate ?? 0) - now <= 3 * DAY_MS;
-    out.push({
-      cardId,
-      front: card.front,
-      fails: e.fails,
-      avgGrade: Number(avg.toFixed(2)),
-      forgetRisk: avg < 3.5 && (card.easiness ?? 2.5) < 2.5 && dueSoon,
-    });
+    
+    entries.sort((a, b) => (a.reviewedAt || a.at) - (b.reviewedAt || b.at));
+    const last5 = entries.slice(-5);
+    
+    let misses = 0;
+    let hards = 0;
+    let sum = 0;
+    for (const r of last5) {
+      if (r.grade < 3) misses++;
+      else if (r.grade === 3) hards++;
+      sum += r.grade;
+    }
+    const avgGrade = Number((sum / last5.length).toFixed(2));
+    
+    const dueSoon = (card.dueDate ?? 0) - now <= 3 * 24 * 60 * 60 * 1000;
+    const forgetRisk = avgGrade < 3.5 && (card.easiness ?? 2.5) < 2.5 && dueSoon;
+    
+    let recovered = false;
+    if (last5.length >= 2 && last5[last5.length - 1].grade >= 4 && last5[last5.length - 2].grade >= 4) {
+      recovered = true;
+    }
+    
+    if (misses > 0 || hards > 0 || forgetRisk) {
+      if (recovered && !forgetRisk) continue;
+      out.push({
+        cardId,
+        sessionId: card.sessionId,
+        front: card.front,
+        forgetRisk,
+        misses,
+        hards,
+        avgGrade
+      });
+    }
   }
-  // Most fails first, then lowest average grade.
-  out.sort((a, b) => b.fails - a.fails || a.avgGrade - b.avgGrade);
+  
+  out.sort((a, b) => {
+    if (b.forgetRisk !== a.forgetRisk) return b.forgetRisk ? 1 : -1;
+    if (b.misses !== a.misses) return b.misses - a.misses;
+    if (b.hards !== a.hards) return b.hards - a.hards;
+    if (a.avgGrade !== b.avgGrade) return a.avgGrade - b.avgGrade;
+    return a.front.localeCompare(b.front);
+  });
+  
   return out.slice(0, 5);
 }

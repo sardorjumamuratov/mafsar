@@ -15,6 +15,7 @@ for example: *"Implement docs/prompts/02-abuse-protection.md. Follow AGENTS.md."
 | 06 | [Error reporting (Sentry)](06-error-reporting.md) | — | `server/src/app.ts`, `index.ts`, `privacy.ts` |
 | 07 | [YouTube and PDF capture](07-youtube-pdf-capture.md) | **02** | service worker, capture UI, new server route, `privacy.ts` |
 | 08 | [Teach it back (Feynman)](08-teach-it-back.md) | **02** | new flow, new server routes, `billing/core.ts`, `privacy.ts` |
+| 09 | [UX polish: delete set, Needs work, updates, delete account](09-ux-polish.md) | — | `src/ui/`, `readiness.js`, service worker, `server/src/app.ts` |
 
 **Running in parallel:** 02, 03, 05, 06, 07 and 08 all edit
 `server/src/app.ts`, and 03 to 08 all edit `server/src/privacy.ts`. Run those one

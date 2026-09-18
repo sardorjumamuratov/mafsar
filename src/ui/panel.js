@@ -1,16 +1,20 @@
+import { confirmDeleteAccount, renderDeleteAccount } from "./views/delete-account.js";
 import { doImport, previewImport, renderImport } from "./views/import.js";
 import { app, bundle, nav, send, setFor, toast } from "./core.js";
 import { goToActiveTab, registerTabs } from "./nav.js";
 import { importSharedSet, lookupShare, renderSets, refreshCaptureAnswerButton } from "./views/sets.js";
 import { onActiveTabChange } from "./tab-watch.js";
-import { currentDetail, makeSet, openDetailTab, paintDetail, promptAddCard, renderSetDetail, saveCardEdit, saveNewCard, setEditingCardId, startQuizForCurrentSet } from "./views/set-detail.js";
+import { currentDetail, makeSet, openDetailTab, paintDetail, promptAddCard, renderSetDetail, saveCardEdit, saveNewCard, setEditingCardId, startQuizForCurrentSet, toggleSetMenu } from "./views/set-detail.js";
 import { captureCurrent, captureLastAnswer } from "./capture.js";
 import { deleteCard, deleteSession, saveStudySet, setExamDate } from "../storage/store.js";
 import { review } from "../../shared/srs.js";
 import { applyNext, goReturn, gradeCard, revealCard, startGlobalReview, startSetReview } from "./flows/review.js";
+import { confirmSheet } from "./confirm.js";
+import { dismissUpdateBanner } from "./update-banner.js";
 import { authGoogle, authSubmit, exportBackup, exportSetTsv, generateSummary, googleAbortController, importBackupFile, renderAuthGate, renderYou } from "./views/you.js";
 import { checkApply, startApply } from "./flows/apply.js";
 import { checkCode, codingNext, startCodingPractice } from "./flows/coding.js";
+import { startTeach, setTeachPersona, sendTeach, finishTeach } from "./flows/teach.js";
 import { copyShareCode, revokeShareFor, toggleSetShare } from "./share.js";
 import { createTeamFromForm, joinTeamFromInput, leaveTeam, renderTeam, renderTeamCreate, renderTeams } from "./views/teams.js";
 import { checkTyped, startTypedPractice, typedNext } from "./flows/typed.js";
@@ -27,15 +31,22 @@ document.addEventListener("click", (e) => {
   const id = (/** @type {any} */ (t)).dataset.id;
   switch (a) {
     case "open-import": renderImport(); break;
+    case "apply-update":
+      (/** @type {any} */ (t)).disabled = true;
+      send({ type: "APPLY_UPDATE" }).catch((e) => toast(e.message));
+      break;
+    case "dismiss-update": dismissUpdateBanner(t); break;
+    case "set-menu": toggleSetMenu(t); break;
     case "nav-back": goToActiveTab(); break;
     case "nav-sets": renderSets(); break;
     case "open-set": renderSetDetail(id); break;
+    case "open-weak": openWeakCard(id, (/** @type {any} */ (t)).dataset.card).catch((e) => toast(e.message)); break;
     case "make-set": makeSet(id); break;
     case "capture-current": captureCurrent(); break;
     case "capture-last-answer": captureLastAnswer(t); break;
     case "tab": openDetailTab((/** @type {any} */ (t)).dataset.tab); break;
     case "delete-set":
-      if (confirm("Delete this set and its cards?")) deleteSession(id).then(goToActiveTab).catch(e => toast(e.message));
+      confirmDeleteSet(id);
       break;
     case "start-review": startGlobalReview(); break;
     case "set-review": startSetReview(id); break;
@@ -96,6 +107,11 @@ document.addEventListener("click", (e) => {
       })().catch(e => toast(e.message));
       break;
     case "start-coding": startCodingPractice(id); break;
+    case "start-teach": startTeach(id); break;
+    case "teach-persona": setTeachPersona((/** @type {any} */ (t)).dataset.persona); break;
+    case "teach-send": sendTeach(false); break;
+    case "teach-hint": sendTeach(true); break;
+    case "teach-finish": finishTeach(); break;
     case "set-share": toggleSetShare(id); break;
     case "share-copy": copyShareCode((/** @type {any} */ (t)).dataset.code, t); break;
     case "share-revoke": revokeShareFor((/** @type {any} */ (t)).dataset.id); break;
@@ -130,7 +146,9 @@ document.addEventListener("click", (e) => {
       }).catch(e => toast(e.message));
       break;
     case "card-del":
-      if (confirm("Delete this card?")) deleteCard(currentDetail().session.id, id).then(() => paintDetail()).catch(e => toast(e.message));
+      confirmSheet({ title: "Delete this card?", body: "It's removed from this set on all your devices. This can't be undone.", confirmLabel: "Delete card", destructive: true })
+        .then((ok) => ok && deleteCard(currentDetail().session.id, id).then(() => paintDetail()))
+        .catch((e) => toast(e.message));
       break;
     // case "export-tsv": exportSetTsv(id); break; // paused with the export button
     case "gen-summary": generateSummary(id); break;
@@ -142,6 +160,8 @@ document.addEventListener("click", (e) => {
     case "auth-google-cancel":
       if (googleAbortController) googleAbortController.abort();
       break;
+    case "delete-account-open": renderDeleteAccount(); break;
+    case "delete-account-confirm": confirmDeleteAccount(); break;
     case "auth-signout":
       logout().then(() => {
         toast("Signed out. Your sets stay on this device.");
@@ -276,3 +296,36 @@ nav.addEventListener("click", (e) => {
   renderAuthGate();
 });
 
+
+async function confirmDeleteSet(sessionId) {
+  const d = currentDetail();
+  const title = d?.session?.title || "this set";
+  const shortTitle = title.length > 60 ? title.slice(0, 59).trimEnd() + "…" : title;
+  const n = d?.studySet?.flashcards?.length || 0;
+  const ok = await confirmSheet({
+    title: `Delete "${shortTitle}"?`,
+    body: `This removes the set, its ${n} flashcard${n === 1 ? "" : "s"} and its quiz from all your devices. This can't be undone.`,
+    confirmLabel: "Delete set",
+    destructive: true,
+  });
+  if (!ok) return;
+  try {
+    await deleteSession(sessionId);
+    toast("Set deleted");
+    goToActiveTab();
+  } catch (e) {
+    toast(e.message);
+  }
+}
+
+/** "Needs work" row: open the card in its set, scrolled into view and highlighted. */
+async function openWeakCard(sessionId, cardId) {
+  const { studySets } = await bundle();
+  if (!setFor(sessionId, studySets)) return toast("That set was deleted");
+  await renderSetDetail(sessionId, "cards");
+  const row = app.querySelector(`[data-card-id="${CSS.escape(String(cardId))}"]`);
+  if (!row) return;
+  row.scrollIntoView({ block: "center" });
+  row.classList.add("flash-highlight");
+  setTimeout(() => row.classList.remove("flash-highlight"), 1500);
+}

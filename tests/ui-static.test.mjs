@@ -56,7 +56,7 @@ test("in-place repaints never reset scroll", () => {
   // home, exam picker, sets, set detail, make-set, import, teams (two exits:
   // signed-out early return + normal path), team detail, you, auth gate.
   const callSites = src.split("topOfView();").length - 1;
-  assert.equal(callSites, 12, "exactly the view-renderer exits reset scroll");
+  assert.equal(callSites, 13, "exactly the view-renderer exits reset scroll");
 });
 
 console.log("quiz length picker wiring (item 1)");
@@ -602,6 +602,82 @@ test("the picker card clips the full-bleed hover to its own radius", () => {
   // .block is shared across many screens; some need overflow visible.
   const generic = css.slice(css.indexOf(".block {"), css.indexOf(".block.tint"));
   assert.ok(!generic.includes("overflow"), "do not put overflow on .block itself");
+});
+
+test("Teach it back is wired end to end", () => {
+  const read = (p) => fs.readFileSync(join(__dirname, p), "utf8").replace(/\r\n/g, "\n");
+  assert.ok(read("../src/ui/views/set-detail.js").includes('data-action="start-teach"'), "set detail needs the Teach it back button");
+  const panel = read("../src/ui/panel.js");
+  for (const a of ["start-teach", "teach-persona", "teach-send", "teach-hint", "teach-finish"]) {
+    assert.ok(panel.includes(`case "${a}"`), `panel.js must handle ${a}`);
+  }
+  const flow = read("../src/ui/flows/teach.js");
+  assert.ok(flow.includes('aria-live="polite"'), "the conversation must announce new replies to screen readers");
+  assert.ok(flow.includes('kind: "teach"'), "review-log rows must be marked so they don't reschedule cards");
+  assert.ok(read("../src/ui/flows/review.js").includes("setTeachState(null)"), "leaving a session must drop its state");
+  const sw = read("../src/background/service-worker.js");
+  assert.ok(sw.includes('case "TEACH_TURN"') && sw.includes('case "TEACH_EVALUATE"'), "the worker must route both messages");
+});
+
+
+console.log("UX polish (prompt 09)");
+const readSrc = (p) => fs.readFileSync(new URL(p, import.meta.url), "utf8").replace(/\r\n/g, "\n");
+const walkJs = (dir) =>
+  fs.readdirSync(new URL(dir, import.meta.url), { withFileTypes: true }).flatMap((d) =>
+    d.isDirectory() ? walkJs(dir + d.name + "/") : d.name.endsWith(".js") ? [dir + d.name] : []
+  );
+
+test("no native confirm() dialogs in the panel: they ignore the theme and fail in Firefox's sidebar", () => {
+  for (const f of walkJs("../src/ui/")) {
+    if (f.endsWith("/confirm.js")) continue;
+    assert.ok(!/(^|[^.\w])confirm\(/.test(readSrc(f)), f + " still calls confirm()");
+  }
+  const sheet = readSrc("../src/ui/confirm.js");
+  assert.ok(sheet.includes('aria-modal="true"') && sheet.includes("Escape"), "the sheet is a modal dialog that Esc closes");
+  assert.ok(readSrc("../src/ui/panel.html").includes('id="sheet"'), "panel.html hosts the sheet");
+  assert.ok(readSrc("../src/ui/panel.css").includes(".sheet-box"), "the sheet is styled");
+});
+
+test("delete set lives in the More menu, not a bare header icon", () => {
+  const detail = readSrc("../src/ui/views/set-detail.js");
+  assert.ok(!/class="iconbtn" data-action="delete-set"/.test(detail), "no trash iconbtn in the header");
+  assert.ok(detail.includes('role="menuitem" data-action="delete-set"'), "Delete set is a menu item");
+  assert.ok(readSrc("../src/ui/panel.js").includes('case "set-menu"'), "panel.js opens the menu");
+});
+
+test("Needs work rows are buttons and never say 0 misses", () => {
+  const home = readSrc("../src/ui/views/home.js");
+  assert.ok(!home.includes("0 miss") && !/\bw\.fails\b/.test(home), "labels come from misses/hards");
+  assert.ok(home.includes('<button type="button" class="insight-row" data-action="open-weak"'));
+  assert.ok(readSrc("../src/ui/panel.js").includes('case "open-weak"'));
+  assert.ok(readSrc("../src/ui/views/set-detail.js").includes("data-card-id="), "card rows can be found by id");
+});
+
+test("updates: banner, restart, and the server's outdated reply are all wired", () => {
+  const sw = readSrc("../src/background/service-worker.js");
+  assert.ok(sw.includes("onUpdateAvailable") && sw.includes('case "APPLY_UPDATE"'), "worker records and applies updates");
+  const panel = readSrc("../src/ui/panel.js");
+  assert.ok(panel.includes('type: "APPLY_UPDATE"'), "the Restart button sends a message the worker understands");
+  assert.ok(!panel.includes('action: "APPLY_UPDATE"'));
+  for (const v of ["../src/ui/views/home.js", "../src/ui/views/you.js"]) {
+    assert.ok(readSrc(v).includes("updateBannerHtml()"), v + " shows the update banner");
+  }
+  const auth = readSrc("../src/sync/auth.js");
+  assert.ok(auth.includes("x-mafsar-version") && auth.includes("res.status !== 426"), "auth.js sends its version and handles 426");
+});
+
+test("delete account: quiet entry on You, calm page, no innerHTML", () => {
+  const you = readSrc("../src/ui/views/you.js");
+  assert.ok(!you.includes("btn-danger"), "no red button on the You tab");
+  assert.ok(you.includes('class="setting-row" data-action="delete-account-open"'), "the page is still reachable");
+  const del = readSrc("../src/ui/views/delete-account.js");
+  assert.ok(del.includes('class="btn btn-ghost" data-action="nav-back">Cancel'), "a Cancel button");
+  assert.ok(del.includes('data-action="export-backup"'), "offers an export first");
+  assert.ok(del.includes("data.usage?.plan"), "reads the plan where /v1/me puts it");
+  for (const src of [you, del]) {
+    assert.ok(!src.includes("innerHTML"), "no innerHTML (AMO rejects it)");
+    assert.ok(!src.includes("�"), "no mis-encoded characters");
+  }
 });
 
 console.log(`\n${passed} tests passed`);

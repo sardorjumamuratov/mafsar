@@ -4,6 +4,7 @@ import { shareLinkFor } from "./share-link.js";
 import { LANDING_BASE } from "../config.js";
 import { saveStudySet } from "../storage/store.js";
 import { setShareOpenFor, shareOpenFor } from "./views/home.js";
+import { confirmSheet } from "./confirm.js";
 
 /**
  * Read-only value + copy icon button, shared by the per-set share link and the
@@ -87,7 +88,13 @@ export async function revokeShareFor(sessionId) {
   const { studySets } = await bundle();
   const set = setFor(sessionId, studySets);
   if (!set?.shareCode) return;
-  if (!confirm("Stop sharing this set? People who already added it keep their copy; the code stops working.")) return;
+  const ok = await confirmSheet({
+    title: "Stop sharing this set?",
+    body: "The share code stops working. People who already added the set keep their copy.",
+    confirmLabel: "Stop sharing",
+    destructive: true,
+  });
+  if (!ok) return;
   try {
     await send({ type: "SHARE_REVOKE", code: set.shareCode });
     delete set.shareCode;

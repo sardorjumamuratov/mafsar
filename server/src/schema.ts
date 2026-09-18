@@ -77,6 +77,12 @@ export const reviewSchema = z.object({
   difficulty: z.number().nullable().optional(),
 });
 
+export const deleteAccountSchema = z.object({
+  // Exact and case-sensitive: this is the one irreversible call in the API.
+  confirm: z.literal("DELETE"),
+  password: z.string().max(200).optional(),
+});
+
 export const syncSchema = z.object({
   since: z.string().optional(),
   sets: z.array(setSchema).default([]),
@@ -146,3 +152,39 @@ export const teamCreateSchema = z.object({ name: z.string().trim().min(1).max(80
 export const teamJoinSchema = z.object({ code: z.string().trim().min(1).max(32) });
 
 export const pollSchema = z.object({ pollToken: z.string().min(20).max(200) });
+
+// Teach it back. The client sends the whole conversation on every turn (nothing
+// is stored server-side), so every size is capped here.
+export const MAX_TEACH_MESSAGES = 24;
+
+const teachCardSchema = z.object({
+  id: z.string().min(1).max(100),
+  front: z.string().min(1).max(500),
+  back: z.string().min(1).max(2000),
+});
+const teachMessageSchema = z.object({
+  role: z.enum(["learner", "student"]),
+  text: z.string().min(1).max(2000),
+  kind: z.enum(["question", "hint", "follow_up", "wrap_up"]).optional(),
+  focusCardId: z.string().max(100).optional(),
+});
+const teachBase = {
+  topic: z.string().min(1).max(200),
+  persona: z.enum(["child", "beginner"]).default("child"),
+  cards: z.array(teachCardSchema).min(1).max(6),
+};
+
+export const teachTurnSchema = z
+  .object({
+    ...teachBase,
+    messages: z.array(teachMessageSchema).min(1).max(MAX_TEACH_MESSAGES),
+    wantHint: z.boolean().default(false),
+  })
+  .refine((b) => b.messages[b.messages.length - 1].role === "learner", {
+    message: "the last message must be the learner's",
+    path: ["messages"],
+  });
+
+export const teachEvaluateSchema = z
+  .object({ ...teachBase, messages: z.array(teachMessageSchema).min(2).max(MAX_TEACH_MESSAGES) })
+  .refine((b) => b.messages.some((m) => m.role === "learner"), { message: "nothing was taught", path: ["messages"] });

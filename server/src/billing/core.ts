@@ -149,51 +149,57 @@ export function matchPriceId(priceId: string, envValue: string | undefined): boo
   return envValue.split(",").map(s => s.trim()).filter(Boolean).includes(priceId);
 }
 
+export type QuotaResult =
+  | { ok: true; eventId: string }
+  | {
+      ok: false;
+      body: { error: "quota_exceeded"; category: string; limit: number | null; used: number; window: "month" | "day" | null; plan: string };
+    };
+
+/**
+ * Spend one unit of `category`, or report why not. Routes that always charge use
+ * requireQuota(); a route that charges conditionally (a teaching session pays on
+ * its first turn only) calls this directly and refunds with refundQuota() on failure.
+ */
+export async function consumeQuota(db: DB, userId: string, category: "set" | "coding" | "practice"): Promise<QuotaResult> {
+  const user = await one<{ plan: string; email: string }>(db, "SELECT plan, email FROM users WHERE id = ?", [userId]);
+  const plan = effectivePlan(user?.plan, user?.email);
+  const limits = planLimits(plan);
+  const limit = limits[category];
+  const eventId = uid();
+
+  if (limit !== null && limits.window !== null) {
+    // One statement, so the count and the insert cannot interleave: the row
+    // only lands if the window is still under the limit at write time.
+    const res = await run(
+      db,
+      `INSERT INTO generation_events (id, user_id, category, created_at)
+       SELECT ?, ?, ?, ?
+       WHERE (SELECT COUNT(*) FROM generation_events WHERE user_id = ? AND category = ? AND created_at >= ?) < ?`,
+      [eventId, userId, category, nowISO(), userId, category, windowStartISO(limits.window), limit]
+    );
+    if (res === 0) {
+      const used = await categoryUsage(db, userId, category, limits.window);
+      return { ok: false, body: { error: "quota_exceeded", category, limit, used, window: limits.window, plan } };
+    }
+  } else {
+    // Unlimited plan: still record the event, for usage reporting.
+    await run(db, "INSERT INTO generation_events (id, user_id, category, created_at) VALUES (?, ?, ?, ?)", [eventId, userId, category, nowISO()]);
+  }
+  return { ok: true, eventId };
+}
+
+/** Give back a unit whose work failed. */
+export async function refundQuota(db: DB, eventId: string): Promise<void> {
+  await run(db, "DELETE FROM generation_events WHERE id = ?", [eventId]);
+}
+
 export function requireQuota(db: DB, category: "set" | "coding" | "practice") {
   return async (c: Context, next: Next) => {
-    const userId = c.get("userId") as string;
-    const user = await one<{ plan: string; email: string }>(
-      db,
-      "SELECT plan, email FROM users WHERE id = ?",
-      [userId]
-    );
-    const plan = effectivePlan(user?.plan, user?.email);
-    const limits = planLimits(plan);
-    const limit = limits[category];
-    
-    let eventId = "";
-
-    if (limit !== null && limits.window !== null) {
-      // One statement, so the count and the insert cannot interleave: the row
-      // only lands if the window is still under the limit at write time.
-      eventId = uid();
-      const res = await run(
-        db,
-        `INSERT INTO generation_events (id, user_id, category, created_at)
-         SELECT ?, ?, ?, ?
-         WHERE (SELECT COUNT(*) FROM generation_events WHERE user_id = ? AND category = ? AND created_at >= ?) < ?`,
-        [eventId, userId, category, nowISO(), userId, category, windowStartISO(limits.window), limit]
-      );
-      
-      if (res === 0) {
-        const used = await categoryUsage(db, userId, category, limits.window);
-        return c.json({ error: "quota_exceeded", category, limit, used, window: limits.window, plan }, 402);
-      }
-    } else {
-      // Unlimited plan
-      eventId = uid();
-      await run(
-        db,
-        "INSERT INTO generation_events (id, user_id, category, created_at) VALUES (?, ?, ?, ?)",
-        [eventId, userId, category, nowISO()]
-      );
-    }
-
+    const q = await consumeQuota(db, c.get("userId") as string, category);
+    if (!q.ok) return c.json(q.body, 402);
     await next();
-
     // Roll back if the downstream handler failed
-    if (c.res.status >= 400 && eventId) {
-      await run(db, "DELETE FROM generation_events WHERE id = ?", [eventId]);
-    }
+    if (c.res.status >= 400) await refundQuota(db, q.eventId);
   };
 }

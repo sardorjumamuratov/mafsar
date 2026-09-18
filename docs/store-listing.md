@@ -40,14 +40,14 @@ any page you select — and turns it into study material automatically.
   before you'd forget it.
 - Set an exam date and Mafsar works backwards into a daily target.
 - See which concepts you keep missing.
-- Works offline; sign in to sync across devices.
+- Free account required: generation runs on our servers, and your sets sync
+  across your devices.
 
 ## Notes to Reviewer
 
 ```
-Test account (sign in on the first-launch screen, or the "You" tab):
-  Email:    amo-reviewer@mafsar.app
-  Password: MafsarReview!2026
+Test account: supplied privately in the store's reviewer-notes field
+(credentials are never committed to this repository).
 
 An account is required because flashcard generation runs server-side.
 
@@ -55,9 +55,11 @@ To test: sign in, open any article or AI chat, then right-click -> "Save page
 to Mafsar". Flashcards and a quiz are generated within ~10 seconds and appear
 under the "Sets" tab.
 
-Build note: no minifier, bundler, or transpiler is used. All JavaScript in this
-package is byte-identical to the public source at
-https://github.com/sardorjumamuratov/mafsar
+Build note: no minifier, bundler, or transpiler is used on our code. Every file
+in this package is byte-identical to the public source at
+https://github.com/sardorjumamuratov/mafsar, with one exception:
+src/vendor/flatpickr.js is the unmodified, published build of flatpickr 4.6.13
+(MIT, https://github.com/flatpickr/flatpickr).
 
 A small script (tools/build.mjs) produces the package. Its only effect on
 content is removing three Chrome-only manifest keys that Firefox does not
@@ -82,8 +84,10 @@ WHAT WE COLLECT
 * Usage metadata: timestamps of when sets and cards were created or reviewed,
   used only to schedule spaced-repetition reviews and compute your streak.
 
-Mafsar works fully offline using your browser's local storage. An account is
-only required for automatic flashcard/quiz generation and cross-device sync.
+Mafsar requires a free account. Flashcard and quiz generation run on our
+servers, and your study data syncs to your account so it's available on your
+other devices. A copy is also kept in your browser's local storage so reviews
+stay fast.
 
 HOW CAPTURED TEXT IS PROCESSED
 
@@ -103,8 +107,6 @@ WHERE DATA IS STORED
 
 Account and synced study data is stored in a hosted SQLite database (Turso),
 accessed by our backend hosted on Railway. All data is transmitted over HTTPS.
-If you never create an account, your data stays only in your browser's local
-storage and is never sent to us.
 
 WHAT WE NEVER DO
 
@@ -147,7 +149,7 @@ schedules them for spaced-repetition review.
 
 | Permission | Justification |
 |---|---|
-| `storage` | Stores the user's study sets, flashcards, review schedule and settings locally so the extension works offline. |
+| `storage` | Stores the user's study sets, flashcards, review schedule and settings locally so reviews stay fast. |
 | `activeTab` | Reads the text of the current tab only when the user explicitly clicks "Save to Mafsar" or the right-click menu item. No background access. |
 | `scripting` | Injects a one-off text-extraction function into the active tab in response to that same user action, to read the article or conversation being saved. |
 | `sidePanel` | The entire study interface (flashcards, review, quizzes) is rendered in Chrome's side panel. |

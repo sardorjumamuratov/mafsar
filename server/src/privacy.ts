@@ -20,7 +20,7 @@ export const PRIVACY_HTML = `<!doctype html>
 </head>
 <body>
 <h1>Mafsar — Privacy Policy</h1>
-<p class="updated">Last updated: August 17, 2026</p>
+<p class="updated">Last updated: September 15, 2026</p>
 
 <p>Mafsar is a browser extension that turns your learning sessions (AI chats,
 articles, or any page you capture) into flashcards, quizzes, and
@@ -38,23 +38,25 @@ and its backend collect, how it's used, and how to delete it.</p>
   created or reviewed, used only to schedule spaced-repetition reviews and
   compute your study streak.</li>
 </ul>
-<p>By default, Mafsar works fully offline using your browser's local storage.
-An account is only needed if you want automatic flashcard/quiz generation or
-to sync data across devices.</p>
+<p>Mafsar requires a free account. Flashcard and quiz generation run on our
+servers, and your study data syncs to your account so it's available on your
+other devices. A copy is also kept in your browser's local storage so reviews
+stay fast.</p>
 
 <h2>How captured text is processed</h2>
 <p>When you capture a page, chat, or selection and ask Mafsar to generate
-flashcards or a quiz, that text is sent to our backend, which forwards it to a
-third-party AI model provider (currently Google Gemini, Groq, or Anthropic,
-depending on server configuration) solely to generate study material. That
-text is not used to train models, and we do not share it for advertising or
-analytics.</p>
+flashcards or a quiz, that text is sent to our backend, which forwards it to a third-party AI service (currently OpenRouter, which passes the request to the
+underlying model provider, such as Google) solely to generate study material. We
+configure that service not to allow your text to be used for model training, and
+we do not share it for advertising or analytics.</p>
+
+<p>The same applies to what you write in practice modes (typed answers, coding
+exercises and Teach it back conversations): it is sent to the AI service only to
+grade or reply, and is not stored on our servers.</p>
 
 <h2>Where data is stored</h2>
 <p>Account and synced study data is stored in a hosted SQLite database (Turso)
-accessed by our backend (hosted on Railway). Data is transmitted over HTTPS.
-If you never create an account, your data stays only in your browser's local
-storage and is never sent to us.</p>
+accessed by our backend (hosted on Railway). Data is transmitted over HTTPS.</p>
 
 <h2>What we don't do</h2>
 <ul>
@@ -66,9 +68,19 @@ storage and is never sent to us.</p>
 
 <h2>Data deletion</h2>
 <p>You can delete individual study sets and cards at any time from the
-extension. To delete your account and all associated server-side data, email
+extension. To delete your account and all associated server-side data, open
+the You tab and choose <strong>Delete account</strong>. Deletion is immediate
+and permanent, and any active subscription is cancelled at the same time. If
+you can't sign in, email
 <a href="mailto:sardoralien@gmail.com">sardoralien@gmail.com</a> from the
 account's registered address and we'll remove it within 7 days.</p>
+
+<h2>Error reports</h2>
+<p>When our backend hits an unexpected error, it sends a report to Sentry, our
+error-monitoring service. The report contains the error message and technical
+details, the part of our API involved, and your random account ID. It never
+includes your email address, password, sign-in tokens, or the content you
+capture.</p>
 
 <h2>Children's privacy</h2>
 <p>Mafsar is not directed at children under 13, and we do not knowingly

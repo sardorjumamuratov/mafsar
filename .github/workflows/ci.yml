@@ -31,6 +31,12 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 22
+          cache: npm
+          cache-dependency-path: package-lock.json
+      # typescript + @types/chrome are root devDependencies.
+      - run: npm ci
+      - name: Type check (extension)
+        run: npm run typecheck
       # Every pure-logic suite for the extension — discovered, not listed.
       # A hand-maintained list silently dropped six suites (coding, srs,
       # quiz-lengths, google-signin, last-answer, messaging): they existed and

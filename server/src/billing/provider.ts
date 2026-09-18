@@ -16,6 +16,8 @@ export interface BillingProvider {
   }): Promise<string>;
   /** Returns the URL to open in a tab. Throws NoSubscriptionError if none. */
   createPortal(args: { db: DB; userId: string; origin: string }): Promise<string>;
+  /** Cancels every live subscription immediately. Throws if any cancel fails. */
+  cancelSubscriptions(args: { db: DB; userId: string }): Promise<void>;
   /** Verifies the signature and classifies the event. Must NOT touch the DB. */
   handleWebhook(rawBody: string, signature: string): Promise<WebhookOutcome>;
 }

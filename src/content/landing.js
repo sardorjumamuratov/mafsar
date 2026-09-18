@@ -12,7 +12,7 @@ const run = () => {
     
     let targetBtn = addBtn;
     if (targetBtn.dataset.bound) {
-      targetBtn = addBtn.cloneNode(true);
+      targetBtn = /** @type {HTMLElement} */ (addBtn.cloneNode(true));
       addBtn.parentNode.replaceChild(targetBtn, addBtn);
     }
     targetBtn.dataset.bound = "true";

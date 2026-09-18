@@ -27,7 +27,7 @@ import {
   backendTeamJoin,
   backendTeamList,
   backendTeamGet,
-  backendTeamLeave,
+  backendTeamLeave, backendDeleteAccount, backendTeachTurn, backendTeachEvaluate,
   backendCodingTask,
   backendCodingGrade,
 } from "../sync/api.js";
@@ -96,7 +96,17 @@ if (sp?.setPanelBehavior) {
   sp.setPanelBehavior({ openPanelOnActionClick: true }).catch(() => {});
 }
 
-chrome.runtime.onInstalled.addListener(() => {
+// A store update has downloaded but only applies once the extension restarts.
+// Don't reload here: that would cut off a review in progress. The panel shows
+// a banner and the user restarts when ready (APPLY_UPDATE).
+chrome.runtime.onUpdateAvailable?.addListener((details) => {
+  chrome.storage.local.set({ updateReady: details.version });
+});
+
+chrome.runtime.onInstalled.addListener((details) => {
+  if (details.reason === "update") {
+    chrome.storage.local.remove(["updateReady", "clientOutdated"]);
+  }
   registerContextMenus();
 });
 
@@ -220,7 +230,7 @@ function extractLastAnswerGeneric() {
     for (let j = 0; j < el.children.length; j++) {
       const child = el.children[j];
       if (child.getClientRects().length === 0) continue;
-      const text = (child.innerText || "").trim();
+      const text = ((/** @type {HTMLElement} */ (child)).innerText || "").trim();
       if (text.length > 30) score++;
     }
 
@@ -251,7 +261,7 @@ function extractLastAnswerGeneric() {
   for (let i = bestContainer.children.length - 1; i >= 0; i--) {
     const child = bestContainer.children[i];
     if (child.getClientRects().length === 0) continue;
-    const text = (child.innerText || "").trim();
+    const text = ((/** @type {HTMLElement} */ (child)).innerText || "").trim();
     if (!text) continue;
 
     if (answer === null) {
@@ -566,6 +576,39 @@ async function handle(msg) {
     case "BILLING_CHECKOUT": {
       const { url } = await backendBillingCheckout(msg.plan);
       return { url };
+    }
+    case "APPLY_UPDATE":
+      // Reply first; reloading tears down this worker and the open panel.
+      setTimeout(() => chrome.runtime.reload(), 150);
+      return {};
+
+    case "TEACH_TURN": {
+      const turn = await backendTeachTurn({
+        topic: String(msg.topic || ""),
+        persona: msg.persona === "beginner" ? "beginner" : "child",
+        cards: Array.isArray(msg.cards) ? msg.cards : [],
+        messages: Array.isArray(msg.messages) ? msg.messages : [],
+        wantHint: !!msg.wantHint,
+      });
+      return { turn };
+    }
+
+    case "TEACH_EVALUATE": {
+      const evaluation = await backendTeachEvaluate({
+        topic: String(msg.topic || ""),
+        persona: msg.persona === "beginner" ? "beginner" : "child",
+        cards: Array.isArray(msg.cards) ? msg.cards : [],
+        messages: Array.isArray(msg.messages) ? msg.messages : [],
+      });
+      return { evaluation };
+    }
+
+    case "DELETE_ACCOUNT": {
+      await backendDeleteAccount({ password: msg.password ? String(msg.password) : "" });
+      // The account is gone; nothing local is useful without it, and leaving the
+      // auth tokens behind would keep a dead session around.
+      await chrome.storage.local.clear();
+      return { deleted: true };
     }
     case "BILLING_PORTAL": {
       const { url } = await backendBillingPortal();

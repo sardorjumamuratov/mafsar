@@ -5,6 +5,7 @@ import { parseTeamCode, teamLinkFor } from ".././share-link.js";
 import { LANDING_BASE } from "../../config.js";
 import { review } from "../../../shared/srs.js";
 import { copyRowHtml } from "../share.js";
+import { confirmSheet } from "../confirm.js";
 
 // ================================================================ TEAMS
 // Account-backed study groups: create one, share the code/link, compare
@@ -27,7 +28,7 @@ export async function renderTeams() {
         <div class="block tint" style="text-align:center">
           <div style="font-size:26px">👥</div>
           <div style="font-weight:650;margin-top:6px">Teams need an account</div>
-          <div style="font-size:12.5px;color:var(--muted);margin-top:4px">Sign in to create a team, share its code, and follow a leaderboard with your study group. Everything else keeps working offline.</div>
+          <div style="font-size:12.5px;color:var(--muted);margin-top:4px">Sign in to create a team, share its code, and follow a leaderboard with your study group.</div>
           <button class="btn btn-primary" style="margin-top:12px" data-action="nav-you">Sign in on the You tab</button>
         </div>
       </div>`);
@@ -223,7 +224,12 @@ export async function renderTeam(id) {
 }
 
 export async function leaveTeam(id) {
-  if (!confirm("Leave this team? You can re-join any time with the team code.")) return;
+  const ok = await confirmSheet({
+    title: "Leave this team?",
+    body: "You can join again any time with the team code.",
+    confirmLabel: "Leave team",
+  });
+  if (!ok) return;
   try {
     await send({ type: "TEAM_LEAVE", id });
     toast("Left the team");

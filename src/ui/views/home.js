@@ -6,6 +6,7 @@ import { review } from "../../../shared/srs.js";
 import { setRow } from "../views/sets.js";
 import { detail } from "../views/set-detail.js";
 import { LANDING_BASE } from "../../config.js";
+import { updateBannerHtml } from "../update-banner.js";
 
 // ================================================================ HOME
 export async function renderHome() {
@@ -88,7 +89,7 @@ export async function renderHome() {
          </label>
        </div>`;
 
-  const allCards = studySets.flatMap((s) => s.flashcards || []);
+  const allCards = studySets.flatMap((s) => (s.flashcards || []).map((c) => ({ ...c, sessionId: s.sessionId })));
   const weak = weakTopics(reviewLog, allCards);
   const insightsCard = weak.length
     ? `<div class="listhd"><span class="t-label">Needs work</span></div>
@@ -97,11 +98,11 @@ export async function renderHome() {
            .slice(0, 3)
            .map(
              (w) =>
-               `<div class="insight-row"><span class="q">${esc(w.front)}</span>${
-                 w.forgetRisk
-                   ? `<span class="tag dot" style="color:var(--warm)">forget soon</span>`
-                   : `<span class="tag">${w.fails} miss${w.fails === 1 ? "" : "es"}</span>`
-               }</div>`
+               `<button type="button" class="insight-row" data-action="open-weak" data-id="${esc(w.sessionId)}" data-card="${esc(w.cardId)}">
+                   <span class="q">${esc(w.front)}</span>
+                   ${w.forgetRisk ? `<span class="tag dot" style="color:var(--warm)">Forget soon</span>` : w.misses > 0 ? `<span class="tag">Missed ${w.misses}×</span>` : `<span class="tag">Felt hard</span>`}
+                   <svg class="ic chev" viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"/></svg>
+                 </button>`
            )
            .join("")}
        </div>`
@@ -119,8 +120,10 @@ export async function renderHome() {
          <div style="font-size:12.5px;color:var(--muted);margin-top:4px">No cards due right now. Capture a chat or import a set.</div>
        </div>`;
 
+  const updateBanner = await updateBannerHtml();
   setHTML(app, `
     <div class="view">
+      ${updateBanner}
       <div class="ahd">
         <div><div class="h-sub">${greeting()}</div><div class="h-title">Ready to review</div></div>
         <div style="display:flex;gap:8px;align-items:center">

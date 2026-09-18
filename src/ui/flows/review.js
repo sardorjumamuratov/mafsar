@@ -5,6 +5,7 @@ import { appendReviewLog, bumpActivity, uid, updateCard } from "../../storage/st
 import { syncNow } from "../../sync/sync.js";
 import { quickQuizLen } from "../flows/quiz.js";
 import { setCodingState } from "../flows/coding.js";
+import { setTeachState } from "./teach.js";
 import { renderSetDetail } from "../views/set-detail.js";
 import { renderHome } from "../views/home.js";
 
@@ -121,6 +122,7 @@ export async function paintReviewDone() {
 
 export function goReturn() {
   setCodingState(null);
+  setTeachState(null);
   const ret = focusReturn;
   if (typeof ret === "string" && ret.startsWith("set:")) renderSetDetail(ret.slice(4));
   else renderHome();
