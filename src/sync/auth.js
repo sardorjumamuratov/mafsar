@@ -145,7 +145,10 @@ export async function googleSignIn({ onTab, cancelSignal }) {
     }
     
     if (pollRes.status === 410) throw new Error('Sign-in expired');
-    if (!pollRes.ok) continue;
+    if (!pollRes.ok) {
+      if (pollRes.status === 429) throw new Error('Too many requests.');
+      continue;
+    }
     
     const data = await pollRes.json();
     if (data.status === 'pending') continue;

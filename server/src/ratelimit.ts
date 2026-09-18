@@ -34,7 +34,7 @@ export const DEFAULT_LIMITS = {
   
   // Google sign-in attempts.
   googleStartPerIp: { limit: 20, windowMs: 60 * 60 * 1000 },
-  googlePollPerIp: { limit: 60, windowMs: 60 * 60 * 1000 },
+  googlePollPerIp: { limit: 500, windowMs: 60 * 60 * 1000 },
 
   // LLM calls per user ID (approx 2 hours). High enough for heavy legitimate
   // use (e.g. 100 short practice sessions), but caps the blast radius if
