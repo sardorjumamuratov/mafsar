@@ -1,4 +1,4 @@
-﻿import { expect, test } from "vitest";
+import { expect, test } from "vitest";
 import { compareVersions } from "../src/version";
 import { createApp } from "../src/app";
 import { createClient } from "@libsql/client";

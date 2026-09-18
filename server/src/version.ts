@@ -1,4 +1,4 @@
-﻿export function compareVersions(a: string, b: string): number {
+export function compareVersions(a: string, b: string): number {
   const partsA = a.split(".").map(Number);
   const partsB = b.split(".").map(Number);
   const len = Math.max(partsA.length, partsB.length);

@@ -5,6 +5,7 @@ import { parseTeamCode, teamLinkFor } from ".././share-link.js";
 import { LANDING_BASE } from "../../config.js";
 import { review } from "../../storage/srs.js";
 import { copyRowHtml } from "../share.js";
+import { confirmSheet } from "../confirm.js";
 
 // ================================================================ TEAMS
 // Account-backed study groups: create one, share the code/link, compare
@@ -223,7 +224,12 @@ export async function renderTeam(id) {
 }
 
 export async function leaveTeam(id) {
-  if (!confirm("Leave this team? You can re-join any time with the team code.")) return;
+  const ok = await confirmSheet({
+    title: "Leave this team?",
+    body: "You can join again any time with the team code.",
+    confirmLabel: "Leave team",
+  });
+  if (!ok) return;
   try {
     await send({ type: "TEAM_LEAVE", id });
     toast("Left the team");

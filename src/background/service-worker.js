@@ -96,13 +96,16 @@ if (sp?.setPanelBehavior) {
   sp.setPanelBehavior({ openPanelOnActionClick: true }).catch(() => {});
 }
 
-chrome.runtime.onUpdateAvailable.addListener((details) => {
+// A store update has downloaded but only applies once the extension restarts.
+// Don't reload here: that would cut off a review in progress. The panel shows
+// a banner and the user restarts when ready (APPLY_UPDATE).
+chrome.runtime.onUpdateAvailable?.addListener((details) => {
   chrome.storage.local.set({ updateReady: details.version });
 });
 
 chrome.runtime.onInstalled.addListener((details) => {
   if (details.reason === "update") {
-    chrome.storage.local.remove("updateReady");
+    chrome.storage.local.remove(["updateReady", "clientOutdated"]);
   }
   registerContextMenus();
 });
@@ -574,6 +577,11 @@ async function handle(msg) {
       const { url } = await backendBillingCheckout(msg.plan);
       return { url };
     }
+    case "APPLY_UPDATE":
+      // Reply first; reloading tears down this worker and the open panel.
+      setTimeout(() => chrome.runtime.reload(), 150);
+      return {};
+
     case "TEACH_TURN": {
       const turn = await backendTeachTurn({
         topic: String(msg.topic || ""),

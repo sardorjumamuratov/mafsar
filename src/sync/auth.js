@@ -5,6 +5,33 @@ import { API_BASE } from "../config.js";
 
 const KEY = "auth";
 
+/** Sent on every request so the server can refuse a version it no longer supports. */
+function versionHeader() {
+  try {
+    return { "x-mafsar-version": chrome.runtime.getManifest().version };
+  } catch {
+    return {}; // no runtime (tests): send nothing rather than a fake version
+  }
+}
+const OUTDATED_FALLBACK = "Update required. Restart your browser to finish updating Mafsar.";
+
+/**
+ * A 426 means this build is below the server's MIN_CLIENT_VERSION. Record it for
+ * the panel banner and ask the store for the update now (Firefox may not
+ * support requestUpdateCheck; the regular daily check still runs there).
+ * @param {Response} res
+ */
+async function noteIfOutdated(res) {
+  if (res.status !== 426) return;
+  const data = await res.clone().json().catch(() => ({}));
+  await new Promise((resolve) => chrome.storage.local.set({ clientOutdated: data.message || OUTDATED_FALLBACK }, () => resolve()));
+  try {
+    /** @type {any} */ (chrome.runtime).requestUpdateCheck?.(() => {});
+  } catch {
+    /* not available in this browser */
+  }
+}
+
 export function getAuth() {
   return new Promise((resolve) => {
     chrome.storage.local.get(KEY, (obj) => resolve(obj[KEY] || null));
@@ -28,9 +55,10 @@ export async function logout() {
 async function postJson(path, body) {
   const res = await fetch(API_BASE + path, {
     method: "POST",
-    headers: { "content-type": "application/json", "x-mafsar-version": chrome.runtime.getManifest().version },
+    headers: { "content-type": "application/json", ...versionHeader() },
     body: JSON.stringify(body),
   });
+  await noteIfOutdated(res);
   const data = await res.json().catch(() => ({}));
   if (!res.ok) throw new Error(data.error || `Request failed (${res.status})`);
   return data;
@@ -53,7 +81,7 @@ async function refreshAccessToken() {
   if (!auth?.refreshToken) throw new Error("signed out");
   const res = await fetch(API_BASE + "/v1/auth/refresh", {
     method: "POST",
-    headers: { "content-type": "application/json", "x-mafsar-version": chrome.runtime.getManifest().version },
+    headers: { "content-type": "application/json", ...versionHeader() },
     body: JSON.stringify({ refreshToken: auth.refreshToken }),
   });
   if (!res.ok) {
@@ -76,7 +104,7 @@ export async function authedFetch(path, opts = {}) {
         ...(opts.headers || {}),
         "content-type": "application/json",
         authorization: `Bearer ${token}`,
-          "x-mafsar-version": chrome.runtime.getManifest().version,
+        ...versionHeader(),
       },
     });
   let res = await doFetch(auth.accessToken);
@@ -84,6 +112,7 @@ export async function authedFetch(path, opts = {}) {
     const token = await refreshAccessToken();
     res = await doFetch(token);
   }
+  await noteIfOutdated(res);
   return res;
 }
 
@@ -108,7 +137,7 @@ export async function googleSignIn({ onTab, cancelSignal }) {
     try {
       pollRes = await fetch(API_BASE + '/v1/auth/google/poll', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json', "x-mafsar-version": chrome.runtime.getManifest().version },
+        headers: { 'Content-Type': 'application/json', ...versionHeader() },
         body: JSON.stringify({ pollToken })
       });
     } catch (e) {

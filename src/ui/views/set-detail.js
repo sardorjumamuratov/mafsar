@@ -8,6 +8,7 @@ import { shuffled, startQuiz } from "../flows/quiz.js";
 import { shareBlockHtml } from "../share.js";
 import { syncNow } from "../../sync/sync.js";
 import { addCard, updateCard } from "../../storage/store.js";
+import { confirmSheet } from "../confirm.js";
 
 // ================================================================ SET DETAIL
 export let detail = null; // { session, studySet, summary, tab }
@@ -207,10 +208,16 @@ export function paintDetail() {
         }
         ${
           studySet
-            ? `<button class="linkbtn" data-action="make-set" data-id="${esc(session.id)}" title="Regenerate flashcards and quiz from the source — matching cards keep their review schedule">↻ Regenerate</button>`
+            ? `<div class="menu-wrap">
+                 <button class="iconbtn" data-action="set-menu" aria-label="More actions" aria-haspopup="menu" aria-expanded="false" aria-controls="setMenu"><svg class="ic" viewBox="0 0 24 24"><circle cx="5" cy="12" r="1.3"/><circle cx="12" cy="12" r="1.3"/><circle cx="19" cy="12" r="1.3"/></svg></button>
+                 <div class="menu hidden" id="setMenu" role="menu" aria-label="Set actions">
+                   <button type="button" class="menu-item" role="menuitem" data-action="make-set" data-id="${esc(session.id)}" title="Matching cards keep their review schedule">↻ Regenerate</button>
+                   <div class="menu-sep" role="separator"></div>
+                   <button type="button" class="menu-item danger" role="menuitem" data-action="delete-set" data-id="${esc(session.id)}">Delete set</button>
+                 </div>
+               </div>`
             : `<span class="tag">${s.total} cards</span>`
         }
-        ${studySet ? `<button class="iconbtn" data-action="delete-set" data-id="${esc(session.id)}" aria-label="Delete set"><svg class="ic" viewBox="0 0 24 24"><path d="M5 7h14M9 7V5h6v2m-8 0l1 13h8l1-13"/></svg></button>` : ""}
       </div>
       <div><div class="h-title" style="line-height:1.25">${esc(session.title || "Untitled")}</div>
         <div style="display:flex;gap:6px;margin-top:8px"><span class="tag dot" style="color:var(--primary)">${esc(sourceLabel(session))}</span></div>
@@ -245,10 +252,11 @@ export async function makeSet(sessionId) {
   // fronts survive the regen keep their SM-2 schedule (service worker).
   const { studySets } = await bundle();
   if (setFor(sessionId, studySets)) {
-    const okToReplace = confirm(
-      "Regenerate this set from its source?\n\n" +
-        "Existing cards and quiz questions are replaced. Cards that come back with the same front keep their review schedule; everything else starts fresh. Your exam date and summary are kept."
-    );
+    const okToReplace = await confirmSheet({
+      title: "Regenerate this set?",
+      body: "Cards and quiz questions are rebuilt from the source. Cards that come back with the same front keep their review schedule; the rest start fresh. Your exam date and summary are kept.",
+      confirmLabel: "Regenerate",
+    });
     if (!okToReplace) return;
   }
   showChrome(false);
@@ -322,3 +330,52 @@ export function openDetailTab(tab) { renderSetDetail(detail.session.id, tab); }
 export function startQuizForCurrentSet(n) { startQuiz(detail.studySet, "set:" + detail.session.id, n); }
 export function currentDetail() { return detail; }
 export function setEditingCardId(v) { editingCardId = v; }
+
+/** Open or close the set's "More" menu (Regenerate, Delete set). */
+export function toggleSetMenu(btn) {
+  const menu = document.getElementById("setMenu");
+  if (!menu) return;
+  const open = menu.classList.contains("hidden");
+  if (!open) return closeSetMenu(true);
+  menu.classList.remove("hidden");
+  btn.setAttribute("aria-expanded", "true");
+  const items = /** @type {HTMLElement[]} */ ([...menu.querySelectorAll('[role="menuitem"]')]);
+  items[0]?.focus();
+
+  const onKey = (/** @type {KeyboardEvent} */ e) => {
+    const i = items.indexOf(/** @type {HTMLElement} */ (document.activeElement));
+    if (e.key === "Escape") {
+      e.preventDefault();
+      closeSetMenu(true);
+    } else if (e.key === "ArrowDown" || e.key === "ArrowUp") {
+      e.preventDefault();
+      const step = e.key === "ArrowDown" ? 1 : -1;
+      items[(i + step + items.length) % items.length].focus();
+    } else if (e.key === "Tab") {
+      closeSetMenu(false);
+    }
+  };
+  // Any click outside the toggle closes it, including a click on an item: the
+  // item's own action has already run by then (panel.js listens first).
+  const onClick = (/** @type {MouseEvent} */ e) => {
+    if (!btn.contains(/** @type {Node} */ (e.target))) closeSetMenu(false);
+  };
+  document.addEventListener("keydown", onKey, true);
+  setTimeout(() => document.addEventListener("click", onClick), 0);
+  closeMenuHandlers = () => {
+    document.removeEventListener("keydown", onKey, true);
+    document.removeEventListener("click", onClick);
+  };
+}
+
+let closeMenuHandlers = () => {};
+
+function closeSetMenu(refocus) {
+  closeMenuHandlers();
+  closeMenuHandlers = () => {};
+  const menu = document.getElementById("setMenu");
+  const btn = /** @type {HTMLElement|null} */ (document.querySelector('[data-action="set-menu"]'));
+  menu?.classList.add("hidden");
+  btn?.setAttribute("aria-expanded", "false");
+  if (refocus) btn?.focus();
+}

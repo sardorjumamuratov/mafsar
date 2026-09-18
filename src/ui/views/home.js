@@ -6,6 +6,7 @@ import { review } from "../../storage/srs.js";
 import { setRow } from "../views/sets.js";
 import { detail } from "../views/set-detail.js";
 import { LANDING_BASE } from "../../config.js";
+import { updateBannerHtml } from "../update-banner.js";
 
 // ================================================================ HOME
 export async function renderHome() {
@@ -97,10 +98,10 @@ export async function renderHome() {
            .slice(0, 3)
            .map(
              (w) =>
-               `<button type="button" class="insight-row rowbtn" data-action="open-weak" data-id="${esc(w.sessionId)}" data-card="${esc(w.cardId)}" style="display:flex;align-items:center;width:100%;background:transparent;border:none;padding:8px 0;cursor:pointer;font:inherit;color:inherit;text-align:left;gap:8px;">
-                   <span class="q" style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${esc(w.front)}</span>
-                   ${w.forgetRisk ? `<span class="tag dot" style="color:var(--warm)">Forget soon</span>` : w.misses > 0 ? `<span class="tag">Missed ${w.misses}&times;</span>` : `<span class="tag">Felt hard</span>`}
-                   <svg class="chevron" viewBox="0 0 24 24" style="width:16px;height:16px;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;opacity:0.3;flex-shrink:0;"><path d="M9 5l7 7-7 7"/></svg>
+               `<button type="button" class="insight-row" data-action="open-weak" data-id="${esc(w.sessionId)}" data-card="${esc(w.cardId)}">
+                   <span class="q">${esc(w.front)}</span>
+                   ${w.forgetRisk ? `<span class="tag dot" style="color:var(--warm)">Forget soon</span>` : w.misses > 0 ? `<span class="tag">Missed ${w.misses}×</span>` : `<span class="tag">Felt hard</span>`}
+                   <svg class="ic chev" viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"/></svg>
                  </button>`
            )
            .join("")}
@@ -119,8 +120,10 @@ export async function renderHome() {
          <div style="font-size:12.5px;color:var(--muted);margin-top:4px">No cards due right now. Capture a chat or import a set.</div>
        </div>`;
 
+  const updateBanner = await updateBannerHtml();
   setHTML(app, `
     <div class="view">
+      ${updateBanner}
       <div class="ahd">
         <div><div class="h-sub">${greeting()}</div><div class="h-title">Ready to review</div></div>
         <div style="display:flex;gap:8px;align-items:center">

@@ -6,6 +6,8 @@ import { renderHome } from "../views/home.js";
 import { syncNow } from "../../sync/sync.js";
 import { renderSetDetail } from "../views/set-detail.js";
 import { review } from "../../storage/srs.js";
+import { confirmSheet } from "../confirm.js";
+import { updateBannerHtml } from "../update-banner.js";
 
 export async function renderYou() {
   setNav("you");
@@ -33,7 +35,6 @@ export async function renderYou() {
            </div>
          </div>
          <button class="btn btn-ghost btn-block" data-action="auth-signout">Sign out</button>
-        
        </div>`
     : `<div class="block" style="display:flex;flex-direction:column;gap:10px">
          <div style="font-weight:600;font-size:13px">Back up and sync</div>
@@ -48,8 +49,10 @@ export async function renderYou() {
          </div>
        </div>`;
 
+  const updateBanner = await updateBannerHtml();
   setHTML(app, `
     <div class="view">
+      ${updateBanner}
       <div class="ahd"><div class="wordmark">Maf<b>sar</b></div></div>
       <div class="block" style="text-align:center;padding:20px">
         <div style="font-size:13px;color:var(--muted)">${auth?.user ? "Your sets are backed up" : "Sign in to back up your sets"}</div>
@@ -63,9 +66,14 @@ export async function renderYou() {
         <div class="stat"><div class="v tnum">${studySets.length}</div><div class="k">Sets</div></div>
       </div>
       ${accountHtml}
-            <div class="listhd"><span class="t-label">Backup</span></div>
+      <div class="listhd"><span class="t-label">Backup</span></div>
       <div id="backupSlot"></div>
       <input type="file" id="backupFile" accept="application/json,.json" class="hidden" />
+      ${auth?.user ? `<div class="listhd"><span class="t-label">Account</span></div>
+      <button type="button" class="setting-row" data-action="delete-account-open">
+        <span class="txt"><span class="main" style="display:block">Delete account</span><span class="sub" style="display:block">Permanently delete your account and data</span></span>
+        <svg class="ic chev" viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"/></svg>
+      </button>` : ""}
     </div>`);
   topOfView();
   if (auth?.user) refreshBilling().catch(() => {});
@@ -307,7 +315,13 @@ export function importBackupFile(file) {
   const reader = new FileReader();
   reader.onload = async () => {
     try {
-      if (!confirm("Restore this backup? It replaces ALL local Mafsar data.")) return;
+      const ok = await confirmSheet({
+        title: "Restore this backup?",
+        body: "Everything Mafsar has stored in this browser is replaced with the backup.",
+        confirmLabel: "Restore backup",
+        destructive: true,
+      });
+      if (!ok) return;
       await importAll(JSON.parse(String(reader.result)));
       toast("Backup restored");
       renderHome();
