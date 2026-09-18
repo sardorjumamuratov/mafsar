@@ -1,56 +1,85 @@
-import { View, Text, TextInput, TouchableOpacity, StyleSheet } from 'react-native';
 import { useState } from 'react';
+import { KeyboardAvoidingView, Platform, Pressable, StyleSheet, Text, TextInput } from 'react-native';
 import { useRouter } from 'expo-router';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { loginWithEmail } from '../../src/auth';
+import { clearLocalData } from '../../src/db';
+import { runSync } from '../../src/sync';
 import { useTheme } from '../../src/theme/useTheme';
+import { Button, ErrorText } from '../../src/ui/components';
 
 export default function SignInScreen() {
-  const [email, setEmail] = useState('');
-  const [pass, setPass] = useState('');
+  const t = useTheme();
   const router = useRouter();
-  const theme = useTheme();
+  const insets = useSafeAreaInsets();
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
-  const handleSignIn = async () => {
+  const ready = /\S+@\S+\.\S+/.test(email.trim()) && password.length > 0;
+
+  const submit = async () => {
+    if (!ready || busy) return;
+    setBusy(true);
+    setError(null);
     try {
-      await loginWithEmail(email, pass);
+      const otherAccount = await loginWithEmail(email, password);
+      if (otherAccount) await clearLocalData();
+      await runSync().catch(() => {});
       router.replace('/(tabs)/today');
-    } catch (e) {
-      console.warn(e);
+    } catch (e: any) {
+      setError(e?.message || "Couldn't sign in.");
+      setBusy(false);
     }
   };
 
+  const input = [styles.input, { backgroundColor: t.colors.surface, color: t.colors.ink, borderColor: t.colors.border }];
+
   return (
-    <View style={[styles.container, { backgroundColor: theme.colors.bg }]}>
-      <Text style={[styles.title, { color: theme.colors.ink }]}>Sign in</Text>
-      
-      <TextInput 
-        style={[styles.input, { backgroundColor: theme.colors.surface, color: theme.colors.ink, borderColor: theme.colors.border }]} 
-        placeholder="Email" 
-        placeholderTextColor={theme.colors.muted}
-        value={email} 
+    <KeyboardAvoidingView
+      style={[styles.container, { backgroundColor: t.colors.bg, paddingTop: insets.top + 12 }]}
+      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+    >
+      <Pressable onPress={() => router.back()} hitSlop={12} accessibilityRole="button" accessibilityLabel="Back">
+        <Text style={{ color: t.colors.primary, fontSize: 17 }}>‹ Back</Text>
+      </Pressable>
+      <Text style={[styles.title, { color: t.colors.ink }]}>Sign in</Text>
+
+      <TextInput
+        style={input}
+        placeholder="Email"
+        placeholderTextColor={t.colors.faint}
+        value={email}
         onChangeText={setEmail}
         autoCapitalize="none"
+        autoComplete="email"
+        keyboardType="email-address"
+        textContentType="emailAddress"
+        returnKeyType="next"
+        accessibilityLabel="Email"
       />
-      <TextInput 
-        style={[styles.input, { backgroundColor: theme.colors.surface, color: theme.colors.ink, borderColor: theme.colors.border }]} 
-        placeholder="Password" 
-        placeholderTextColor={theme.colors.muted}
-        value={pass} 
-        onChangeText={setPass} 
-        secureTextEntry 
+      <TextInput
+        style={input}
+        placeholder="Password"
+        placeholderTextColor={t.colors.faint}
+        value={password}
+        onChangeText={setPassword}
+        secureTextEntry
+        autoComplete="current-password"
+        textContentType="password"
+        returnKeyType="go"
+        onSubmitEditing={submit}
+        accessibilityLabel="Password"
       />
-      
-      <TouchableOpacity style={[styles.btn, { backgroundColor: theme.colors.primary }]} onPress={handleSignIn}>
-        <Text style={[styles.btnText, { color: theme.colors.surface }]}>Sign in</Text>
-      </TouchableOpacity>
-    </View>
+      <ErrorText>{error}</ErrorText>
+      <Button title="Sign in" onPress={submit} disabled={!ready} loading={busy} style={{ marginTop: 12 }} />
+    </KeyboardAvoidingView>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, padding: 32, justifyContent: 'center' },
-  title: { fontSize: 28, fontWeight: 'bold', marginBottom: 24 },
-  input: { padding: 16, borderRadius: 12, borderWidth: 1, marginBottom: 16, fontSize: 17 },
-  btn: { padding: 16, borderRadius: 12, alignItems: 'center', marginTop: 8 },
-  btnText: { fontSize: 17, fontWeight: '600' }
+  container: { flex: 1, paddingHorizontal: 28 },
+  title: { fontSize: 30, fontWeight: '700', marginTop: 24, marginBottom: 24 },
+  input: { padding: 16, borderRadius: 12, borderWidth: 1, marginBottom: 14, fontSize: 17 },
 });

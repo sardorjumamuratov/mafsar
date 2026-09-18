@@ -87,7 +87,10 @@ jobs:
           cache: npm
           cache-dependency-path: server/package-lock.json
       - run: npm ci
-      - run: npx tsc --noEmit
+      - run: npm run typecheck
+      - run: npm test
+      # Version mismatches with the Expo SDK crash on device, not in tests.
+      - run: npx expo install --check
       # Boot the server against a local file DB and hit the health endpoint —
       # catches runtime breakage (bad imports, env handling) before deploy.
       - name: Boot smoke test
@@ -100,7 +103,7 @@ jobs:
           echo "server did not become healthy" && exit 1
 
   mobile-tests:
-    name: Mobile Typecheck (tsc)
+    name: Mobile app (type check, tests, Expo doctor)
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -113,4 +116,7 @@ jobs:
           cache: npm
           cache-dependency-path: mobile/package-lock.json
       - run: npm ci
-      - run: npx tsc --noEmit
+      - run: npm run typecheck
+      - run: npm test
+      # Version mismatches with the Expo SDK crash on device, not in tests.
+      - run: npx expo install --check

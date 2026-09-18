@@ -1,122 +1,119 @@
-import { View, Text, TouchableOpacity, StyleSheet, SafeAreaView, ScrollView } from 'react-native';
-import { useRouter } from 'expo-router';
-import { useTheme } from '../src/theme/useTheme';
-import { useState, useEffect } from 'react';
-import { getDB } from '../src/db';
+import { useEffect, useState } from 'react';
+import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { useLocalSearchParams, useRouter } from 'expo-router';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { shuffleQuiz } from '../../shared/quiz.js';
+import { getQuiz, type QuizQuestion } from '../src/db/queries';
+import { useTheme } from '../src/theme/useTheme';
+import { Button, Loading } from '../src/ui/components';
 
 export default function QuizScreen() {
-  const theme = useTheme();
+  const t = useTheme();
   const router = useRouter();
-  const [queue, setQueue] = useState<any[]>([]);
+  const insets = useSafeAreaInsets();
+  const { setId } = useLocalSearchParams<{ setId?: string }>();
+  const [queue, setQueue] = useState<QuizQuestion[] | null>(null);
   const [idx, setIdx] = useState(0);
   const [score, setScore] = useState(0);
   const [answered, setAnswered] = useState<number | null>(null);
 
   useEffect(() => {
-    getDB().then(async db => {
-      const raw = await db.getAllAsync<any>('SELECT * FROM quiz WHERE deleted = 0 LIMIT 10');
-      const questions = raw.map(q => ({
-        id: q.id,
-        q: q.question,
-        options: JSON.parse(q.options_json),
-        answer: q.answer,
-        explain: q.explain
-      }));
-      setQueue(shuffleQuiz(questions));
-    });
-  }, []);
+    // Shuffle options too: generated quizzes tend to park the answer in one slot.
+    getQuiz(setId ? String(setId) : undefined).then((qs) => setQueue(shuffleQuiz(qs)));
+  }, [setId]);
 
-  if (queue.length === 0) return <View style={{ flex: 1, backgroundColor: theme.colors.bg }} />;
-  if (idx >= queue.length) {
+  if (queue === null) return <Loading />;
+
+  if (queue.length === 0 || idx >= queue.length) {
+    const pct = queue.length ? Math.round((score / queue.length) * 100) : 0;
     return (
-      <View style={[styles.container, { backgroundColor: theme.colors.bg, justifyContent: 'center', alignItems: 'center' }]}>
-        <Text style={{ color: theme.colors.ink, fontSize: 32, fontWeight: 'bold' }}>{score} / {queue.length}</Text>
-        <TouchableOpacity style={[styles.primaryBtn, { backgroundColor: theme.colors.primary, marginTop: 24, paddingHorizontal: 32 }]} onPress={() => router.back()}>
-          <Text style={{ color: theme.colors.surface, fontSize: 17, fontWeight: 'bold' }}>Done</Text>
-        </TouchableOpacity>
+      <View style={[styles.center, { backgroundColor: t.colors.bg, paddingBottom: insets.bottom + 24 }]}>
+        {queue.length ? (
+          <>
+            <Text style={{ color: t.colors.ink, fontSize: 44, fontWeight: '700' }}>{score} / {queue.length}</Text>
+            <Text style={{ color: t.colors.muted, fontSize: 17, marginTop: 8 }}>
+              {pct >= 80 ? 'Great work.' : pct >= 50 ? 'Getting there.' : 'Worth another look at these cards.'}
+            </Text>
+          </>
+        ) : (
+          <Text style={{ color: t.colors.ink, fontSize: 18 }}>This set has no quiz questions.</Text>
+        )}
+        <Button title="Done" onPress={() => router.back()} style={{ marginTop: 32, alignSelf: 'stretch' }} />
       </View>
     );
   }
 
   const q = queue[idx];
-
-  const handleOption = (i: number) => {
+  const choose = (i: number) => {
     if (answered !== null) return;
     setAnswered(i);
     if (i === q.answer) setScore(score + 1);
   };
 
-  const handleNext = () => {
-    setAnswered(null);
-    setIdx(idx + 1);
-  };
-
   return (
-    <SafeAreaView style={[styles.container, { backgroundColor: theme.colors.bg }]}>
+    <View style={{ flex: 1, backgroundColor: t.colors.bg, paddingTop: insets.top }}>
       <View style={styles.header}>
-        <TouchableOpacity onPress={() => router.back()} style={{ padding: 16 }}>
-          <Text style={{ color: theme.colors.muted, fontSize: 24 }}>✕</Text>
-        </TouchableOpacity>
-        <Text style={{ color: theme.colors.muted, fontSize: 17, padding: 16 }}>{idx + 1} / {queue.length}</Text>
+        <Pressable onPress={() => router.back()} hitSlop={12} accessibilityRole="button" accessibilityLabel="Close quiz" style={{ padding: 16 }}>
+          <Text style={{ color: t.colors.muted, fontSize: 22 }}>✕</Text>
+        </Pressable>
+        <Text style={{ color: t.colors.muted, fontSize: 16, padding: 16 }}>{idx + 1} / {queue.length}</Text>
       </View>
 
-      <ScrollView style={{ flex: 1, padding: 16 }}>
-        <Text style={{ color: theme.colors.ink, fontSize: 22, fontWeight: '600', marginBottom: 24, lineHeight: 32 }}>{q.q}</Text>
-        
+      <ScrollView contentContainerStyle={{ padding: 16 }}>
+        <Text style={{ color: t.colors.ink, fontSize: 21, fontWeight: '600', marginBottom: 24, lineHeight: 30 }}>{q.q}</Text>
         <View style={{ gap: 12 }}>
-          {q.options.map((opt: string, i: number) => {
-            const isCorrect = answered !== null && i === q.answer;
-            const isWrong = answered === i && i !== q.answer;
-            let bgColor = theme.colors.surface;
-            let borderColor = theme.colors.border;
-            
-            if (isCorrect) {
-              bgColor = theme.colors.success + '20';
-              borderColor = theme.colors.success;
-            } else if (isWrong) {
-              bgColor = theme.colors.danger + '20';
-              borderColor = theme.colors.danger;
-            }
-
+          {q.options.map((opt, i) => {
+            const correct = answered !== null && i === q.answer;
+            const wrong = answered === i && i !== q.answer;
             return (
-              <TouchableOpacity 
-                key={i} 
-                onPress={() => handleOption(i)} 
-                activeOpacity={answered !== null ? 1 : 0.7}
-                style={[styles.optBtn, { backgroundColor: bgColor, borderColor }]}
+              <Pressable
+                key={i}
+                onPress={() => choose(i)}
+                disabled={answered !== null}
+                accessibilityRole="button"
+                accessibilityState={{ selected: answered === i }}
+                accessibilityLabel={`${opt}${correct ? ', correct answer' : wrong ? ', wrong' : ''}`}
+                style={[
+                  styles.option,
+                  {
+                    backgroundColor: correct ? t.colors.success + '22' : wrong ? t.colors.danger + '22' : t.colors.surface,
+                    borderColor: correct ? t.colors.success : wrong ? t.colors.danger : t.colors.border,
+                  },
+                ]}
               >
-                <Text style={{ color: theme.colors.ink, fontSize: 17 }}>{opt}</Text>
-              </TouchableOpacity>
+                <Text style={{ color: t.colors.ink, fontSize: 17, lineHeight: 24 }}>{opt}</Text>
+              </Pressable>
             );
           })}
         </View>
 
         {answered !== null && (
-          <View style={{ marginTop: 32 }}>
-            <Text style={{ color: answered === q.answer ? theme.colors.success : theme.colors.danger, fontWeight: 'bold', fontSize: 17, marginBottom: 8 }}>
+          <View style={{ marginTop: 24 }} accessibilityLiveRegion="polite">
+            <Text style={{ color: answered === q.answer ? t.colors.success : t.colors.danger, fontWeight: '700', fontSize: 17, marginBottom: 6 }}>
               {answered === q.answer ? 'Correct' : 'Not quite'}
             </Text>
-            {q.explain && <Text style={{ color: theme.colors.ink, fontSize: 17, lineHeight: 24 }}>{q.explain}</Text>}
+            {!!q.explain && <Text style={{ color: t.colors.ink, fontSize: 16, lineHeight: 23 }}>{q.explain}</Text>}
           </View>
         )}
       </ScrollView>
 
       {answered !== null && (
-        <View style={styles.footer}>
-          <TouchableOpacity style={[styles.primaryBtn, { backgroundColor: theme.colors.primary }]} onPress={handleNext}>
-            <Text style={{ color: theme.colors.surface, fontSize: 17, fontWeight: 'bold' }}>Next</Text>
-          </TouchableOpacity>
+        <View style={{ padding: 16, paddingBottom: 16 + insets.bottom }}>
+          <Button
+            title={idx + 1 < queue.length ? 'Next' : 'See score'}
+            onPress={() => {
+              setAnswered(null);
+              setIdx(idx + 1);
+            }}
+          />
         </View>
       )}
-    </SafeAreaView>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1 },
   header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  footer: { padding: 16 },
-  primaryBtn: { padding: 16, borderRadius: 12, alignItems: 'center' },
-  optBtn: { padding: 16, borderRadius: 12, borderWidth: 1 }
+  option: { padding: 16, borderRadius: 12, borderWidth: 1.5 },
+  center: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 32 },
 });

@@ -1,14 +1,26 @@
 import * as SQLite from 'expo-sqlite';
 
+// Local copy of the user's library. The server is the source of truth; this is
+// what makes the app work offline. `dirty = 1` marks rows to push on next sync.
+
+let dbPromise: Promise<SQLite.SQLiteDatabase> | null = null;
+
+/** One shared connection for the whole app. */
+export function getDB(): Promise<SQLite.SQLiteDatabase> {
+  if (!dbPromise) dbPromise = SQLite.openDatabaseAsync('mafsar.db');
+  return dbPromise;
+}
+
 export async function initDB() {
-  const db = await SQLite.openDatabaseAsync('mafsar.db');
-  
+  const db = await getDB();
   await db.execAsync(`
+    PRAGMA journal_mode = WAL;
+
     CREATE TABLE IF NOT EXISTS meta (
       key TEXT PRIMARY KEY,
       value TEXT
     );
-    
+
     CREATE TABLE IF NOT EXISTS sets (
       id TEXT PRIMARY KEY,
       title TEXT NOT NULL,
@@ -21,7 +33,9 @@ export async function initDB() {
       deleted INTEGER NOT NULL DEFAULT 0,
       dirty INTEGER NOT NULL DEFAULT 0
     );
-    
+
+    -- Times are epoch ms (due_date, last_review); the sync layer converts to
+    -- and from the server's ISO strings.
     CREATE TABLE IF NOT EXISTS cards (
       id TEXT PRIMARY KEY,
       set_id TEXT NOT NULL,
@@ -38,11 +52,11 @@ export async function initDB() {
       difficulty REAL,
       state TEXT,
       lapses INTEGER NOT NULL DEFAULT 0,
-      last_review TEXT
+      last_review INTEGER
     );
     CREATE INDEX IF NOT EXISTS idx_cards_set_id ON cards(set_id);
     CREATE INDEX IF NOT EXISTS idx_cards_due_date ON cards(due_date) WHERE deleted = 0;
-    
+
     CREATE TABLE IF NOT EXISTS quiz (
       id TEXT PRIMARY KEY,
       set_id TEXT NOT NULL,
@@ -54,13 +68,13 @@ export async function initDB() {
       deleted INTEGER NOT NULL DEFAULT 0,
       dirty INTEGER NOT NULL DEFAULT 0
     );
-    
+
     CREATE TABLE IF NOT EXISTS activity (
       day TEXT PRIMARY KEY,
       count INTEGER NOT NULL,
       dirty INTEGER NOT NULL DEFAULT 0
     );
-    
+
     CREATE TABLE IF NOT EXISTS review_log (
       id TEXT PRIMARY KEY,
       card_id TEXT NOT NULL,
@@ -74,11 +88,17 @@ export async function initDB() {
       dirty INTEGER NOT NULL DEFAULT 0
     );
   `);
-  
   return db;
 }
 
-export const getDB = () => SQLite.openDatabaseAsync('mafsar.db');
+/** Erase everything local (account deleted, or a different user signed in). */
+export async function clearLocalData() {
+  const db = await getDB();
+  await db.execAsync(`
+    DELETE FROM sets; DELETE FROM cards; DELETE FROM quiz;
+    DELETE FROM activity; DELETE FROM review_log; DELETE FROM meta;
+  `);
+}
 
 export async function getMeta(key: string): Promise<string | null> {
   const db = await getDB();

@@ -12,12 +12,13 @@ libSQL (Turso) backend in `server/`, deployed on Railway.
   - `src/content/`: content scripts. These are classic scripts, so no `import`.
   - `src/storage/`: pure logic plus `chrome.storage` access.
   - `src/vendor/`: unmodified third-party files. This is the only place they may live.
-- `shared/`: pure modules used by both the extension and the server (for example `shared/srs.js`), if the folder exists.
+- `shared/`: pure JS used by both the extension and the mobile app: the FSRS scheduler (`srs.js`), sync mapping, streaks, quiz, readiness. No `chrome.*` or React Native here. The server does not import it (Railway may deploy `server/` alone).
+- `mobile/`: the Expo (React Native) phone app. It reviews the same cards through `/v1/sync`. Check it with `cd mobile && npm run typecheck && npm test && npx expo install --check`.
 - `server/`: the TypeScript API, run with `tsx`. Database migrations are the `MIGRATIONS` list in `server/src/db.ts`.
 - `landing/`: the landing page, served by the backend.
 - `tests/*.test.mjs`: extension tests. Each is a self-running plain-node script.
 - `server/tests/*.test.ts`: server tests (vitest).
-- `tools/build.mjs`: builds `dist/mafsar-{chrome,firefox}-<version>.zip` from everything under `src/`.
+- `tools/build.mjs`: builds `dist/mafsar-{chrome,firefox}-<version>.zip` from everything under `src/` and `shared/`.
 - `docs/prompts/`: task prompts. When asked to implement `docs/prompts/NN-….md`, follow that file exactly, and read `docs/prompts/README.md` for order and dependencies.
 
 ## Hard rules

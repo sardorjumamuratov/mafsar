@@ -1,159 +1,152 @@
-import { View, Text, TouchableOpacity, StyleSheet, SafeAreaView, ScrollView } from 'react-native';
-import { useRouter } from 'expo-router';
-import { useTheme } from '../src/theme/useTheme';
-import { useState, useEffect } from 'react';
-import { getReviewQueue, CardRow } from '../src/db/queries';
-import { getDB } from '../src/db';
-import { review, byDue } from '../../shared/srs.js';
+import { useEffect, useRef, useState } from 'react';
+import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { useLocalSearchParams, useRouter } from 'expo-router';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Haptics from 'expo-haptics';
+import { getReviewQueue, previewIntervals, recordReview, type ReviewItem } from '../src/db/queries';
+import { syncQuietly } from '../src/sync';
+import { useTheme } from '../src/theme/useTheme';
+import { Button, Loading } from '../src/ui/components';
+
+type Grade = 0 | 3 | 4 | 5;
 
 export default function ReviewScreen() {
-  const theme = useTheme();
+  const t = useTheme();
   const router = useRouter();
-  const [queue, setQueue] = useState<CardRow[]>([]);
+  const insets = useSafeAreaInsets();
+  const { setId } = useLocalSearchParams<{ setId?: string }>();
+  const [queue, setQueue] = useState<ReviewItem[] | null>(null);
   const [idx, setIdx] = useState(0);
   const [showAnswer, setShowAnswer] = useState(false);
-  const [loading, setLoading] = useState(true);
+  const [busy, setBusy] = useState(false);
+  const reviewed = useRef(0);
 
   useEffect(() => {
-    getReviewQueue().then(cards => {
-      // Sort by due date (byDue handles nulls etc.)
-      const sorted = cards.sort((a, b) => byDue({ dueDate: a.due_date }, { dueDate: b.due_date }));
-      setQueue(sorted);
-      setLoading(false);
-    });
-  }, []);
+    getReviewQueue(setId ? String(setId) : undefined).then(setQueue);
+  }, [setId]);
 
-  if (loading) return <View style={{ flex: 1, backgroundColor: theme.colors.bg }} />;
-  if (idx >= queue.length || queue.length === 0) {
+  const finish = () => {
+    if (reviewed.current) syncQuietly();
+    router.back();
+  };
+
+  if (queue === null) return <Loading />;
+
+  if (idx >= queue.length) {
     return (
-      <View style={[styles.container, { backgroundColor: theme.colors.bg, justifyContent: 'center', alignItems: 'center' }]}>
-        <Text style={{ color: theme.colors.ink, fontSize: 22, fontWeight: 'bold' }}>{queue.length} cards reviewed</Text>
-        <TouchableOpacity style={[styles.primaryBtn, { backgroundColor: theme.colors.primary, marginTop: 24 }]} onPress={() => router.back()}>
-          <Text style={{ color: theme.colors.surface, fontSize: 17, fontWeight: 'bold' }}>Done</Text>
-        </TouchableOpacity>
+      <View style={[styles.done, { backgroundColor: t.colors.bg, paddingBottom: insets.bottom + 24 }]}>
+        <Text style={{ fontSize: 40 }}>{reviewed.current ? '🎉' : '✅'}</Text>
+        <Text style={{ color: t.colors.ink, fontSize: 24, fontWeight: '700', marginTop: 12 }}>
+          {reviewed.current ? 'Session complete' : 'Nothing is due'}
+        </Text>
+        <Text style={{ color: t.colors.muted, fontSize: 17, marginTop: 8, textAlign: 'center' }}>
+          {reviewed.current
+            ? `You reviewed ${reviewed.current} card${reviewed.current === 1 ? '' : 's'}. They'll come back when you're about to forget them.`
+            : 'Come back later, or pick a set to study.'}
+        </Text>
+        <Button title="Done" onPress={finish} style={{ marginTop: 32, alignSelf: 'stretch' }} />
       </View>
     );
   }
 
-  const card = queue[idx];
+  const item = queue[idx];
+  const iv = previewIntervals(item);
 
-  const handleReveal = () => {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+  const reveal = () => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
     setShowAnswer(true);
   };
 
-  const handleGrade = async (grade: 0 | 3 | 4 | 5) => {
-    if (grade >= 4) Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-    else if (grade === 0) Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-    else Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-
-    const now = Date.now();
-    const prevInterval = card.interval || 0;
-    
-    // Calculate new schedule
-    const c = { id: card.id, easiness: card.easiness, interval: card.interval, repetitions: card.repetitions, dueDate: card.due_date || 0 };
-    const next = review(c, grade, now, null);
-    
-    const db = await getDB();
-    const isoNow = new Date(now).toISOString();
-    
-    await db.withTransactionAsync(async () => {
-      // Update card
-      await db.runAsync(
-        'UPDATE cards SET easiness = ?, interval = ?, repetitions = ?, due_date = ?, updated_at = ?, dirty = 1 WHERE id = ?',
-        [next.easiness, next.interval, next.repetitions, next.dueDate, isoNow, card.id]
-      );
-      // Append review log
-      const logId = Math.random().toString(36).slice(2);
-      await db.runAsync(
-        'INSERT INTO review_log (id, card_id, grade, prev_interval, new_interval, reviewed_at, dirty) VALUES (?, ?, ?, ?, ?, ?, 1)',
-        [logId, card.id, grade, prevInterval, next.interval, isoNow]
-      );
-    });
-
-    // Relearn requeue
-    let nextQueue = [...queue];
-    if (grade < 3) {
-      // insert 3 positions later
-      const insertAt = Math.min(idx + 4, nextQueue.length);
-      nextQueue.splice(insertAt, 0, card);
+  const grade = async (g: Grade) => {
+    if (busy) return;
+    setBusy(true);
+    if (g >= 4) Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
+    else Haptics.impactAsync(g === 0 ? Haptics.ImpactFeedbackStyle.Medium : Haptics.ImpactFeedbackStyle.Light).catch(() => {});
+    try {
+      const updated = await recordReview(item, g);
+      reviewed.current++;
+      const next = [...queue];
+      // "Again" brings the card back later in this session, with its new state.
+      if (g === 0) next.splice(Math.min(idx + 4, next.length), 0, { ...item, card: updated });
+      setQueue(next);
+      setShowAnswer(false);
+      setIdx(idx + 1);
+    } finally {
+      setBusy(false);
     }
-    
-    setQueue(nextQueue);
-    setShowAnswer(false);
-    setIdx(idx + 1);
   };
 
-  // Preview intervals
-  const c = { id: card.id, easiness: card.easiness, interval: card.interval, repetitions: card.repetitions, dueDate: card.due_date || 0 };
-  const now = Date.now();
-  const iAgain = Math.round(review(c, 0, now, null).interval);
-  const iHard = Math.round(review(c, 3, now, null).interval);
-  const iGood = Math.round(review(c, 4, now, null).interval);
-  const iEasy = Math.round(review(c, 5, now, null).interval);
+  const days = (n: number) => (n <= 1 ? '1d' : n < 30 ? `${n}d` : `${Math.round(n / 30)}mo`);
+  const grades: { g: Grade; label: string; color: string; hint: string }[] = [
+    { g: 0, label: 'Again', color: t.colors.danger, hint: days(iv.again) },
+    { g: 3, label: 'Hard', color: t.colors.warm, hint: days(iv.hard) },
+    { g: 4, label: 'Good', color: t.colors.success, hint: days(iv.good) },
+    { g: 5, label: 'Easy', color: t.colors.primary, hint: days(iv.easy) },
+  ];
 
   return (
-    <SafeAreaView style={[styles.container, { backgroundColor: theme.colors.bg }]}>
+    <View style={{ flex: 1, backgroundColor: t.colors.bg, paddingTop: insets.top }}>
       <View style={styles.header}>
-        <TouchableOpacity onPress={() => router.back()} style={{ padding: 16 }}>
-          <Text style={{ color: theme.colors.muted, fontSize: 24 }}>✕</Text>
-        </TouchableOpacity>
-        <Text style={{ color: theme.colors.muted, fontSize: 17, padding: 16 }}>{idx + 1} / {queue.length}</Text>
+        <Pressable onPress={finish} hitSlop={12} accessibilityRole="button" accessibilityLabel="Close review" style={{ padding: 16 }}>
+          <Text style={{ color: t.colors.muted, fontSize: 22 }}>✕</Text>
+        </Pressable>
+        <Text style={{ color: t.colors.muted, fontSize: 16, padding: 16 }}>{idx + 1} / {queue.length}</Text>
+      </View>
+      <View style={[styles.track, { backgroundColor: t.colors.surface2 }]}>
+        <View style={{ width: `${(idx / queue.length) * 100}%`, height: '100%', backgroundColor: t.colors.primary }} />
       </View>
 
-      <TouchableOpacity activeOpacity={1} style={styles.cardArea} onPress={!showAnswer ? handleReveal : undefined}>
-        <ScrollView style={[styles.card, { backgroundColor: theme.colors.surface, borderColor: theme.colors.border }]}>
-          <Text style={{ color: theme.colors.faint, fontSize: 13, fontWeight: 'bold', marginBottom: 12 }}>QUESTION</Text>
-          <Text style={{ color: theme.colors.ink, fontSize: theme.typography.serif.sizes.card, fontFamily: theme.typography.serif.fontFamily, lineHeight: 32 }}>{card.front}</Text>
-          
+      <Pressable style={{ flex: 1, padding: 16 }} onPress={showAnswer ? undefined : reveal} accessibilityHint={showAnswer ? undefined : 'Shows the answer'}>
+        <ScrollView style={[styles.card, { backgroundColor: t.colors.surface, borderColor: t.colors.border }]} contentContainerStyle={{ padding: 24 }}>
+          <Text style={[styles.label, { color: t.colors.faint }]}>QUESTION</Text>
+          <Text style={[styles.cardText, { color: t.colors.ink, fontFamily: t.typography.serif.fontFamily }]}>{item.card.front}</Text>
           {showAnswer && (
             <>
-              <View style={{ height: 1, backgroundColor: theme.colors.border, marginVertical: 24 }} />
-              <Text style={{ color: theme.colors.faint, fontSize: 13, fontWeight: 'bold', marginBottom: 12 }}>ANSWER</Text>
-              <Text style={{ color: theme.colors.ink, fontSize: theme.typography.serif.sizes.card, fontFamily: theme.typography.serif.fontFamily, lineHeight: 32 }}>{card.back}</Text>
+              <View style={{ height: 1, backgroundColor: t.colors.border, marginVertical: 24 }} />
+              <Text style={[styles.label, { color: t.colors.faint }]}>ANSWER</Text>
+              <Text style={[styles.cardText, { color: t.colors.ink, fontFamily: t.typography.serif.fontFamily }]} accessibilityLiveRegion="polite">
+                {item.card.back}
+              </Text>
             </>
           )}
         </ScrollView>
-      </TouchableOpacity>
+      </Pressable>
 
-      <View style={styles.footer}>
+      <View style={{ padding: 16, paddingBottom: 16 + insets.bottom }}>
         {!showAnswer ? (
-          <TouchableOpacity style={[styles.primaryBtn, { backgroundColor: theme.colors.primary }]} onPress={handleReveal}>
-            <Text style={{ color: theme.colors.surface, fontSize: 17, fontWeight: 'bold' }}>Show answer</Text>
-          </TouchableOpacity>
+          <Button title="Show answer" onPress={reveal} />
         ) : (
           <View style={styles.gradeRow}>
-            <TouchableOpacity style={[styles.gradeBtn, { backgroundColor: theme.colors.surface, borderColor: theme.colors.border }]} onPress={() => handleGrade(0)}>
-              <Text style={{ color: theme.colors.danger, fontWeight: 'bold', fontSize: 17 }}>Again</Text>
-              <Text style={{ color: theme.colors.muted, fontSize: 13 }}>{iAgain}d</Text>
-            </TouchableOpacity>
-            <TouchableOpacity style={[styles.gradeBtn, { backgroundColor: theme.colors.surface, borderColor: theme.colors.border }]} onPress={() => handleGrade(3)}>
-              <Text style={{ color: theme.colors.warm, fontWeight: 'bold', fontSize: 17 }}>Hard</Text>
-              <Text style={{ color: theme.colors.muted, fontSize: 13 }}>{iHard}d</Text>
-            </TouchableOpacity>
-            <TouchableOpacity style={[styles.gradeBtn, { backgroundColor: theme.colors.surface, borderColor: theme.colors.border }]} onPress={() => handleGrade(4)}>
-              <Text style={{ color: theme.colors.success, fontWeight: 'bold', fontSize: 17 }}>Good</Text>
-              <Text style={{ color: theme.colors.muted, fontSize: 13 }}>{iGood}d</Text>
-            </TouchableOpacity>
-            <TouchableOpacity style={[styles.gradeBtn, { backgroundColor: theme.colors.surface, borderColor: theme.colors.border }]} onPress={() => handleGrade(5)}>
-              <Text style={{ color: theme.colors.primary, fontWeight: 'bold', fontSize: 17 }}>Easy</Text>
-              <Text style={{ color: theme.colors.muted, fontSize: 13 }}>{iEasy}d</Text>
-            </TouchableOpacity>
+            {grades.map(({ g, label, color, hint }) => (
+              <Pressable
+                key={g}
+                onPress={() => grade(g)}
+                disabled={busy}
+                accessibilityRole="button"
+                accessibilityLabel={`${label}, next review in ${hint}`}
+                style={({ pressed }) => [
+                  styles.gradeBtn,
+                  { backgroundColor: t.colors.surface, borderColor: t.colors.border, opacity: pressed || busy ? 0.6 : 1 },
+                ]}
+              >
+                <Text style={{ color, fontWeight: '700', fontSize: 16 }}>{label}</Text>
+                <Text style={{ color: t.colors.muted, fontSize: 13, marginTop: 2 }}>{hint}</Text>
+              </Pressable>
+            ))}
           </View>
         )}
       </View>
-    </SafeAreaView>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1 },
   header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  cardArea: { flex: 1, padding: 16 },
-  card: { flex: 1, padding: 24, borderRadius: 16, borderWidth: 1 },
-  footer: { padding: 16 },
-  primaryBtn: { padding: 16, borderRadius: 12, alignItems: 'center' },
+  track: { height: 3, marginHorizontal: 16, borderRadius: 2, overflow: 'hidden' },
+  card: { flex: 1, borderRadius: 16, borderWidth: 1 },
+  label: { fontSize: 12, fontWeight: '700', letterSpacing: 0.8, marginBottom: 12 },
+  cardText: { fontSize: 22, lineHeight: 32 },
   gradeRow: { flexDirection: 'row', gap: 8 },
-  gradeBtn: { flex: 1, paddingVertical: 12, borderRadius: 12, borderWidth: 1, alignItems: 'center' }
+  gradeBtn: { flex: 1, minHeight: 60, paddingVertical: 10, borderRadius: 12, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
+  done: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 32 },
 });
