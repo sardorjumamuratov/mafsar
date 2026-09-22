@@ -9,6 +9,7 @@ import { shareBlockHtml } from "../share.js";
 import { syncNow } from "../../sync/sync.js";
 import { addCard, updateCard } from "../../storage/store.js";
 import { confirmSheet } from "../confirm.js";
+import { chainCoverage, liveChains, orderedSteps } from "../../storage/chains.js";
 
 // ================================================================ SET DETAIL
 export let detail = null; // { session, studySet, summary, tab }
@@ -109,6 +110,14 @@ export function paintDetail() {
       </div>
       <button class="btn btn-ghost btn-block" data-action="start-teach" data-id="${esc(session.id)}">🧒 Teach it back</button>
       ${studySet.mode === "coding" ? `<button class="btn btn-ghost btn-block" data-action="start-coding" data-id="${esc(session.id)}">⌨️ Coding exercises</button>` : ""}
+      ${studySet.mode === "design" ? `<div class="block drill-block">
+          <div class="t-label">System design practice</div>
+          <button class="btn btn-ghost btn-block" data-action="start-design" data-id="${esc(session.id)}">🏗️ Design drill</button>
+          <div class="drill-row">
+            <button class="btn btn-ghost" data-action="start-estimation" data-id="${esc(session.id)}">🔢 Estimation</button>
+            <button class="btn btn-ghost" data-action="start-bottleneck" data-id="${esc(session.id)}">🔍 Find the bottleneck</button>
+          </div>
+        </div>` : ""}
       <div style="display:flex;gap:10px">
         <button class="btn btn-ghost" style="flex:1" data-action="add-card" data-id="${esc(session.id)}">＋ Card</button>
         <button class="btn btn-ghost" style="flex:1" data-action="start-typed" data-id="${esc(session.id)}">✍️ Type answers</button>
@@ -146,6 +155,8 @@ export function paintDetail() {
             ? "Imported sets are flashcards only."
             : "Tap <b>↻ Regenerate</b> (top right) — fresh sets scale the quiz with the cards."
         }</div>`;
+  } else if (tab === "chains") {
+    body = chainsTabHtml(session.id, studySet);
   } else {
     // summary
     const summ = studySet.summary;
@@ -199,9 +210,9 @@ export function paintDetail() {
 
   
   let medicineBanner = "";
-  if (studySet && studySet.suggestMedicineMode && !studySet.dismissedMedicine && studySet.mode !== "medicine") {
+  if (studySet && studySet.suggestMedicine && !studySet.dismissedMedicine && studySet.mode !== "medicine") {
     medicineBanner = `
-      <div class="block tint" style="margin-bottom:12px;display:flex;flex-direction:column;gap:12px">
+      <div class="block tint" role="status" style="margin-bottom:12px;display:flex;flex-direction:column;gap:12px">
         <div style="font-size:14px">This looks like medicine. Organise it as mechanism chains?</div>
         <div style="display:flex;gap:10px">
           <button class="btn btn-ghost btn-sm" style="flex:1" data-action="dismiss-medicine" data-id="${esc(session.id)}">Not now</button>
@@ -269,10 +280,12 @@ export async function makeSet(sessionId) {
   // Regenerating an existing set replaces its cards — warn first. Cards whose
   // fronts survive the regen keep their SM-2 schedule (service worker).
   const { studySets } = await bundle();
-  if (setFor(sessionId, studySets)) {
+  const current = setFor(sessionId, studySets);
+  if (current) {
+    const style = { design: " Cards are written in the system design style (trade-offs and decisions).", medicine: " Mechanism chains are rebuilt too; steps you edited are kept." }[current.mode] || "";
     const okToReplace = await confirmSheet({
       title: "Regenerate this set?",
-      body: "Cards and quiz questions are rebuilt from the source. Cards that come back with the same front keep their review schedule; the rest start fresh. Your exam date and summary are kept.",
+      body: "Cards and quiz questions are rebuilt from the source. Cards that come back with the same front keep their review schedule; the rest start fresh. Your exam date and summary are kept." + style,
       confirmLabel: "Regenerate",
     });
     if (!okToReplace) return;
@@ -396,4 +409,46 @@ function closeSetMenu(refocus) {
   menu?.classList.add("hidden");
   btn?.setAttribute("aria-expanded", "false");
   if (refocus) btn?.focus();
+}
+
+/** Chains tab: one vertical chain per condition; gaps shown, never invented. */
+function chainsTabHtml(sessionId, studySet) {
+  const chains = liveChains(studySet.chains);
+  const note = `<div class="chain-note">Study aid built from your notes. Not medical advice. Don't capture real patient details.</div>`;
+  if (!chains.length) {
+    return `<div class="block tint" style="text-align:center">
+        <div style="font-weight:650">No chains yet</div>
+        <div class="help" style="margin-top:4px">Tap <b>↻ Regenerate</b> (in the ⋯ menu) to build mechanism chains from this set's source.</div>
+      </div>${note}`;
+  }
+  return chains
+    .map((ch) => {
+      const { filled, total } = chainCoverage(ch);
+      const rows = orderedSteps(ch)
+        .map(({ key, label, step }, i) => {
+          const edit = `data-action="chain-edit" data-id="${esc(sessionId)}" data-chain="${esc(ch.id)}" data-key="${esc(key)}"`;
+          const arrow = i ? `<li class="chain-arrow" aria-hidden="true">↓</li>` : "";
+          if (!step) {
+            return `${arrow}<li class="chain-step gap">
+                <span class="chain-label">${esc(label)}</span>
+                <span class="chain-text">Not in your source</span>
+                <button class="linkbtn" ${edit} aria-label="Add ${esc(label)}">Add</button>
+              </li>`;
+          }
+          return `${arrow}<li class="chain-step">
+              <span class="chain-label">${esc(label)}</span>
+              <details class="chain-body">
+                <summary class="chain-text">${esc(step.statement)}</summary>
+                <div class="chain-why">${step.why ? esc(step.why) : "No explanation of this link in your source."}</div>
+                <button class="linkbtn" ${edit}>Edit</button>
+              </details>
+            </li>`;
+        })
+        .join("");
+      return `<div class="block chain">
+          <div class="chain-head"><span class="chain-title">${esc(ch.title)}</span><span class="tag">${filled} of ${total} steps</span></div>
+          <ol class="chain-steps" aria-label="${esc(ch.title)} mechanism chain">${rows}</ol>
+        </div>`;
+    })
+    .join("") + note;
 }

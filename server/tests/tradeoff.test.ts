@@ -38,7 +38,7 @@ describe("tradeoff cards generation", () => {
       console.error(await res.text());
     }
 
-    expect(capturedBody).toContain("System Design cards");
+    expect(capturedBody).toContain("This is a SYSTEM DESIGN set");
     expect(capturedBody).toContain("X vs Y: when would you pick each?");
   });
 
@@ -55,6 +55,6 @@ describe("tradeoff cards generation", () => {
       body: JSON.stringify({ messages: [{ role: "user", text: "hi" }] })
     });
 
-    expect(capturedBody).not.toContain("System Design cards");
+    expect(capturedBody).not.toContain("SYSTEM DESIGN");
   });
 });

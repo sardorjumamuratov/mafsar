@@ -1866,3 +1866,52 @@ button.insight-row:focus-visible { outline: 2px solid var(--primary); outline-of
 .del-who { margin: 0 0 12px; font-size: 12.5px; color: var(--muted); }
 .del-actions { display: flex; gap: 8px; margin-top: 18px; }
 .del-actions .btn { flex: 1; }
+
+/* --- Teach it back: who you're teaching (prompt 10) ----------------------- */
+.teach-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 10px; }
+.teach-topic { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.teach-persona-chip { flex-shrink: 0; user-select: none; cursor: default; }
+
+/* --- System design drills ------------------------------------------------- */
+.drill-block { display: flex; flex-direction: column; gap: 8px; }
+.drill-row { display: flex; gap: 8px; }
+.drill-row .btn { flex: 1; }
+.drill-loading { display: flex; align-items: center; gap: 10px; margin-top: 8px; font-size: 13px; color: var(--muted); }
+.drill-loading .spinner { border-color: var(--border); border-top-color: var(--primary); }
+.design-sections { display: flex; flex-direction: column; gap: 8px; margin-top: 8px; }
+.design-section { background: var(--surface-2); border-radius: var(--r-md); padding: 8px 10px; }
+.design-section summary { font-weight: 600; font-size: 13.5px; cursor: pointer; padding: 4px 0; }
+.design-section summary:focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; border-radius: 4px; }
+.design-section textarea { margin-top: 8px; background: var(--surface); width: 100%; box-sizing: border-box; }
+.design-count { font-size: 12px; color: var(--muted); text-align: right; margin: 8px 0 12px; }
+.design-count .over { color: var(--danger); font-weight: 600; }
+.design-verdicts { margin-bottom: 12px; }
+.arch-flow {
+  margin: 0 0 16px; padding: 12px 14px; background: var(--surface-2); border-radius: var(--r-md);
+  font: 13px/1.6 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; color: var(--ink);
+  white-space: pre; overflow-x: auto;
+}
+
+/* --- Medicine: mechanism chains ------------------------------------------- */
+.chain { padding: 12px 14px; }
+.chain-head { display: flex; justify-content: space-between; align-items: center; gap: 10px; margin-bottom: 10px; }
+.chain-title { font-weight: 650; font-size: 15px; min-width: 0; overflow-wrap: anywhere; }
+.chain-steps { list-style: none; margin: 0; padding: 0; }
+.chain-step { display: grid; grid-template-columns: 104px 1fr auto; gap: 8px; align-items: start; padding: 6px 0; }
+.chain-label { font-size: 11px; font-weight: 600; letter-spacing: .04em; text-transform: uppercase; color: var(--muted); padding-top: 2px; }
+.chain-body { min-width: 0; grid-column: 2 / span 2; }
+.chain-text { font-size: 13.5px; line-height: 1.45; color: var(--ink); cursor: pointer; overflow-wrap: anywhere; }
+.chain-body summary { list-style: none; }
+.chain-body summary::-webkit-details-marker { display: none; }
+.chain-body summary:focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; border-radius: 4px; }
+.chain-why { margin: 6px 0 4px; padding: 8px 10px; background: var(--primary-soft); border-radius: var(--r-sm); font-size: 12.5px; line-height: 1.5; color: var(--ink); }
+.chain-step.gap .chain-text { color: var(--faint); font-style: italic; cursor: default; }
+.chain-arrow { text-align: left; padding-left: 40px; color: var(--faint); font-size: 12px; line-height: 1; }
+.chain-note { margin: 10px 2px 0; font-size: 11.5px; color: var(--faint); line-height: 1.4; }
+.chain-remove { display: block; margin: 14px auto 0; color: var(--danger); }
+@media (max-width: 360px) {
+  .chain-step { grid-template-columns: 1fr auto; }
+  .chain-label { grid-column: 1 / -1; }
+  .chain-body { grid-column: 1 / -1; }
+  .chain-arrow { padding-left: 4px; }
+}

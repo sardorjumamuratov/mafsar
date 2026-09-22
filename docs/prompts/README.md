@@ -16,6 +16,16 @@ for example: *"Implement docs/prompts/02-abuse-protection.md. Follow AGENTS.md."
 | 07 | [YouTube and PDF capture](07-youtube-pdf-capture.md) | **02** | service worker, capture UI, new server route, `privacy.ts` |
 | 08 | [Teach it back (Feynman)](08-teach-it-back.md) | **02** | new flow, new server routes, `billing/core.ts`, `privacy.ts` |
 | 09 | [UX polish: delete set, Needs work, updates, delete account](09-ux-polish.md) | — | `src/ui/`, `readiness.js`, service worker, `server/src/app.ts` |
+| 10 | [Teach it back: show who you're teaching](10-teach-persona-indicator.md) | 08 | `src/ui/flows/teach.js`, `src/storage/teach.js`, CSS |
+| 11 | [System design: Design drill mode](11-design-drill.md) | — | new mode, new server routes, coding-style flow, `privacy.ts` |
+| 12 | [System design: estimation drills](12-estimation-drills.md) | **11** | new route, unit parsing, design sets |
+| 13 | [System design: trade-off cards](13-tradeoff-cards.md) | **11** | `/v1/generate` (mode-aware), worker generation path |
+| 14 | [System design: find the bottleneck](14-find-the-bottleneck.md) | **11** | new routes, design sets, `privacy.ts` |
+| 15 | [Medicine: mechanism chains (foundation)](15-medicine-chains.md) | **13** | new mode, chain storage + sync + migration, `/v1/generate`, Chains tab |
+| 16 | [Medicine: link cards in review](16-chain-link-cards.md) | **15** | review queue, sync, mobile review |
+| 17 | [Medicine: chain drills](17-chain-drills.md) | **15** | new flow, `/v1/grade` reuse |
+| 18 | [Medicine: clinical cases](18-clinical-cases.md) | **15**, **11** | Design drill engine, new routes, `privacy.ts` |
+| 19 | [Medicine: differentials + patient persona](19-differentials-and-patient-persona.md) | **15**, **16**, **10** | compare view, fork cards, Teach it back personas |
 
 **Running in parallel:** 02, 03, 05, 06, 07 and 08 all edit
 `server/src/app.ts`, and 03 to 08 all edit `server/src/privacy.ts`. Run those one
@@ -24,6 +34,13 @@ run side by side:
 
 - **01 with any other task.** It touches neither file.
 - **02 with 04.** 02 edits only `app.ts` and 04 edits only `privacy.ts`.
+
+**System design (11–14):** 11 first. Then 12, 13 and 14 one at a time, merging each
+before the next: they all edit `server/src/app.ts`, `server/src/llm.ts` and the set
+detail view. Prompts 11–14 leave implementation choices to the agent.
+
+**Medicine (15–19):** 15 first. Then 16, 17, 18, 19 one at a time, merging each
+before the next. Like 11–14, these leave implementation choices to the agent.
 
 ## Steps no agent can do for you
 

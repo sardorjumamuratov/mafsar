@@ -221,14 +221,14 @@ const MIGRATIONS: string[] = [
     key TEXT NOT NULL,
     statement TEXT NOT NULL,
     why TEXT NOT NULL,
+    edited INTEGER NOT NULL DEFAULT 0,
     updated_at TEXT NOT NULL,
     server_updated_at TEXT NOT NULL,
     deleted INTEGER NOT NULL DEFAULT 0
   );
   CREATE INDEX idx_chain_steps_user_server_updated ON chain_steps(user_id, server_updated_at);
   `
-  ];
-  
+];
 
 export async function migrate(db: DB): Promise<void> {
   await db.execute(

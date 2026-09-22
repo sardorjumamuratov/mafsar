@@ -111,6 +111,45 @@ export async function applySync(db: DB, userId: string, body: SyncBody): Promise
     );
   }
 
+  // Mechanism chains (Medicine mode). Same last-write-wins and user_id guard as
+  // cards. Chains go first so their steps have a parent row.
+  for (const ch of body.chains ?? []) {
+    await run(
+      db,
+      "INSERT OR IGNORE INTO sets (id, user_id, title, created_at, updated_at, server_updated_at) VALUES (?, ?, '(pending set)', ?, ?, ?)",
+      [ch.setId, userId, ch.updatedAt, ch.updatedAt, now]
+    );
+    const stored = await one<Row>(db, "SELECT updated_at FROM chains WHERE id = ? AND user_id = ?", [ch.id, userId]);
+    if (!shouldWrite(stored, { updated_at: ch.updatedAt })) continue;
+    await run(
+      db,
+      `INSERT INTO chains (id, set_id, user_id, template, title, updated_at, server_updated_at, deleted)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+       ON CONFLICT(id) DO UPDATE SET template=excluded.template, title=excluded.title,
+         updated_at=excluded.updated_at, server_updated_at=excluded.server_updated_at, deleted=excluded.deleted
+       WHERE chains.user_id = excluded.user_id`,
+      [ch.id, ch.setId, userId, ch.template, ch.title, ch.updatedAt, now, ch.deleted ? 1 : 0]
+    );
+  }
+
+  for (const st of body.chainSteps ?? []) {
+    // A step whose chain this user doesn't own (or that never arrived) is dropped.
+    const parent = await one(db, "SELECT 1 AS x FROM chains WHERE id = ? AND user_id = ?", [st.chainId, userId]);
+    if (!parent) continue;
+    const stored = await one<Row>(db, "SELECT updated_at FROM chain_steps WHERE id = ? AND user_id = ?", [st.id, userId]);
+    if (!shouldWrite(stored, { updated_at: st.updatedAt })) continue;
+    await run(
+      db,
+      `INSERT INTO chain_steps (id, chain_id, user_id, key, statement, why, edited, updated_at, server_updated_at, deleted)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+       ON CONFLICT(id) DO UPDATE SET key=excluded.key, statement=excluded.statement, why=excluded.why,
+         edited=excluded.edited, updated_at=excluded.updated_at, server_updated_at=excluded.server_updated_at,
+         deleted=excluded.deleted
+       WHERE chain_steps.user_id = excluded.user_id`,
+      [st.id, st.chainId, userId, st.key, st.statement, st.why ?? "", st.edited ? 1 : 0, st.updatedAt, now, st.deleted ? 1 : 0]
+    );
+  }
+
   // Append-only review log; re-inserting the same id is a no-op.
   for (const r of body.reviews) {
     await run(
@@ -162,5 +201,17 @@ export async function changesSince(db: DB, userId: string, since?: string) {
     reviewedAt: r.reviewed_at,
     kind: r.kind, stability: r.stability, difficulty: r.difficulty,
   }));
-  return { sets, cards, quiz, activity, reviews };
+  const chains = (await all<any>(
+    db, "SELECT * FROM chains WHERE user_id = ? AND server_updated_at > ?", [userId, sinceEffective]
+  )).map((r) => ({
+    id: r.id, setId: r.set_id, template: r.template, title: r.title,
+    updatedAt: r.updated_at, deleted: !!r.deleted,
+  }));
+  const chainSteps = (await all<any>(
+    db, "SELECT * FROM chain_steps WHERE user_id = ? AND server_updated_at > ?", [userId, sinceEffective]
+  )).map((r) => ({
+    id: r.id, chainId: r.chain_id, key: r.key, statement: r.statement, why: r.why,
+    edited: !!r.edited, updatedAt: r.updated_at, deleted: !!r.deleted,
+  }));
+  return { sets, cards, quiz, activity, reviews, chains, chainSteps };
 }

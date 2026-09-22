@@ -1,102 +1,126 @@
-import assert from "node:assert";
+// Mechanism chains (Medicine mode). Run: node tests/chains.test.mjs
+//
+// Tests the real module the worker and the editor use, not a copy.
+import assert from "node:assert/strict";
+import {
+  DEFAULT_TEMPLATE, chainCoverage, editStep, liveChains, mergeChains, orderedSteps, stepLabel, templateSteps,
+} from "../src/storage/chains.js";
+import { applyServer, toServer } from "../shared/sync-map.js";
 
-// we can test the worker's logic by implementing the same merge and checking it
-function mergeChains(existingChains, generatedChains, uid) {
-  const existingChainsByTitle = new Map(
-    (existingChains || [])
-      .filter((ch) => !ch.deleted)
-      .map((ch) => [String(ch.title).trim().toLowerCase(), ch])
-  );
-  
-  return (generatedChains || []).map((ch) => {
-    const oldChain = existingChainsByTitle.get(String(ch.title).trim().toLowerCase());
-    if (!oldChain) {
-      return { id: uid(), template: "medicine-condition", title: ch.title, steps: (ch.steps || []).map(s => ({ id: uid(), key: s.key, statement: s.statement, why: s.why })) };
-    }
-    // merge steps
-    const newSteps = [];
-    const oldStepsByKey = new Map((oldChain.steps || []).filter(s => !s.deleted).map(s => [s.key, s]));
-    for (const newStep of ch.steps || []) {
-      const oldStep = oldStepsByKey.get(newStep.key);
-      if (oldStep && oldStep.editedAt) {
-        newSteps.push(oldStep); // keep manual edits
-      } else {
-        newSteps.push({ id: oldStep ? oldStep.id : uid(), key: newStep.key, statement: newStep.statement, why: newStep.why });
-      }
-      oldStepsByKey.delete(newStep.key);
-    }
-    for (const oldStep of oldStepsByKey.values()) {
-      if (oldStep.editedAt) {
-        newSteps.push(oldStep);
-      }
-    }
-    return { ...oldChain, title: ch.title, steps: newSteps };
-  });
+let passed = 0;
+function test(name, fn) {
+  fn();
+  passed++;
+  console.log(`  ✓ ${name}`);
 }
+let n = 0;
+const uid = () => `id${++n}`;
+const T1 = "2026-09-01T00:00:00.000Z";
+const T2 = "2026-09-02T00:00:00.000Z";
 
-function testMergeChains() {
-  let idCounter = 1;
-  const uid = () => `id-${idCounter++}`;
-  
-  const existing = [
-    {
-      id: "chain-1",
-      title: "Asthma",
-      steps: [
-        { id: "step-1", key: "cause", statement: "Allergens", editedAt: 123 }, // user edited
-        { id: "step-2", key: "mechanism", statement: "Inflammation", editedAt: null } // LLM generated
-      ]
-    }
-  ];
-  
-  const generated = [
-    {
-      title: "Asthma",
-      steps: [
-        { key: "cause", statement: "New allergens from LLM" },
-        { key: "mechanism", statement: "New inflammation from LLM" },
-        { key: "symptoms", statement: "Wheeze" }
-      ]
-    }
-  ];
-  
-  const merged = mergeChains(existing, generated, uid);
-  assert.strictEqual(merged.length, 1);
-  assert.strictEqual(merged[0].id, "chain-1");
-  assert.strictEqual(merged[0].steps.length, 3);
-  
-  const causeStep = merged[0].steps.find(s => s.key === "cause");
-  assert.strictEqual(causeStep.id, "step-1");
-  assert.strictEqual(causeStep.statement, "Allergens"); // PRESERVED!
-  
-  const mechStep = merged[0].steps.find(s => s.key === "mechanism");
-  assert.strictEqual(mechStep.id, "step-2");
-  assert.strictEqual(mechStep.statement, "New inflammation from LLM"); // OVERWRITTEN!
-  
-  const sympStep = merged[0].steps.find(s => s.key === "symptoms");
-  assert.strictEqual(sympStep.statement, "Wheeze");
-}
+const asthma = {
+  title: "Asthma",
+  steps: [
+    { key: "cause", statement: "Allergen or trigger", why: "" },
+    { key: "mechanism", statement: "Airway inflammation", why: "The trigger activates immune cells." },
+    { key: "treatment", statement: "Bronchodilator + inhaled steroid", why: "" },
+  ],
+};
 
-function testOldClientIgnoresChains() {
-  import("../shared/sync-map.js").then(m => {
-    const applyServer = m.applyServer;
-    const resp = {
-      sets: [],
-      cards: [],
-      quiz: [],
-      activity: [],
-      reviews: [],
-      chains: [{ id: "c1", setId: "s1", title: "Asthma", updatedAt: "2024-01-01T00:00:00.000Z" }],
-      chainSteps: [{ id: "s1", chainId: "c1", key: "cause", statement: "X", updatedAt: "2024-01-01T00:00:00.000Z" }]
-    };
-    const local = { studySets: [{ id: "s1", sessionId: "s1" }] };
-    
-    // An old client wouldn't crash (we are the new client so applyServer supports it, but imagine we are old... wait. The test should be that our new applyServer doesn't crash if `resp.chains` is missing, and an old client just ignores it? Actually, the prompt says "sync round trip, including an old client that ignores chains". Let's mock applyServer without chains support to see it ignore it? No, if we send it to an old client, the old client's sync-map simply doesn't read resp.chains. That's implicitly true because old code doesn't read it. Let's just ensure our new applyServer works when chains are omitted.)
-    const res = applyServer({ sets: [] }, local);
-    assert.strictEqual(res.studySets.length, 1);
-  });
-}
+console.log("template");
+test("the medicine template has the eight steps in order", () => {
+  assert.deepEqual(templateSteps(DEFAULT_TEMPLATE).map((s) => s.key),
+    ["cause", "mechanism", "physiological", "symptoms", "signs", "tests", "diagnosis", "treatment"]);
+  assert.equal(stepLabel(DEFAULT_TEMPLATE, "physiological"), "Physiological change");
+});
+test("gaps show as null steps, and coverage counts only filled ones", () => {
+  const [ch] = mergeChains([], [asthma], { uid, now: T1 });
+  const rows = orderedSteps(ch);
+  assert.equal(rows.length, 8);
+  assert.equal(rows.find((r) => r.key === "tests").step, null);
+  assert.deepEqual(chainCoverage(ch), { filled: 3, total: 8 });
+});
 
-testMergeChains();
-testOldClientIgnoresChains();
-console.log("chains client tests passed");
+console.log("merging on regeneration");
+test("new chains get ids, the default template and timestamps", () => {
+  const [ch] = mergeChains([], [asthma], { uid, now: T1 });
+  assert.ok(ch.id);
+  assert.equal(ch.template, DEFAULT_TEMPLATE);
+  assert.ok(ch.steps.every((s) => s.id && s.updatedAt === T1));
+});
+test("a regenerated condition keeps its ids; unchanged steps keep their timestamps", () => {
+  const [first] = mergeChains([], [asthma], { uid, now: T1 });
+  const [again] = mergeChains([first], [asthma], { uid, now: T2 });
+  assert.equal(again.id, first.id);
+  assert.deepEqual(again.steps.map((s) => s.id), first.steps.map((s) => s.id));
+  assert.ok(again.steps.every((s) => s.updatedAt === T1), "nothing changed, nothing to sync");
+});
+test("the learner's edits survive regeneration", () => {
+  const [first] = mergeChains([], [asthma], { uid, now: T1 });
+  const edited = editStep(first, "mechanism", { statement: "Eosinophilic airway inflammation", why: "My words" }, { uid, now: T1 });
+  const [again] = mergeChains([edited], [{ ...asthma, steps: asthma.steps.map((s) => (s.key === "mechanism" ? { ...s, statement: "Model rewrite" } : s)) }], { uid, now: T2 });
+  const mech = again.steps.find((s) => s.key === "mechanism" && !s.deleted);
+  assert.equal(mech.statement, "Eosinophilic airway inflammation");
+  assert.equal(mech.edited, true);
+});
+test("an edited step survives even when the new output drops it", () => {
+  const [first] = mergeChains([], [asthma], { uid, now: T1 });
+  const filled = editStep(first, "tests", { statement: "Spirometry: reversible obstruction", why: "" }, { uid, now: T1 });
+  const [again] = mergeChains([filled], [asthma], { uid, now: T2 });
+  assert.ok(again.steps.some((s) => s.key === "tests" && !s.deleted && s.statement.startsWith("Spirometry")));
+});
+test("unedited steps the new output dropped are tombstoned so the delete syncs", () => {
+  const [first] = mergeChains([], [asthma], { uid, now: T1 });
+  const [again] = mergeChains([first], [{ title: "Asthma", steps: asthma.steps.slice(0, 2) }], { uid, now: T2 });
+  const t = again.steps.find((s) => s.key === "treatment");
+  assert.equal(t.deleted, true);
+  assert.equal(t.updatedAt, T2);
+});
+test("conditions no longer generated are tombstoned, unless they hold edits", () => {
+  const [a] = mergeChains([], [asthma], { uid, now: T1 });
+  const copd = editStep(mergeChains([], [{ ...asthma, title: "COPD" }], { uid, now: T1 })[0], "cause", { statement: "Smoking" }, { uid, now: T1 });
+  const out = mergeChains([a, copd], [], { uid, now: T2 });
+  assert.equal(out.find((c) => c.id === a.id).deleted, true);
+  assert.ok(!out.find((c) => c.id === copd.id).deleted);
+  assert.deepEqual(liveChains(out).map((c) => c.title), ["COPD"]);
+});
+
+console.log("editing");
+test("filling a gap adds an edited step; clearing a step tombstones it", () => {
+  const [ch] = mergeChains([], [asthma], { uid, now: T1 });
+  const filled = editStep(ch, "signs", { statement: "Expiratory wheeze", why: "" }, { uid, now: T2 });
+  assert.equal(chainCoverage(filled).filled, 4);
+  const cleared = editStep(filled, "signs", { statement: "  " }, { uid, now: T2 });
+  assert.equal(chainCoverage(cleared).filled, 3);
+  assert.ok(cleared.steps.some((s) => s.key === "signs" && s.deleted));
+  assert.equal(cleared.updatedAt, T2);
+});
+
+console.log("sync");
+test("chains and steps (with the edited flag) round-trip through the sync mapping", () => {
+  const [ch] = mergeChains([], [asthma], { uid, now: T1 });
+  const edited = editStep(ch, "cause", { statement: "House dust mite" }, { uid, now: T2 });
+  const local = {
+    sessions: [{ id: "sess1", title: "Resp", capturedAt: 1 }],
+    studySets: [{ id: "st1", sessionId: "sess1", title: "Resp", updatedAt: T1, flashcards: [], quiz: [], chains: [edited] }],
+    activity: {}, reviewLog: [],
+  };
+  const pushed = toServer(local, "");
+  assert.equal(pushed.chains.length, 1);
+  assert.equal(pushed.chains[0].setId, "sess1");
+  const cause = pushed.chainSteps.find((s) => s.key === "cause");
+  assert.equal(cause.edited, true);
+
+  const fresh = { sessions: [], studySets: [], activity: {}, reviewLog: [] };
+  const pulled = applyServer({ sets: [], cards: [], quiz: [], activity: [], reviews: [], chains: pushed.chains, chainSteps: pushed.chainSteps }, fresh);
+  const got = pulled.studySets[0].chains[0];
+  assert.equal(got.title, "Asthma");
+  assert.equal(got.steps.find((s) => s.key === "cause").statement, "House dust mite");
+  assert.equal(got.steps.find((s) => s.key === "cause").edited, true);
+});
+test("a server response without chains (old server) changes nothing", () => {
+  const local = { sessions: [], studySets: [], activity: {}, reviewLog: [] };
+  assert.doesNotThrow(() => applyServer({ sets: [], cards: [], quiz: [], activity: [], reviews: [] }, local));
+});
+
+console.log(`\n${passed} passed`);

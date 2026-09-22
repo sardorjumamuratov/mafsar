@@ -6,6 +6,9 @@ import { syncNow } from "../../sync/sync.js";
 import { quickQuizLen } from "../flows/quiz.js";
 import { setCodingState } from "../flows/coding.js";
 import { setTeachState } from "./teach.js";
+import { setDesignState } from "./design.js";
+import { setEstimationState } from "./estimation.js";
+import { setBottleneckState } from "./bottleneck.js";
 import { renderSetDetail } from "../views/set-detail.js";
 import { renderHome } from "../views/home.js";
 
@@ -123,6 +126,9 @@ export async function paintReviewDone() {
 export function goReturn() {
   setCodingState(null);
   setTeachState(null);
+  setDesignState(null);
+  setEstimationState(null);
+  setBottleneckState(null);
   const ret = focusReturn;
   if (typeof ret === "string" && ret.startsWith("set:")) renderSetDetail(ret.slice(4));
   else renderHome();

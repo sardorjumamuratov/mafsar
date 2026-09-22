@@ -12,6 +12,7 @@ import {
   uid,
 } from "../storage/store.js";
 import { initSchedule } from "../../shared/srs.js";
+import { mergeChains } from "../storage/chains.js";
 import {
   backendGenerate,
   backendGrade,
@@ -33,6 +34,11 @@ import {
   backendDesignTask,
   backendDesignGrade,
   backendDesignCurveball,
+  backendEstimationTask,
+  backendEstimationSummary,
+  backendBottleneckTask,
+  backendBottleneckHint,
+  backendBottleneckGrade,
 } from "../sync/api.js";
 
 /** Generate a study set for a captured session via the backend. */
@@ -47,7 +53,6 @@ async function generateForSession(session, mode) {
     updatedAt: new Date(now).toISOString(),
     ...initSchedule(now),
   }));
-  generated.chains = generated.chains || [];
   generated.quiz = (generated.quiz || []).map((q) => ({
     id: uid(),
     q: String(q.q),
@@ -80,37 +85,11 @@ async function saveGeneratedStudySet(session, generated) {
         : c;
   });
   
-  const existingChainsByTitle = new Map(
-    (existing?.chains || [])
-      .filter((ch) => !ch.deleted)
-      .map((ch) => [String(ch.title).trim().toLowerCase(), ch])
-  );
-  
-  const chains = (generated.chains || []).map((ch) => {
-    const oldChain = existingChainsByTitle.get(String(ch.title).trim().toLowerCase());
-    if (!oldChain) {
-      return { id: uid(), template: "medicine-condition", title: ch.title, steps: (ch.steps || []).map(s => ({ id: uid(), key: s.key, statement: s.statement, why: s.why })) };
-    }
-    // merge steps
-    const newSteps = [];
-    const oldStepsByKey = new Map((oldChain.steps || []).filter(s => !s.deleted).map(s => [s.key, s]));
-    for (const newStep of ch.steps || []) {
-      const oldStep = oldStepsByKey.get(newStep.key);
-      if (oldStep && oldStep.editedAt) {
-        newSteps.push(oldStep); // keep manual edits
-      } else {
-        newSteps.push({ id: oldStep ? oldStep.id : uid(), key: newStep.key, statement: newStep.statement, why: newStep.why });
-      }
-      oldStepsByKey.delete(newStep.key);
-    }
-    // Also include any user-edited steps that weren't in the new generated output
-    for (const oldStep of oldStepsByKey.values()) {
-      if (oldStep.editedAt) {
-        newSteps.push(oldStep);
-      }
-    }
-    return { ...oldChain, title: ch.title, steps: newSteps };
-  });
+  // Chains (Medicine mode): merge by condition so learner edits survive.
+  // Other modes return no chains, so existing ones are left as they are.
+  const chains = Array.isArray(generated.chains)
+    ? mergeChains(existing?.chains || [], generated.chains, { uid })
+    : existing?.chains;
 
   return saveStudySet({
     sessionId: session.id,
@@ -121,6 +100,10 @@ async function saveGeneratedStudySet(session, generated) {
     createdAt: existing?.createdAt ?? Date.now(),
     flashcards,
     quiz: generated.quiz,
+    ...(chains ? { chains } : {}),
+    // "This looks like medicine" hint, kept until the learner answers it.
+    suggestMedicine: existing?.suggestMedicine ?? !!generated.suggestMedicine,
+    dismissedMedicine: existing?.dismissedMedicine,
   });
 }
 
@@ -538,7 +521,9 @@ async function handle(msg) {
       const sessions = await getSessions();
       const session = sessions.find((s) => s.id === msg.sessionId);
       if (!session) throw new Error("Session not found.");
-      const generated = await generateForSession(session);
+      // Regenerating keeps the set's mode, so design and medicine sets get their card style.
+      const existingSet = await getStudySetForSession(session.id);
+      const generated = await generateForSession(session, existingSet?.mode);
       const studySet = await saveGeneratedStudySet(session, generated);
       return { studySet };
     }
@@ -574,21 +559,51 @@ async function handle(msg) {
     }
 
     case "DESIGN_GRADE": {
-      const res = await backendDesignGrade({
+      return backendDesignGrade({
         task: String(msg.task || ""),
         answer: String(msg.answer || ""),
+        rubric: Array.isArray(msg.rubric) ? msg.rubric.map(String) : [],
+        ...(msg.curveball ? { curveball: String(msg.curveball), originalAnswer: String(msg.originalAnswer || "") } : {}),
       });
-      return res;
     }
 
     case "DESIGN_CURVEBALL": {
-      const res = await backendDesignCurveball({
+      return backendDesignCurveball({
         task: String(msg.task || ""),
         answer: String(msg.answer || ""),
+        previous: Array.isArray(msg.previous) ? msg.previous.map(String) : [],
       });
-      return res;
     }
 
+    case "ESTIMATION_TASK": {
+      return backendEstimationTask({
+        concept: String(msg.concept || ""),
+        reference: Array.isArray(msg.reference) ? msg.reference : [],
+      });
+    }
+
+    case "ESTIMATION_SUMMARY": {
+      return backendEstimationSummary({ results: Array.isArray(msg.results) ? msg.results : [] });
+    }
+
+    case "BOTTLENECK_TASK": {
+      return backendBottleneckTask({
+        concept: String(msg.concept || ""),
+        reference: Array.isArray(msg.reference) ? msg.reference : [],
+      });
+    }
+
+    case "BOTTLENECK_HINT": {
+      return backendBottleneckHint({ state: String(msg.state || "") });
+    }
+
+    case "BOTTLENECK_GRADE": {
+      return backendBottleneckGrade({
+        state: String(msg.state || ""),
+        answer: String(msg.answer || ""),
+        usedHint: !!msg.usedHint,
+      });
+    }
 
     case "GRADE_CODING": {
       const grading = await backendCodingGrade({

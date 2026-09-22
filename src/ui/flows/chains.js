@@ -1,82 +1,79 @@
-import { app, bundle, esc, setHTML, XBTN, toast } from "../core.js";
-import { setFocusReturn } from "./review.js";
-import { saveStudySet } from "../../storage/store.js";
+import { app, bundle, esc, setFor, setHTML, toast, topOfView } from "../core.js";
+import { showChrome } from "../nav.js";
+import { saveStudySet, uid } from "../../storage/store.js";
+import { editStep, stepLabel } from "../../storage/chains.js";
+import { renderSetDetail } from "../views/set-detail.js";
 
-let editingState = null;
+// Editing one step of a mechanism chain (Medicine mode). Edits are marked so
+// regeneration never overwrites them (mergeChains in storage/chains.js).
+
+let editing = null; // { sessionId, chainId, key }
 
 export async function openChainStepEdit(sessionId, chainId, key) {
   const { studySets } = await bundle();
-  const set = studySets.find((s) => s.sessionId === sessionId);
-  if (!set) return;
-  const chain = (set.chains || []).find((c) => c.id === chainId);
-  if (!chain) return;
-  
-  const step = (chain.steps || []).find((s) => s.key === key && !s.deleted) || { key, statement: "", why: "" };
-  
-  editingState = { sessionId, chainId, key, step, set, chain };
-  setFocusReturn("set:" + sessionId);
-  
-  const LABELS = { cause: "Cause", mechanism: "Mechanism", physiological: "Physiological change", symptoms: "Symptoms", signs: "Signs", tests: "Tests", diagnosis: "Diagnosis", treatment: "Treatment" };
-  
+  const set = setFor(sessionId, studySets);
+  const chain = (set?.chains || []).find((c) => c.id === chainId && !c.deleted);
+  if (!chain) return toast("That chain no longer exists.");
+  const step = (chain.steps || []).find((s) => s.key === key && !s.deleted);
+  editing = { sessionId, chainId, key };
+  const label = stepLabel(chain.template, key);
+  showChrome(false);
   setHTML(app, `
-    <div class="rev-top">${XBTN}</div>
-    <div class="rev-body teach" style="padding-bottom:120px">
-      <div class="t-label">Edit ${esc(LABELS[key])}</div>
-      <div class="help" style="margin-bottom:16px">Your edits survive regeneration.</div>
-      
-      <div class="field" style="margin-bottom:16px">
-        <label>Statement (What happens)</label>
-        <textarea id="chainStmt" rows="3" class="sa-input" style="font-size:15px;padding:12px">${esc(step.statement)}</textarea>
+    <div class="view">
+      <div class="ahd">
+        <button class="iconbtn" data-action="chain-edit-cancel" aria-label="Back"><svg class="ic" viewBox="0 0 24 24"><path d="M15 6l-6 6 6 6"/></svg></button>
+        <div class="h-title" style="font-size:16px">${step ? "Edit" : "Add"} ${esc(label)}</div><span style="width:32px"></span>
       </div>
-      
-      <div class="field">
-        <label>Why (Link from the previous step)</label>
-        <textarea id="chainWhy" rows="3" class="sa-input" style="font-size:15px;padding:12px" placeholder="Optional">${esc(step.why)}</textarea>
+      <div class="help">${esc(chain.title)} · your edits are kept when the set is regenerated.</div>
+      <div class="field"><label for="chainStmt">What happens at this step</label>
+        <textarea id="chainStmt" class="sa-input" rows="3">${esc(step?.statement || "")}</textarea></div>
+      <div class="field"><label for="chainWhy">Why it follows from the step before (optional)</label>
+        <textarea id="chainWhy" class="sa-input" rows="3">${esc(step?.why || "")}</textarea></div>
+      <div class="del-actions">
+        <button class="btn btn-ghost" data-action="chain-edit-cancel">Cancel</button>
+        <button class="btn btn-primary" data-action="chain-edit-save">Save</button>
       </div>
-      
-      <div style="position:fixed;bottom:0;left:0;right:0;padding:16px;background:var(--bg);border-top:1px solid var(--border)">
-        <button class="btn btn-primary btn-block" data-action="save-chain-step">Save</button>
-      </div>
-    </div>
-  `);
+      ${step ? `<button class="linkbtn chain-remove" data-action="chain-edit-remove">Remove this step</button>` : ""}
+    </div>`);
+  topOfView();
+  document.getElementById("chainStmt")?.focus();
+}
+
+async function commit(values) {
+  if (!editing) return;
+  const { sessionId, chainId, key } = editing;
+  const { studySets } = await bundle();
+  const set = setFor(sessionId, studySets);
+  const chain = (set?.chains || []).find((c) => c.id === chainId);
+  if (!set || !chain) return toast("That chain no longer exists.");
+  const updated = editStep(chain, key, values, { uid });
+  await saveStudySet({ ...set, chains: set.chains.map((c) => (c.id === chainId ? updated : c)) });
+  editing = null;
+  renderSetDetail(sessionId, "chains");
 }
 
 export async function saveChainStep() {
-  if (!editingState) return;
-  const { set, chain, key, step } = editingState;
-  
-  const stmtBox = document.getElementById("chainStmt");
-  const whyBox = document.getElementById("chainWhy");
-  const statement = ((/** @type {HTMLTextAreaElement|null} */ (stmtBox))?.value || "").trim();
-  const why = ((/** @type {HTMLTextAreaElement|null} */ (whyBox))?.value || "").trim();
-  
-  if (!statement) {
-    return toast("Statement cannot be empty. Delete it instead?");
-  }
-  
-  chain.steps = chain.steps || [];
-  let existing = chain.steps.find((s) => s.key === key && !s.deleted);
-  if (existing) {
-    existing.statement = statement;
-    existing.why = why;
-    existing.editedAt = Date.now();
-    existing.updatedAt = new Date().toISOString();
-  } else {
-    chain.steps.push({
-      id: Math.random().toString(36).slice(2),
-      key,
-      statement,
-      why,
-      editedAt: Date.now(),
-      updatedAt: new Date().toISOString(),
-    });
-  }
-  chain.updatedAt = new Date().toISOString();
-  set.updatedAt = new Date().toISOString();
-  
-  await saveStudySet(set);
-  
-  // Return to the set view
-  const xbtn = document.querySelector(".rev-top .xbtn");
-  if (xbtn) (/** @type {HTMLElement} */ (xbtn)).click();
+  const statement = /** @type {HTMLTextAreaElement|null} */ (document.getElementById("chainStmt"))?.value || "";
+  const why = /** @type {HTMLTextAreaElement|null} */ (document.getElementById("chainWhy"))?.value || "";
+  if (!statement.trim()) return toast("Write what happens at this step, or remove it.");
+  return commit({ statement, why });
+}
+
+export function removeChainStep() {
+  return commit({ statement: "", why: "" });
+}
+
+export function cancelChainEdit() {
+  const sessionId = editing?.sessionId;
+  editing = null;
+  if (sessionId) renderSetDetail(sessionId, "chains");
+}
+
+/** "Not now" on the "This looks like medicine" suggestion: never ask again for this set. */
+export async function dismissMedicineSuggestion(sessionId) {
+  const { studySets } = await bundle();
+  const set = setFor(sessionId, studySets);
+  if (!set) return;
+  await saveStudySet({ ...set, dismissedMedicine: true });
+  renderSetDetail(sessionId);
 }

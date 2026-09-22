@@ -39,8 +39,8 @@ export function reviewGradeFor(status) {
 
 
 export const PERSONAS = {
-  child:    { emoji: "👶", short: "12-year-old", long: "a curious 12-year-old", option: "A curious 12-year-old" },
-  beginner: { emoji: "🐣", short: "beginner",    long: "a complete beginner",   option: "A complete beginner" },
+  child:    { emoji: "🧒", short: "12-year-old", long: "a curious 12-year-old", option: "A curious 12-year-old" },
+  beginner: { emoji: "🙋", short: "beginner",    long: "a complete beginner",   option: "A complete beginner" },
 };
 
 /** Unknown values fall back to child, matching setTeachPersona. */

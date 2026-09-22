@@ -86,9 +86,9 @@ export function paintTeachChat() {
   setHTML(app, `
     ${progressBar()}
     <div class="rev-body teach">
-      <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:12px">
-        <div class="t-label" style="margin-bottom:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">Teaching ${esc(topic)}</div>
-        <div class="teach-persona-chip tag" aria-label="You're teaching ${esc(info.long)}" title="Chosen at the start. To teach someone else, finish and start again." style="flex-shrink:0;background:var(--surface-2);color:var(--muted);font-size:11px;padding:4px 8px;border-radius:6px;user-select:none">${info.emoji} ${esc(capitalizedShort)}</div>
+      <div class="teach-head">
+        <div class="t-label teach-topic">Teaching ${esc(topic)}</div>
+        <span class="teach-persona-chip tag" role="note" aria-label="You're teaching ${esc(info.long)}" title="Chosen at the start. To teach someone else, finish and start again.">${info.emoji} ${esc(capitalizedShort)}</span>
       </div>
       <div class="teach-thread" id="teachThread" aria-live="polite">
         ${messages.map(bubble).join("")}
@@ -224,7 +224,7 @@ export function paintTeachResult() {
     <div class="view teach-result">
       <div class="ahd">
         <div class="h-title" style="margin-bottom:2px">How you taught</div>
-        <div style="font-size:12px;color:var(--muted);font-weight:normal">${esc(teachState.topic)} &bull; to ${esc(personaInfo(teachState.persona).long)}</div>
+        <div style="font-size:12px;color:var(--muted);font-weight:normal">${esc(teachState.topic)} · to ${esc(personaInfo(teachState.persona).long)}</div>
       </div>
       <div class="block teach-score">
         <div class="score tnum ${u >= 70 ? "ok" : "no"}">${esc(u)}</div>

@@ -32,8 +32,9 @@ and its backend collect, how it's used, and how to delete it.</p>
   <li><strong>Account info:</strong> if you register, your email address and a
   bcrypt-hashed password. We never store your password in plain text.</li>
   <li><strong>Study content:</strong> captured page/chat text, generated
-  flashcards and quiz questions, review history (grades, intervals), exam
-  dates, and study-set titles.</li>
+  flashcards and quiz questions, mechanism chains you create or edit in
+  Medicine sets, review history (grades, intervals), exam dates, and
+  study-set titles.</li>
   <li><strong>Usage metadata:</strong> timestamps of when sets and cards were
   created or reviewed, used only to schedule spaced-repetition reviews and
   compute your study streak.</li>
@@ -51,8 +52,10 @@ configure that service not to allow your text to be used for model training, and
 we do not share it for advertising or analytics.</p>
 
 <p>The same applies to what you write in practice modes (typed answers, coding
-exercises and Teach it back conversations): it is sent to the AI service only to
-grade or reply, and is not stored on our servers.</p>
+exercises, Teach it back conversations, and system design drills): it is sent
+to the AI service only to grade or reply, and is not stored on our servers.
+Practice cases in Medicine sets are built from your own notes; don't include
+real patient details in what you capture.</p>
 
 <h2>Where data is stored</h2>
 <p>Account and synced study data is stored in a hosted SQLite database (Turso)

@@ -79,6 +79,29 @@ export const deleteAccountSchema = z.object({
   password: z.string().max(200).optional(),
 });
 
+// Mechanism chains (Medicine mode): one chain per condition, steps keyed by the
+// template (for medicine: cause, mechanism, physiological, symptoms, signs,
+// tests, diagnosis, treatment). Synced like cards.
+export const chainSchema = z.object({
+  id: z.string().min(1).max(100),
+  setId: z.string().min(1).max(100),
+  template: z.string().min(1).max(50),
+  title: z.string().max(200),
+  updatedAt: z.string().min(1),
+  deleted: z.boolean().optional(),
+});
+
+export const chainStepSchema = z.object({
+  id: z.string().min(1).max(100),
+  chainId: z.string().min(1).max(100),
+  key: z.string().min(1).max(40),
+  statement: z.string().max(1000),
+  why: z.string().max(1000).default(""),
+  edited: z.boolean().optional(),
+  updatedAt: z.string().min(1),
+  deleted: z.boolean().optional(),
+});
+
 export const syncSchema = z.object({
   since: z.string().optional(),
   sets: z.array(setSchema).default([]),
@@ -86,6 +109,9 @@ export const syncSchema = z.object({
   quiz: z.array(quizSchema).default([]),
   activity: z.array(activitySchema).default([]),
   reviews: z.array(reviewSchema).default([]),
+  // Clients older than Medicine mode send neither; both default to empty.
+  chains: z.array(chainSchema).default([]),
+  chainSteps: z.array(chainStepSchema).default([]),
 });
 export type SyncBody = z.infer<typeof syncSchema>;
 
@@ -99,7 +125,8 @@ export const messageSchema = z.object({
 export const generateSchema = z.object({
   messages: z.array(messageSchema).min(1),
   title: z.string().optional(),
-  mode: z.string().optional(),
+  // Set mode; unknown values are treated as general (see llm.ts studyMode).
+  mode: z.string().max(20).optional(),
 });
 
 export const gradeSchema = z.object({
@@ -186,82 +213,44 @@ export const teachEvaluateSchema = z
   .object({ ...teachBase, messages: z.array(teachMessageSchema).min(2).max(MAX_TEACH_MESSAGES) })
   .refine((b) => b.messages.some((m) => m.role === "learner"), { message: "nothing was taught", path: ["messages"] });
 
+// --- System design drills (Design drill, Estimation, Find the bottleneck) ---
+const drillReference = z.array(z.object({ front: z.string().max(500), back: z.string().max(2000) })).max(50);
+const drillSource = { concept: z.string().min(1).max(500), reference: drillReference };
+export const MAX_DESIGN_ANSWER = 4000;
 
-export const designTaskSchema = z.object({
-  concept: z.string().min(1).max(500),
-  reference: z.array(
-    z.object({
-      front: z.string(),
-      back: z.string(),
-    })
-  ).max(50),
-});
+export const designTaskSchema = z.object(drillSource);
 
+/** Grades the first answer, or (with curveball) the adaptation to a curveball. */
 export const designGradeSchema = z.object({
   task: z.string().min(1).max(2000),
-  answer: z.string().min(1).max(4000),
+  answer: z.string().min(1).max(MAX_DESIGN_ANSWER),
+  curveball: z.string().max(1000).optional(),
+  originalAnswer: z.string().max(MAX_DESIGN_ANSWER).optional(),
 });
 
 export const designCurveballSchema = z.object({
   task: z.string().min(1).max(2000),
-  answer: z.string().min(1).max(4000),
+  answer: z.string().min(1).max(MAX_DESIGN_ANSWER),
+  previous: z.array(z.string().max(1000)).max(5).default([]),
 });
 
-export const estimationTaskSchema = z.object({
-  concept: z.string().min(1).max(500),
-  reference: z.array(
-    z.object({
-      front: z.string(),
-      back: z.string(),
-    })
-  ).max(50),
-});
+export const estimationTaskSchema = z.object(drillSource);
 
 export const estimationSummarySchema = z.object({
-  results: z.array(
-    z.object({
-      question: z.string(),
-      expected: z.string(),
-      answer: z.string(),
-      grade: z.string()
-    })
-  ).max(10),
+  results: z.array(z.object({
+    question: z.string().max(1000),
+    expected: z.string().max(200),
+    answer: z.string().max(200),
+    grade: z.enum(["spot_on", "ballpark", "off"]),
+  })).min(1).max(10),
 });
 
-export const bottleneckTaskSchema = z.object({
-  concept: z.string().min(1).max(500),
-  reference: z.array(
-    z.object({
-      front: z.string(),
-      back: z.string(),
-    })
-  ).max(50),
-});
-
-export const bottleneckHintSchema = z.object({
-  state: z.string(),
-});
-
+export const bottleneckTaskSchema = z.object(drillSource);
+// state is the server-encrypted planted flaw (see crypto.ts); bounded so a
+// forged blob can't be huge.
+export const bottleneckHintSchema = z.object({ state: z.string().min(1).max(4000) });
 export const bottleneckGradeSchema = z.object({
-  state: z.string(),
-  answer: z.string().min(1).max(4000),
-});
-
-export const chainSchema = z.object({
-  id: z.string().min(1),
-  setId: z.string().min(1),
-  template: z.string().min(1),
-  title: z.string(),
-  updatedAt: z.string().min(1),
-  deleted: z.boolean().optional()
-});
-
-export const chainStepSchema = z.object({
-  id: z.string().min(1),
-  chainId: z.string().min(1),
-  key: z.string().min(1),
-  statement: z.string(),
-  why: z.string(),
-  updatedAt: z.string().min(1),
-  deleted: z.boolean().optional()
+  state: z.string().min(1).max(4000),
+  answer: z.string().min(1).max(MAX_DESIGN_ANSWER),
+  usedHint: z.boolean().default(false),
 });

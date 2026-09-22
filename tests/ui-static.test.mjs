@@ -54,9 +54,10 @@ test("in-place repaints never reset scroll", () => {
   // revealCard / answerQuiz / paintQuizQ bodies — approximated by asserting
   // the total call-site count matches exactly the view renderers' exits:
   // home, exam picker, sets, set detail, make-set, import, teams (two exits:
-  // signed-out early return + normal path), team detail, you, auth gate.
+  // signed-out early return + normal path), team detail, you, auth gate,
+  // delete account, and the chain step editor.
   const callSites = src.split("topOfView();").length - 1;
-  assert.equal(callSites, 13, "exactly the view-renderer exits reset scroll");
+  assert.equal(callSites, 14, "exactly the view-renderer exits reset scroll");
 });
 
 console.log("quiz length picker wiring (item 1)");
@@ -691,4 +692,101 @@ test("delete account: quiet entry on You, calm page, no innerHTML", () => {
   }
 });
 
+
+console.log("System design + Medicine wiring (prompts 11-15)");
+
+test("every data-action the panel renders has a handler", () => {
+  const panel = readSrc("../src/ui/panel.js");
+  const actions = new Set();
+  for (const f of walkJs("../src/ui/")) {
+    for (const m of readSrc(f).matchAll(/data-action="([a-z0-9-]+)"/g)) actions.add(m[1]);
+  }
+  // Either a case in the main switch, or the second listener's dataset.action === check.
+  const handled = (a) => panel.includes('case "' + a + '"') || panel.includes('=== "' + a + '"');
+  const missing = [...actions].filter((a) => !handled(a));
+  assert.deepEqual(missing, [], "buttons without a handler do nothing when tapped");
+});
+
+test("every message the panel sends is routed by the worker", () => {
+  const sw = readSrc("../src/background/service-worker.js");
+  const types = new Set();
+  for (const f of walkJs("../src/ui/")) {
+    // Only messages to the worker (send); sendToTab talks to content scripts.
+    for (const m of readSrc(f).matchAll(/\bsend\(\{\s*type: "([A-Z_]+)"/g)) types.add(m[1]);
+  }
+  const missing = [...types].filter((t) => !sw.includes('case "' + t + '"'));
+  assert.deepEqual(missing, [], "unrouted messages fail with 'Unknown message type'");
+});
+
+test("every CSS variable the UI uses is defined", () => {
+  const css = readSrc("../src/ui/panel.css");
+  const defined = new Set([...css.matchAll(/(--[a-z0-9-]+)\s*:/g)].map((m) => m[1]));
+  const used = new Set();
+  for (const f of [...walkJs("../src/ui/"), "../src/ui/panel.css"]) {
+    for (const m of readSrc(f).matchAll(/var\((--[a-z0-9-]+)/g)) used.add(m[1]);
+  }
+  const undefinedVars = [...used].filter((v) => !defined.has(v));
+  assert.deepEqual(undefinedVars, [], "an undefined variable silently renders nothing");
+});
+
+test("drill review-log rows never carry an empty card id (it fails server validation for the whole sync)", () => {
+  for (const f of walkJs("../src/ui/")) {
+    assert.ok(!/cardId:\s*""/.test(readSrc(f)), f + " logs an empty cardId");
+  }
+  for (const f of ["design", "estimation", "bottleneck"]) {
+    const flow = readSrc("../src/ui/flows/" + f + ".js");
+    assert.ok(flow.includes("drillLogEntry("), f + " logs through drillLogEntry");
+    assert.ok(!flow.includes('kind: "teach"'), f + " must log its own kind");
+  }
+});
+
+test("System design sets show all three drills", () => {
+  const detail = readSrc("../src/ui/views/set-detail.js");
+  for (const a of ["start-design", "start-estimation", "start-bottleneck"]) {
+    assert.ok(detail.includes('data-action="' + a + '"'), "set detail needs " + a);
+  }
+  assert.ok(detail.includes('["design", "System design"'), "the mode picker offers System design");
+  assert.ok(detail.includes('["medicine", "Medicine"'), "the mode picker offers Medicine");
+});
+
+test("leaving a drill drops its state", () => {
+  const review = readSrc("../src/ui/flows/review.js");
+  for (const fn of ["setDesignState(null)", "setEstimationState(null)", "setBottleneckState(null)", "setTeachState(null)"]) {
+    assert.ok(review.includes(fn), "goReturn must call " + fn);
+  }
+});
+
+test("regenerating sends the set's mode, so design and medicine sets get their style", () => {
+  const sw = readSrc("../src/background/service-worker.js");
+  assert.ok(sw.includes("generateForSession(session, existingSet?.mode)"));
+  assert.ok(readSrc("../src/sync/api.js").includes('post("/v1/generate", { messages, title, mode })'));
+});
+
+test("the Chains tab shows gaps honestly and says it isn't medical advice", () => {
+  const detail = readSrc("../src/ui/views/set-detail.js");
+  assert.ok(detail.includes('tab === "chains"'), "the Chains tab has a body");
+  assert.ok(detail.includes("Not in your source"), "gaps are labelled, never filled");
+  assert.ok(detail.includes("Not medical advice"), "framing line");
+  assert.ok(!/<ol[^>]*>[^]*?<div class="chain-arrow"/.test(detail), "arrows are list items, not divs inside <ol>");
+});
+
+test("the persona chip is quiet: the right emoji, not a button, styled in CSS", () => {
+  const teach = readSrc("../src/storage/teach.js");
+  assert.ok(teach.includes('emoji: "🧒"') && teach.includes('emoji: "🙋"'));
+  const flow = readSrc("../src/ui/flows/teach.js");
+  assert.ok(flow.includes('class="teach-persona-chip tag" role="note"'));
+  assert.ok(!/teach-persona-chip[^>]*style=/.test(flow), "styling lives in panel.css");
+  assert.ok(readSrc("../src/ui/panel.css").includes(".teach-persona-chip"));
+});
+
+test("the medicine suggestion reads the same field the worker saves", () => {
+  const detail = readSrc("../src/ui/views/set-detail.js");
+  const sw = readSrc("../src/background/service-worker.js");
+  assert.ok(sw.includes("suggestMedicine:"), "the worker stores suggestMedicine");
+  assert.ok(detail.includes("studySet.suggestMedicine &&"), "the banner must read suggestMedicine");
+  assert.ok(!detail.includes("suggestMedicineMode"), "no field that nothing sets");
+});
+
 console.log(`\n${passed} tests passed`);
+
+

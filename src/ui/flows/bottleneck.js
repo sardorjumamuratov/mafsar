@@ -3,9 +3,11 @@ import { XBTN, app, bundle, esc, send, setFor, setHTML, toast } from "../core.js
 import { setFocusReturn } from "../flows/review.js";
 import { showChrome } from "../nav.js";
 import { appendReviewLog, bumpActivity, uid } from "../../storage/store.js";
+import { drillLogEntry } from "../../storage/drill-log.js";
 import { renderArchitecture } from "../../storage/bottleneck.js";
 
-export let bottleneckState = null; // { sessionId, topic, cards, task, hint, result, step, token, usedHint }
+export let bottleneckState = null; // { sessionId, topic, cards, task, hint, result, step, token, usedHint, draft }
+export function setBottleneckState(v) { bottleneckState = v; }
 
 export async function startBottleneckDrill(sessionId) {
   const { sessions, studySets } = await bundle();
@@ -23,6 +25,7 @@ export async function startBottleneckDrill(sessionId) {
     result: null,
     step: "generating",
     usedHint: false,
+    draft: "",
   };
   setFocusReturn("set:" + sessionId);
   showChrome(false);
@@ -63,28 +66,25 @@ export function paintBottleneckQuestion() {
   
   setHTML(app, `
     <div class="rev-top">${XBTN}</div>
-    <div class="rev-body teach" style="padding-bottom:120px">
+    <div class="rev-body teach">
       <div class="t-label">Scenario</div>
       <p class="teach-lead" style="margin-bottom:16px;font-size:16px">${esc(s.task.narrative)}</p>
       
       <div class="t-label">Architecture</div>
-      <div style="background:var(--surface-2);padding:16px;border-radius:8px;margin-bottom:20px;font-family:monospace;font-size:14px;overflow-x:auto;white-space:pre">
-${esc(renderArchitecture(s.task.architecture))}
-      </div>
+      <pre class="arch-flow" role="img" aria-label="Request flow: ${esc((s.task.architecture || []).join(", then "))}">${esc(renderArchitecture(s.task.architecture))}</pre>
       
-      ${s.hint ? `<div class="t-label">Hint</div><div class="block tint" style="margin-bottom:16px">${esc(s.hint)}</div>` : `<button class="btn btn-ghost" data-action="bottleneck-hint" style="margin-bottom:16px;font-size:13px">Get a hint</button>`}
+      ${s.hint ? `<div class="t-label">Hint</div><div class="block tint" style="margin-bottom:16px">${esc(s.hint)}</div>` : `<button class="btn btn-ghost btn-sm" data-action="bottleneck-hint" style="margin-bottom:16px">Get a hint (costs half a point)</button>`}
       
       <div class="t-label">What breaks and why?</div>
-      <textarea id="bottleneckAnswer" class="sa-input" placeholder="Name the flaw, explain what load breaks it, and propose a fix." rows="5" style="font-size:15px;padding:12px"></textarea>
-      
-      <div style="position:fixed;bottom:0;left:0;right:0;padding:16px;background:var(--bg);border-top:1px solid var(--border)">
-        <button class="btn btn-primary btn-block" data-action="bottleneck-submit">Submit</button>
-      </div>
+      <textarea id="bottleneckAnswer" class="sa-input" placeholder="What breaks, why (under what load or failure), and how you'd fix it." rows="6">${esc(s.draft)}</textarea>
+      <button class="btn btn-primary btn-block" data-action="bottleneck-submit" style="margin-top:12px">Submit</button>
     </div>`);
 }
 
 export async function requestBottleneckHint() {
   const s = bottleneckState;
+  if (s.usedHint) return;
+  s.draft = /** @type {HTMLTextAreaElement|null} */ (document.getElementById("bottleneckAnswer"))?.value || "";
   s.usedHint = true;
   paintBottleneckLoader("Getting a hint...");
   const token = (s.token = {});
@@ -109,19 +109,15 @@ export async function submitBottleneck() {
   paintBottleneckLoader("Grading...");
   const token = (s.token = {});
   try {
-    const res = await send({ type: "BOTTLENECK_GRADE", state: s.task.state, answer: ans });
+    s.draft = ans;
+    const res = await send({ type: "BOTTLENECK_GRADE", state: s.task.state, answer: ans, usedHint: s.usedHint });
     if (bottleneckState !== s || s.token !== token) return;
     s.result = res;
     
-    // Log review
-    const grade = s.usedHint ? 2 : 3;
-    const writes = [bumpActivity(1)];
-    writes.push(appendReviewLog({
-      kind: "teach", stability: null, difficulty: null,
-      id: uid(), cardId: "", sessionId: s.sessionId,
-      grade, prevInterval: 0, newInterval: 0, reviewedAt: new Date().toISOString(),
-    }));
-    await Promise.all(writes);
+    await Promise.all([
+      bumpActivity(1),
+      appendReviewLog(drillLogEntry({ kind: "bottleneck", sessionId: s.sessionId, fraction: (Number(res.score) || 0) / 3, id: uid() })),
+    ]);
     
     s.step = "revealed";
     paintBottleneckReveal();
@@ -129,9 +125,6 @@ export async function submitBottleneck() {
     if (bottleneckState !== s || s.token !== token) return;
     toast(e.message);
     paintBottleneckQuestion();
-    // restore their text
-    const newBox = document.getElementById("bottleneckAnswer");
-    if (newBox) (/** @type {HTMLTextAreaElement} */ (newBox)).value = ans;
   }
 }
 
@@ -146,8 +139,9 @@ function paintBottleneckReveal() {
   setHTML(app, `
     <div class="rev-top">${XBTN}</div>
     <div class="rev-body teach">
-      <div class="t-label">Feedback</div>
+      <div class="t-label">Score ${esc(r.score)} / 3${r.usedHint ? " (hint used)" : ""}</div>
       <div class="block tint" style="margin-bottom:16px">${esc(r.feedback)}</div>
+      ${r.other_valid_issue ? `<div class="block" style="margin-bottom:16px"><b>Also a real problem you spotted:</b> ${esc(r.other_valid_issue)}</div>` : ""}
       
       <div style="display:flex;flex-direction:column;gap:8px;margin-bottom:20px">
         <div style="display:flex;justify-content:space-between;align-items:center;background:var(--surface-2);padding:12px;border-radius:8px">
@@ -166,8 +160,9 @@ function paintBottleneckReveal() {
       
       <div class="t-label">The Planted Flaw</div>
       <div style="background:var(--surface-2);padding:16px;border-radius:8px;margin-bottom:16px">
-        <p style="margin-bottom:8px;font-weight:600;color:var(--no)">${esc(r.planted_flaw)}</p>
-        <div style="font-size:14px;color:var(--text-p);line-height:1.5">${esc(r.model_solution)}</div>
+        <p style="margin-bottom:8px;font-weight:600;color:var(--danger)">${esc(r.planted_flaw)}</p>
+        ${r.why_it_fails ? `<div style="font-size:14px;line-height:1.5;margin-bottom:8px">${esc(r.why_it_fails)}</div>` : ""}
+        <div style="font-size:14px;color:var(--ink);line-height:1.5"><b>A good fix:</b> ${esc(r.model_solution)}</div>
       </div>
       
       <button class="btn btn-primary btn-block" data-action="return-focus" style="margin-top:16px">Done</button>

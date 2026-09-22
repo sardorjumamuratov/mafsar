@@ -19,7 +19,7 @@ describe("auth schemas", () => {
 describe("sync schema", () => {
   it("defaults all arrays to empty and since to undefined", () => {
     const parsed = syncSchema.parse({});
-    expect(parsed).toEqual({ sets: [], cards: [], quiz: [], activity: [], reviews: [] });
+    expect(parsed).toEqual({ sets: [], cards: [], quiz: [], activity: [], reviews: [], chains: [], chainSteps: [] });
     expect(parsed.since).toBeUndefined();
   });
 

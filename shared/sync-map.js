@@ -98,14 +98,15 @@ export function toServer({ sessions, studySets, activity, reviewLog }, lastSync)
             chainId: ch.id,
             key: step.key,
             statement: step.statement,
-            why: step.why,
+            why: step.why || "",
+            edited: !!step.edited,
             updatedAt: step.updatedAt,
             deleted: !!step.deleted
           });
         }
       }
     }
-  } // END OF FOR ST LOOP
+  }
 
 
   // Activity has no per-entry timestamp; the server max-merges per day, so
@@ -242,7 +243,8 @@ export function applyServer(resp, local, uid = () => Math.random().toString(36).
       id: step.id,
       key: step.key,
       statement: step.statement,
-      why: step.why,
+      why: step.why || "",
+      edited: !!step.edited,
       updatedAt: step.updatedAt,
       deleted: !!step.deleted
     };

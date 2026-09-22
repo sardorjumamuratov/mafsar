@@ -143,30 +143,12 @@ export function backendTeachEvaluate(payload) {
   return post("/v1/teach/evaluate", payload);
 }
 
-
-export function backendDesignTask({ concept, reference }) {
-  return post("/v1/design-task", { concept, reference });
-}
-export function backendDesignGrade({ task, answer }) {
-  return post("/v1/design-grade", { task, answer });
-}
-export function backendDesignCurveball({ task, answer }) {
-  return post("/v1/design-curveball", { task, answer });
-}
-
-export function backendEstimationTask({ concept, reference }) {
-  return post("/v1/estimation-task", { concept, reference });
-}
-export function backendEstimationSummary({ results }) {
-  return post("/v1/estimation-summary", { results });
-}
-
-export function backendBottleneckTask({ concept, reference }) {
-  return post("/v1/bottleneck-task", { concept, reference });
-}
-export function backendBottleneckHint({ state }) {
-  return post("/v1/bottleneck-hint", { state });
-}
-export function backendBottleneckGrade({ state, answer }) {
-  return post("/v1/bottleneck-grade", { state, answer });
-}
+// System design drills. Payloads are shaped by the worker (service-worker.js).
+export const backendDesignTask = (payload) => post("/v1/design-task", payload);
+export const backendDesignGrade = (payload) => post("/v1/design-grade", payload);
+export const backendDesignCurveball = (payload) => post("/v1/design-curveball", payload);
+export const backendEstimationTask = (payload) => post("/v1/estimation-task", payload);
+export const backendEstimationSummary = (payload) => post("/v1/estimation-summary", payload);
+export const backendBottleneckTask = (payload) => post("/v1/bottleneck-task", payload);
+export const backendBottleneckHint = (payload) => post("/v1/bottleneck-hint", payload);
+export const backendBottleneckGrade = (payload) => post("/v1/bottleneck-grade", payload);

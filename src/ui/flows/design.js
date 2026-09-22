@@ -1,236 +1,251 @@
-
 import { XBTN, app, bundle, esc, send, setFor, setHTML, toast } from "../core.js";
-import { isDue } from "../../../shared/srs.js";
 import { setFocusReturn } from "../flows/review.js";
 import { showChrome } from "../nav.js";
 import { appendReviewLog, bumpActivity, uid } from "../../storage/store.js";
-import { assembleAnswer, MAX_DESIGN_CHARS, reviewGradeForDesign } from "../../storage/design.js";
+import { drillLogEntry } from "../../storage/drill-log.js";
+import {
+  MAX_CURVEBALLS, MAX_DESIGN_CHARS, SECTIONS, answerTooLong, assembleAnswer, drillScore, emptySections,
+} from "../../storage/design.js";
 
-export let designState = null; // { sessionId, topic, cards, brief, grading, curveball, curveballGrading, step, token,  sections }
+// Design drill (System design sets): brief → sectioned answer → rubric feedback
+// → up to MAX_CURVEBALLS curveballs → summary. One sitting's state; goReturn() nulls it.
+// { sessionId, topic, cards, brief, rubric, sections, grading, curveballs: [{ question, answer, grading }], logged, token }
+export let designState = null;
+export function setDesignState(v) { designState = v; }
 
 export async function startDesignDrill(sessionId) {
   const { sessions, studySets } = await bundle();
   const set = setFor(sessionId, studySets);
   const cards = (set?.flashcards || []).filter((c) => c.front && c.back).slice(0, 50);
-  if (!cards.length) return toast("This set has no cards to drill with yet.");
+  if (!cards.length) return toast("This set has no cards to build a brief from yet.");
   const session = sessions.find((s) => s.id === sessionId);
-  
   designState = {
     sessionId,
     topic: String(session?.title || set?.title || "this topic").slice(0, 200),
-    cards: cards.map(c => ({ front: c.front, back: c.back })),
+    cards: cards.map((c) => ({ front: String(c.front).slice(0, 500), back: String(c.back).slice(0, 2000) })),
     brief: null,
+    rubric: [],
+    sections: emptySections(),
     grading: null,
-    curveballCount: 0,
     curveballs: [],
-    step: "generating_brief",
-    sections: { requirements: "", estimates: "", api: "", dataModel: "", components: "", bottlenecks: "" }
+    logged: false,
+    token: null,
   };
   setFocusReturn("set:" + sessionId);
   showChrome(false);
-  paintDesignLoader("Writing a brief...");
-  requestDesignBrief();
-}
-
-export function setDesignState(v) { designState = v; }
-
-function paintDesignLoader(msg) {
-  setHTML(app, `
-    <div class="rev-top">${XBTN}</div>
-    <div class="rev-body teach">
-      <div class="t-label">System design drill</div>
-      <div style="display:flex;align-items:center;gap:10px;margin-top:8px">
-        <span class="spinner" style="border-color:var(--border);border-top-color:var(--primary)"></span>
-        <span style="font-size:13px;color:var(--muted)">${esc(msg)}</span>
-      </div>
-    </div>`);
-}
-
-async function requestDesignBrief() {
   const s = designState;
+  paintLoader("Writing a brief…");
   const token = (s.token = {});
   try {
     const res = await send({ type: "DESIGN_TASK", concept: s.topic, reference: s.cards });
     if (designState !== s || s.token !== token) return;
     s.brief = res.brief;
-    s.step = "answering_brief";
-    paintDesignForm();
+    s.rubric = Array.isArray(res.rubric) ? res.rubric : [];
+    paintForm();
   } catch (e) {
     if (designState !== s || s.token !== token) return;
-    toast(e.message);
-    (/** @type {HTMLElement} */ (document.querySelector(".rev-top .xbtn")))?.click();
+    paintError(e.message);
   }
 }
 
-const SECTION_LABELS = {
-  requirements: "Requirements", estimates: "Estimates", api: "API", 
-  dataModel: "Data model", components: "Components & flow", bottlenecks: "Bottlenecks & trade-offs"
-};
+function paintLoader(msg) {
+  setHTML(app, `
+    <div class="rev-top">${XBTN}</div>
+    <div class="rev-body teach">
+      <div class="t-label">Design drill</div>
+      <div class="drill-loading"><span class="spinner"></span><span>${esc(msg)}</span></div>
+    </div>`);
+}
 
-function paintDesignForm() {
+function paintError(message) {
+  setHTML(app, `
+    <div class="rev-top">${XBTN}</div>
+    <div class="rev-body teach">
+      <div class="t-label">Design drill</div>
+      <div class="block tint">${esc(message)}</div>
+      <button class="btn btn-ghost btn-block" data-action="return-focus">Back to the set</button>
+    </div>`);
+}
+
+function counter(len) {
+  const over = len > MAX_DESIGN_CHARS;
+  return `<span class="${over ? "over" : ""}">${len.toLocaleString()} / ${MAX_DESIGN_CHARS.toLocaleString()}</span>${over ? " · too long, trim it before submitting" : ""}`;
+}
+
+function paintForm() {
   const s = designState;
-  const chars = assembleAnswer(s.sections).length;
-  
+  const len = assembleAnswer(s.sections).length;
   setHTML(app, `
     <div class="rev-top">${XBTN}</div>
     <div class="rev-body teach">
       <div class="t-label">Design brief</div>
-      <p class="teach-lead" style="margin-bottom:12px">${esc(s.brief)}</p>
-      
-      <div class="t-label" style="margin-top:20px;margin-bottom:8px">Your design</div>
-      <div class="design-sections" style="display:flex;flex-direction:column;gap:8px">
-        ${Object.keys(SECTION_LABELS).map(k => `
-          <details class="design-section" style="background:var(--surface-2);border-radius:8px;padding:8px">
-            <summary style="font-weight:600;font-size:14px;cursor:pointer;user-select:none;outline:none">${esc(SECTION_LABELS[k])}</summary>
-            <textarea data-key="${k}" class="sa-input" rows="3" style="margin-top:8px;background:var(--surface);width:100%;box-sizing:border-box" placeholder="Optional">${esc(s.sections[k])}</textarea>
-          </details>
-        `).join("")}
+      <p class="teach-lead">${esc(s.brief)}</p>
+      <div class="t-label" style="margin-top:16px">Your design</div>
+      <p class="help">Every section is optional. Aim for 10–15 minutes.</p>
+      <div class="design-sections">
+        ${SECTIONS.map(({ key, title, hint }) => `
+          <details class="design-section"${s.sections[key] ? " open" : ""}>
+            <summary>${esc(title)}${s.sections[key] ? " ✓" : ""}</summary>
+            <textarea class="sa-input" data-key="${key}" rows="3" aria-label="${esc(title)}" placeholder="${esc(hint)}">${esc(s.sections[key])}</textarea>
+          </details>`).join("")}
       </div>
-      <div style="font-size:12px;color:var(--muted);text-align:right;margin-top:8px" id="designCharCount">${chars} / ${MAX_DESIGN_CHARS}</div>
-      <button class="btn btn-primary btn-block" data-action="design-submit" style="margin-top:16px">Submit design</button>
+      <div class="design-count" id="designCount" aria-live="polite">${counter(len)}</div>
+      <button class="btn btn-primary btn-block" data-action="design-submit">Submit design</button>
     </div>`);
-    
-  app.querySelectorAll("textarea").forEach(ta => {
-    ta.addEventListener("input", (e) => {
-      s.sections[ta.dataset.key] = ta.value;
-      const len = assembleAnswer(s.sections).length;
-      const count = document.getElementById("designCharCount");
-      if (count) {
-        count.textContent = `${len} / ${MAX_DESIGN_CHARS}`;
-        count.style.color = len > MAX_DESIGN_CHARS ? "var(--no)" : "var(--muted)";
-      }
+  app.querySelectorAll(".design-section textarea").forEach((ta) => {
+    const box = /** @type {HTMLTextAreaElement} */ (ta);
+    box.addEventListener("input", () => {
+      s.sections[box.dataset.key] = box.value;
+      const out = document.getElementById("designCount");
+      if (out) setHTML(out, counter(assembleAnswer(s.sections).length));
     });
   });
 }
 
 export async function submitDesign() {
   const s = designState;
+  if (!s) return;
   const answer = assembleAnswer(s.sections);
   if (!answer) return toast("Write at least one section.");
-  if (answer.length > MAX_DESIGN_CHARS) return toast("Your answer is too long.");
-  
-  s.step = "grading_brief";
-  paintDesignLoader("Reviewing your design...");
-  
+  if (answerTooLong(answer)) return toast(`Your design is over ${MAX_DESIGN_CHARS.toLocaleString()} characters. Trim it first.`);
+  paintLoader("Reviewing your design…");
   const token = (s.token = {});
   try {
-    const res = await send({ type: "DESIGN_GRADE", task: s.brief, answer });
+    const res = await send({ type: "DESIGN_GRADE", task: s.brief, rubric: s.rubric, answer });
     if (designState !== s || s.token !== token) return;
     s.grading = res;
-    s.step = "feedback";
-    await recordDesignActivity(s);
-    paintDesignFeedback();
+    paintFeedback();
   } catch (e) {
     if (designState !== s || s.token !== token) return;
     toast(e.message);
-    s.step = "answering_brief";
-    paintDesignForm();
+    paintForm();
   }
 }
 
-async function recordDesignActivity(s) {
-  const writes = [bumpActivity(1)];
-  writes.push(appendReviewLog({
-    kind: "teach", stability: null, difficulty: null,
-    id: uid(), cardId: "", sessionId: s.sessionId,
-    grade: 3, prevInterval: 0, newInterval: 0, reviewedAt: new Date().toISOString(),
-  }));
-  await Promise.all(writes);
+const COVERAGE = { covered: ["Covered", "ok"], partial: ["Partly", "warn"], missed: ["Missed", "no"] };
+const VERDICT = { strong: ["Strong", "ok"], ok: ["OK", ""], weak: ["Weak", "warn"], missing: ["Missing", "no"] };
+
+function rubricRows(grading) {
+  return (grading.rubric_evaluation || []).map((r) => {
+    const [label, cls] = COVERAGE[r.status] || COVERAGE.missed;
+    return `<div class="idea-row"><div class="idea-top"><span class="name">${esc(r.point)}</span><span class="idea-chip ${cls}">${esc(label)}</span></div>${
+      r.note ? `<div class="idea-note">${esc(r.note)}</div>` : ""}</div>`;
+  }).join("");
 }
 
-function paintDesignFeedback() {
+function paintFeedback() {
   const s = designState;
-  const g = s.curveballs.length ? s.curveballs[s.curveballs.length - 1].grading : s.grading;
-  
-  const statusColor = (st) => st === "covered" || st === "strong" ? "ok" : st === "partial" ? "warn" : "no";
-  const statusLabel = (st) => st === "covered" ? "Covered" : st === "partial" ? "Partial" : "Missed";
-
+  const last = s.curveballs[s.curveballs.length - 1];
+  const g = last?.grading || s.grading;
+  const sections = last ? [] : s.grading.sections || [];
+  const canCurve = s.curveballs.length < MAX_CURVEBALLS;
   setHTML(app, `
     <div class="rev-top">${XBTN}</div>
-    <div class="rev-body teach">
-      <div class="ahd"><div class="h-title">Feedback</div></div>
-      
-      <div class="listhd"><span class="t-label">Rubric</span></div>
-      <div class="block" style="padding:6px 14px">
-        ${g.rubric_evaluation.map(r => `
-          <div class="idea-row">
-            <div class="idea-top"><span class="name">${esc(r.point)}</span><span class="idea-chip ${statusColor(r.status)}">${esc(statusLabel(r.status))}</span></div>
-            ${r.note ? `<div class="idea-note">${esc(r.note)}</div>` : ""}
-          </div>
-        `).join("")}
-      </div>
-      
-      <div class="listhd"><span class="t-label">Next time</span></div>
-      <div class="block tint"><div style="margin-top:6px">${esc(g.next_time)}</div></div>
-      
-      ${s.curveballCount < 2 ? `
-        <button class="btn btn-ghost btn-block" data-action="design-curveball" style="margin-top:16px">Face a curveball</button>
-      ` : ""}
-      <button class="btn btn-primary btn-block" data-action="return-focus" style="margin-top:8px">Done</button>
+    <div class="rev-body teach" aria-live="polite">
+      <div class="t-label">${last ? `Curveball ${s.curveballs.length} feedback` : "Feedback"}</div>
+      ${last ? `<p class="teach-lead">${esc(last.question)}</p>` : ""}
+      <div class="block" style="padding:6px 14px">${rubricRows(g)}</div>
+      ${sections.length ? `<div class="t-label">By section</div>
+        <div class="design-verdicts">${sections.map((x) => {
+          const [label, cls] = VERDICT[x.verdict] || VERDICT.missing;
+          return `<div class="idea-row"><div class="idea-top"><span class="name">${esc(x.section)}</span><span class="idea-chip ${cls}">${esc(label)}</span></div>${
+            x.note ? `<div class="idea-note">${esc(x.note)}</div>` : ""}</div>`;
+        }).join("")}</div>` : ""}
+      <div class="block tint"><div class="t-label">Next time</div><div style="margin-top:6px">${esc(g.next_time)}</div></div>
+      ${canCurve ? `<button class="btn btn-primary btn-block" data-action="design-curveball">Take a curveball</button>` : ""}
+      <button class="btn ${canCurve ? "btn-ghost" : "btn-primary"} btn-block" data-action="design-finish">Finish</button>
     </div>`);
 }
 
 export async function requestDesignCurveball() {
   const s = designState;
-  const answer = assembleAnswer(s.sections);
-  s.step = "generating_curveball";
-  paintDesignLoader("Throwing a curveball...");
-  
+  if (!s || s.curveballs.length >= MAX_CURVEBALLS) return;
+  paintLoader("Throwing a curveball…");
   const token = (s.token = {});
   try {
-    const res = await send({ type: "DESIGN_CURVEBALL", task: s.brief, answer });
+    const res = await send({
+      type: "DESIGN_CURVEBALL",
+      task: s.brief,
+      answer: assembleAnswer(s.sections),
+      previous: s.curveballs.map((c) => c.question),
+    });
     if (designState !== s || s.token !== token) return;
     s.curveballs.push({ question: res.curveball, answer: "", grading: null });
-    s.curveballCount++;
-    s.step = "answering_curveball";
-    paintDesignCurveballForm();
+    paintCurveballForm();
   } catch (e) {
     if (designState !== s || s.token !== token) return;
     toast(e.message);
-    s.step = "feedback";
-    paintDesignFeedback();
+    paintFeedback();
   }
 }
 
-function paintDesignCurveballForm() {
+function paintCurveballForm() {
   const s = designState;
-  const current = s.curveballs[s.curveballs.length - 1];
-  
+  const cb = s.curveballs[s.curveballs.length - 1];
   setHTML(app, `
     <div class="rev-top">${XBTN}</div>
     <div class="rev-body teach">
-      <div class="t-label">Curveball</div>
-      <p class="teach-lead" style="margin-bottom:12px">${esc(current.question)}</p>
-      
-      <textarea id="curveballInput" class="sa-input" rows="5" placeholder="How does your design adapt?" style="width:100%;box-sizing:border-box">${esc(current.answer)}</textarea>
-      <button class="btn btn-primary btn-block" data-action="design-submit-curveball" style="margin-top:16px">Submit adaptation</button>
+      <div class="t-label">Curveball ${s.curveballs.length} of ${MAX_CURVEBALLS}</div>
+      <p class="teach-lead">${esc(cb.question)}</p>
+      <textarea id="curveballInput" class="sa-input" rows="6" aria-label="How your design changes" placeholder="What changes in your design, and why?">${esc(cb.answer)}</textarea>
+      <button class="btn btn-primary btn-block" data-action="design-submit-curveball">Submit</button>
     </div>`);
+  document.getElementById("curveballInput")?.focus();
 }
 
 export async function submitDesignCurveball() {
   const s = designState;
-  const current = s.curveballs[s.curveballs.length - 1];
-  const box = document.getElementById("curveballInput");
-  const answer = ((/** @type {HTMLTextAreaElement|null} */ (box))?.value || "").trim();
-  if (!answer) return toast("Write an adaptation first.");
-  
-  current.answer = answer;
-  s.step = "grading_curveball";
-  paintDesignLoader("Reviewing your adaptation...");
-  
+  if (!s) return;
+  const cb = s.curveballs[s.curveballs.length - 1];
+  const answer = (/** @type {HTMLTextAreaElement|null} */ (document.getElementById("curveballInput"))?.value || "").trim();
+  if (!answer) return toast("Write how your design changes first.");
+  if (answerTooLong(answer)) return toast(`Keep it under ${MAX_DESIGN_CHARS.toLocaleString()} characters.`);
+  cb.answer = answer;
+  paintLoader("Reviewing your change…");
   const token = (s.token = {});
   try {
-    const res = await send({ type: "DESIGN_GRADE", task: current.question, answer: answer });
+    // Graded with the brief, the original design and the curveball for context.
+    const res = await send({
+      type: "DESIGN_GRADE",
+      task: s.brief,
+      rubric: [],
+      answer,
+      curveball: cb.question,
+      originalAnswer: assembleAnswer(s.sections),
+    });
     if (designState !== s || s.token !== token) return;
-    current.grading = res;
-    s.step = "feedback";
-    await recordDesignActivity(s);
-    paintDesignFeedback();
+    cb.grading = res;
+    paintFeedback();
   } catch (e) {
     if (designState !== s || s.token !== token) return;
     toast(e.message);
-    s.step = "answering_curveball";
-    paintDesignCurveballForm();
+    paintCurveballForm();
   }
 }
 
+export async function finishDesignDrill() {
+  const s = designState;
+  if (!s || !s.grading) return;
+  const score = drillScore(s.grading, s.curveballs.map((c) => c.grading));
+  if (!s.logged) {
+    s.logged = true;
+    await Promise.all([
+      bumpActivity(1),
+      appendReviewLog(drillLogEntry({ kind: "design", sessionId: s.sessionId, fraction: score, id: uid() })),
+    ]);
+  }
+  const pct = Math.round(score * 100);
+  setHTML(app, `
+    <div class="view teach-result">
+      <div class="ahd"><div class="h-title">Drill complete</div></div>
+      <div class="block teach-score">
+        <div class="score tnum ${pct >= 70 ? "ok" : "no"}">${pct}</div>
+        <div><b>Rubric coverage</b><div class="feedback">First design counts double, each curveball once.</div></div>
+      </div>
+      <div class="block"><div class="t-label">The brief</div><div style="margin-top:6px">${esc(s.brief)}</div></div>
+      ${s.curveballs.filter((c) => c.grading).map((c, i) => `
+        <div class="block"><div class="t-label">Curveball ${i + 1}</div><div style="margin-top:6px">${esc(c.question)}</div></div>`).join("")}
+      <div class="block tint"><div class="t-label">Keep in mind</div><div style="margin-top:6px">${esc((s.curveballs.at(-1)?.grading || s.grading).next_time)}</div></div>
+      <button class="btn btn-primary btn-block" data-action="return-focus">Done</button>
+    </div>`);
+}

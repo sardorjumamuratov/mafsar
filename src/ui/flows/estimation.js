@@ -4,7 +4,8 @@ import { isDue } from "../../../shared/srs.js";
 import { setFocusReturn } from "../flows/review.js";
 import { showChrome } from "../nav.js";
 import { appendReviewLog, bumpActivity, uid } from "../../storage/store.js";
-import { parseEstimation, gradeEstimation } from "../../storage/estimation.js";
+import { drillLogEntry } from "../../storage/drill-log.js";
+import { gradeEstimation, mismatchNote, parseEstimation, parseReference } from "../../storage/estimation.js";
 
 export let estimationState = null; // { sessionId, topic, cards, task, idx, results, step, token }
 
@@ -75,7 +76,7 @@ export function paintEstimationQuestion() {
       <p class="teach-lead" style="margin-bottom:12px;font-size:18px">${esc(q.question)}</p>
       
       <div style="display:flex;flex-direction:column;gap:8px">
-        <input type="text" id="estimationValue" class="sa-input" inputmode="text" placeholder="e.g. 1.5 million QPS" style="font-size:18px;padding:12px" autofocus />
+        <input type="text" id="estimationValue" class="sa-input" inputmode="text" placeholder="e.g. 300 TB, 12k QPS, 2.5 GB/s" aria-label="Your estimate, with a unit" style="font-size:18px;padding:12px" autofocus />
       </div>
       <button class="btn btn-primary btn-block" data-action="estimation-submit" style="margin-top:16px">Check</button>
     </div>`);
@@ -96,13 +97,13 @@ export function submitEstimation() {
   if (!raw) return toast("Enter an estimate.");
   
   const parsed = parseEstimation(raw);
-  if (!parsed) return toast("Couldn't understand that number.");
+  if (!parsed) return toast("Couldn't read that. Try a number with a unit, like 300 TB or 12k QPS.");
   
   const q = s.task.questions[s.idx];
-  const parsedRef = parseEstimation(q.reference_value + " " + q.reference_unit);
-  
+  // A reference unit we can't read is compared as the same kind as the answer.
+  const parsedRef = parseReference(q.reference_value, q.reference_unit) || { value: Number(q.reference_value), kind: parsed.kind };
   const grade = gradeEstimation(parsedRef, parsed);
-  s.results.push({ question: q, answer: parsed, grade });
+  s.results.push({ question: q, answer: parsed, grade, note: mismatchNote(parsedRef, parsed) });
   
   paintEstimationGrade();
 }
@@ -131,7 +132,8 @@ function paintEstimationGrade() {
           <span class="idea-chip ${cl}">${esc(label)}</span>
         </div>
         <div style="font-size:20px;font-weight:700">${esc(r.answer.original)}</div>
-        <div style="font-size:13px;color:var(--muted);margin-top:4px">Target: ${esc(q.reference_value)} ${esc(q.reference_unit)}</div>
+        <div style="font-size:13px;color:var(--muted);margin-top:4px">Reference: ${esc(q.reference_value)} ${esc(q.reference_unit)}</div>
+        ${r.note ? `<div style="font-size:13px;color:var(--danger);margin-top:4px">${esc(r.note)}</div>` : ""}
       </div>
       
       <div class="t-label">Solution</div>
@@ -162,13 +164,12 @@ async function finishEstimation() {
     
     if (estimationState !== s || s.token !== token) return;
     
-    const writes = [bumpActivity(1)];
-    writes.push(appendReviewLog({
-      kind: "teach", stability: null, difficulty: null,
-      id: uid(), cardId: "", sessionId: s.sessionId,
-      grade: 3, prevInterval: 0, newInterval: 0, reviewedAt: new Date().toISOString(),
-    }));
-    await Promise.all(writes);
+    // Spot on counts fully, ballpark half.
+    const score = s.results.reduce((n, r) => n + (r.grade === "spot_on" ? 1 : r.grade === "ballpark" ? 0.5 : 0), 0);
+    await Promise.all([
+      bumpActivity(1),
+      appendReviewLog(drillLogEntry({ kind: "estimation", sessionId: s.sessionId, fraction: score / s.results.length, id: uid() })),
+    ]);
     
     paintEstimationSummary(res);
   } catch (e) {
@@ -191,15 +192,15 @@ function paintEstimationSummary(summary) {
       
       <div style="display:flex;gap:8px;margin-bottom:16px;text-align:center">
         <div style="flex:1;background:var(--surface-2);border-radius:8px;padding:12px">
-          <div style="font-size:24px;font-weight:700;color:var(--ok)">${spotOn}</div>
+          <div style="font-size:24px;font-weight:700;color:var(--success)">${spotOn}</div>
           <div style="font-size:12px;color:var(--muted)">Spot on</div>
         </div>
         <div style="flex:1;background:var(--surface-2);border-radius:8px;padding:12px">
-          <div style="font-size:24px;font-weight:700;color:var(--warn)">${ballpark}</div>
+          <div style="font-size:24px;font-weight:700;color:var(--warm)">${ballpark}</div>
           <div style="font-size:12px;color:var(--muted)">Ballpark</div>
         </div>
         <div style="flex:1;background:var(--surface-2);border-radius:8px;padding:12px">
-          <div style="font-size:24px;font-weight:700;color:var(--no)">${off}</div>
+          <div style="font-size:24px;font-weight:700;color:var(--danger)">${off}</div>
           <div style="font-size:12px;color:var(--muted)">Off</div>
         </div>
       </div>

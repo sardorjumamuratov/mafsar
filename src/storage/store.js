@@ -167,6 +167,10 @@ export async function saveStudySet(studySet) {
   // Stamp any unsynced children so LWW comparisons always have a timestamp.
   for (const c of record.flashcards || []) c.updatedAt ||= record.updatedAt;
   for (const q of record.quiz || []) q.updatedAt ||= record.updatedAt;
+  for (const ch of record.chains || []) {
+    ch.updatedAt ||= record.updatedAt;
+    for (const st of ch.steps || []) st.updatedAt ||= record.updatedAt;
+  }
   if (idx >= 0) sets[idx] = record;
   else sets.unshift(record);
   await set(KEYS.STUDY_SETS, sets);

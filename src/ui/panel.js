@@ -1,4 +1,7 @@
-import { startDesignDrill, submitDesign, requestDesignCurveball, submitDesignCurveball } from "./flows/design.js";
+import { finishDesignDrill, requestDesignCurveball, startDesignDrill, submitDesign, submitDesignCurveball } from "./flows/design.js";
+import { estimationNext, startEstimationDrill, submitEstimation } from "./flows/estimation.js";
+import { requestBottleneckHint, startBottleneckDrill, submitBottleneck } from "./flows/bottleneck.js";
+import { cancelChainEdit, dismissMedicineSuggestion, openChainStepEdit, removeChainStep, saveChainStep } from "./flows/chains.js";
 import { confirmDeleteAccount, renderDeleteAccount } from "./views/delete-account.js";
 import { doImport, previewImport, renderImport } from "./views/import.js";
 import { app, bundle, nav, send, setFor, toast } from "./core.js";
@@ -112,6 +115,18 @@ document.addEventListener("click", (e) => {
     case "design-submit": submitDesign(); break;
     case "design-curveball": requestDesignCurveball(); break;
     case "design-submit-curveball": submitDesignCurveball(); break;
+    case "design-finish": finishDesignDrill().catch((e) => toast(e.message)); break;
+    case "start-estimation": startEstimationDrill(id); break;
+    case "estimation-submit": submitEstimation(); break;
+    case "estimation-next": estimationNext(); break;
+    case "start-bottleneck": startBottleneckDrill(id); break;
+    case "bottleneck-hint": requestBottleneckHint(); break;
+    case "bottleneck-submit": submitBottleneck(); break;
+    case "chain-edit": openChainStepEdit(id, (/** @type {any} */ (t)).dataset.chain, (/** @type {any} */ (t)).dataset.key); break;
+    case "chain-edit-save": saveChainStep().catch((e) => toast(e.message)); break;
+    case "chain-edit-remove": removeChainStep().catch((e) => toast(e.message)); break;
+    case "chain-edit-cancel": cancelChainEdit(); break;
+    case "dismiss-medicine": dismissMedicineSuggestion(id).catch((e) => toast(e.message)); break;
     case "start-teach": startTeach(id); break;
     case "teach-persona": setTeachPersona((/** @type {any} */ (t)).dataset.persona); break;
     case "teach-send": sendTeach(false); break;
