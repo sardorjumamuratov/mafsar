@@ -401,7 +401,7 @@ export function createApp(db: DB) {
   // off), so a new metered route can't be added here without its gate.
   app.post("/v1/generate", requireQuota(db, "set"), async (c) => {
     const body = generateSchema.parse(await c.req.json());
-    const generated = await generateStudySet(body.messages);
+    const generated = await generateStudySet(body.messages, body.mode);
     return c.json(generated);
   });
 

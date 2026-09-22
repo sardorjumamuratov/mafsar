@@ -33,8 +33,8 @@ import {
 } from "../sync/api.js";
 
 /** Generate a study set for a captured session via the backend. */
-async function generateForSession(session) {
-  const generated = await backendGenerate(session.messages, session.title);
+async function generateForSession(session, mode) {
+  const generated = await backendGenerate(session.messages, session.title, mode);
   const now = Date.now();
   // Attach client-side SM-2 scheduling + ids to the server's cards.
   generated.flashcards = (generated.flashcards || []).map((c) => ({

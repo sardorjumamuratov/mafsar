@@ -272,11 +272,13 @@ function transcript(messages: { role: string; text: string }[]): string {
 export interface GeneratedCard { id: string; front: string; back: string }
 export interface GeneratedQuiz { id: string; q: string; options: string[]; answer: number; explain: string }
 
-export async function generateStudySet(messages: { role: string; text: string }[]) {
-  const user = "Here is the conversation transcript:\n\n" + transcript(messages) + "\n\nGenerate the study material now.";
+export async function generateStudySet(messages: { role: string; text: string }[], mode?: string) {
+  const modeInstructions = mode === "design" ? "\n  - When the user sets the mode to \"design\", produce System Design cards.\n  - For design sets, heavily favour trade-off cards (\"X vs Y: when would you pick each?\"), decision cards (\"You need Z under constraint C. What do you choose?\"), and failure cards (\"What breaks first if...\").\n  - Backs must stay short and concise (the deciding factors, not an essay).\n  - The quiz for design sets must test decisions (e.g. \"Which fits a write-heavy, append-only workload?\"), not trivia.\n  - A minority of plain definition cards is allowed only for terms the other cards rely on." : "";
+    const prompt = GENERATE_PROMPT + modeInstructions;
+    const user = "Here is the conversation transcript:\n\n" + transcript(messages) + "\n\nGenerate the study material now.";
   let lastErr: unknown;
   for (let attempt = 0; attempt < 2; attempt++) {
-    const parsed = await callJson(GENERATE_PROMPT, user);
+    const parsed = await callJson(prompt, user);
     const flashcards: GeneratedCard[] = (parsed.flashcards || [])
       .filter((c: any) => c && c.front && c.back)
       .map((c: any) => ({ id: randomUUID(), front: String(c.front), back: String(c.back) }));
@@ -289,8 +291,9 @@ export async function generateStudySet(messages: { role: string; text: string }[
         answer: Math.max(0, Math.min(q.options.length - 1, Number(q.answer) || 0)),
         explain: q.explain ? String(q.explain) : "",
       }));
-    const mode = String(parsed.mode).toLowerCase() === "coding" ? "coding" : "general";
-    if (flashcards.length || quiz.length) return { flashcards, quiz, mode };
+    const parsedMode = String(parsed.mode).toLowerCase();
+      const finalMode = (mode === "design" || parsedMode === "design") ? "design" : (parsedMode === "coding" ? "coding" : "general");
+    if (flashcards.length || quiz.length) return { flashcards, quiz, mode: finalMode };
     lastErr = new Error("Model returned no usable cards.");
   }
   throw new LLMError(`Generation failed: ${lastErr instanceof Error ? lastErr.message : "unknown"}`);
