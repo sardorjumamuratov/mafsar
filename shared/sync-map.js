@@ -18,9 +18,13 @@ const ms = (val) => {
 export function toServer({ sessions, studySets, activity, reviewLog }, lastSync) {
   const since = lastSync || "";
   const sessionById = new Map(sessions.map((se) => [se.id, se]));
+  
   const sets = [];
   const cards = [];
   const quiz = [];
+  const chains = [];
+  const chainSteps = [];
+
 
   for (const st of studySets) {
     const se = sessionById.get(st.sessionId);
@@ -75,14 +79,41 @@ export function toServer({ sessions, studySets, activity, reviewLog }, lastSync)
         });
       }
     }
-  }
+
+    for (const ch of st.chains || []) {
+      if ((ch.updatedAt || "") > since) {
+        chains.push({
+          id: ch.id,
+          setId: se.id,
+          template: ch.template,
+          title: ch.title,
+          updatedAt: ch.updatedAt,
+          deleted: !!ch.deleted
+        });
+      }
+      for (const step of ch.steps || []) {
+        if ((step.updatedAt || "") > since) {
+          chainSteps.push({
+            id: step.id,
+            chainId: ch.id,
+            key: step.key,
+            statement: step.statement,
+            why: step.why,
+            updatedAt: step.updatedAt,
+            deleted: !!step.deleted
+          });
+        }
+      }
+    }
+  } // END OF FOR ST LOOP
+
 
   // Activity has no per-entry timestamp; the server max-merges per day, so
   // sending the whole map is cheap and idempotent.
   const activityOut = Object.entries(activity || {}).map(([day, count]) => ({ day, count }));
   const reviews = (reviewLog || []).filter((r) => (r.reviewedAt || "") > since);
 
-  return { sets, cards, quiz, activity: activityOut, reviews };
+  return { sets, cards, quiz, chains, chainSteps, activity: activityOut, reviews };
 }
 
 /** Find or create the local studySet shell a server row belongs to. */
@@ -176,6 +207,48 @@ export function applyServer(resp, local, uid = () => Math.random().toString(36).
     if (existing && (q.updatedAt || "") <= (existing.updatedAt || "")) continue;
     if (existing) Object.assign(existing, mapped);
     else st.quiz.push(mapped);
+  }
+
+  
+  for (const ch of resp.chains || []) {
+    const st = ensureSet(state, ch.setId);
+    st.chains = st.chains || [];
+    const existing = st.chains.find(x => x.id === ch.id);
+    const mapped = {
+      id: ch.id,
+      template: ch.template,
+      title: ch.title,
+      updatedAt: ch.updatedAt,
+      deleted: !!ch.deleted,
+      steps: existing ? existing.steps : []
+    };
+    if (existing && (ch.updatedAt || "") <= (existing.updatedAt || "")) continue;
+    if (existing) Object.assign(existing, mapped);
+    else st.chains.push(mapped);
+  }
+
+  for (const step of resp.chainSteps || []) {
+    // Find the chain
+    let foundChain = null;
+    for (const st of state.studySets) {
+      if (st.chains) {
+        foundChain = st.chains.find(x => x.id === step.chainId);
+        if (foundChain) break;
+      }
+    }
+    if (!foundChain) continue; // orphan step
+    const existing = foundChain.steps.find(x => x.id === step.id);
+    const mapped = {
+      id: step.id,
+      key: step.key,
+      statement: step.statement,
+      why: step.why,
+      updatedAt: step.updatedAt,
+      deleted: !!step.deleted
+    };
+    if (existing && (step.updatedAt || "") <= (existing.updatedAt || "")) continue;
+    if (existing) Object.assign(existing, mapped);
+    else foundChain.steps.push(mapped);
   }
 
   for (const a of resp.activity || []) {

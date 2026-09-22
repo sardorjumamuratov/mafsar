@@ -184,3 +184,22 @@ export const teachTurnSchema = z
 export const teachEvaluateSchema = z
   .object({ ...teachBase, messages: z.array(teachMessageSchema).min(2).max(MAX_TEACH_MESSAGES) })
   .refine((b) => b.messages.some((m) => m.role === "learner"), { message: "nothing was taught", path: ["messages"] });
+
+export const chainSchema = z.object({
+  id: z.string().min(1),
+  setId: z.string().min(1),
+  template: z.string().min(1),
+  title: z.string(),
+  updatedAt: z.string().min(1),
+  deleted: z.boolean().optional()
+});
+
+export const chainStepSchema = z.object({
+  id: z.string().min(1),
+  chainId: z.string().min(1),
+  key: z.string().min(1),
+  statement: z.string(),
+  why: z.string(),
+  updatedAt: z.string().min(1),
+  deleted: z.boolean().optional()
+});

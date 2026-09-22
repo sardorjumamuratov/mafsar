@@ -15,6 +15,8 @@ export async function deleteUserData(db: DB, userId: string): Promise<void> {
       { sql: "DELETE FROM generation_events WHERE user_id = ?", args: [userId] },
       { sql: "DELETE FROM shares WHERE user_id = ?", args: [userId] },
       { sql: "DELETE FROM quiz WHERE user_id = ?", args: [userId] },
+      { sql: "DELETE FROM chain_steps WHERE user_id = ?", args: [userId] },
+      { sql: "DELETE FROM chains WHERE user_id = ?", args: [userId] },
       { sql: "DELETE FROM cards WHERE user_id = ?", args: [userId] },
       { sql: "DELETE FROM sets WHERE user_id = ?", args: [userId] },
       { sql: `DELETE FROM team_members WHERE team_id IN (${ownedTeams})`, args: [userId] },
