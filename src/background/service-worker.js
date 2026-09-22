@@ -30,6 +30,9 @@ import {
   backendTeamLeave, backendDeleteAccount, backendTeachTurn, backendTeachEvaluate,
   backendCodingTask,
   backendCodingGrade,
+  backendDesignTask,
+  backendDesignGrade,
+  backendDesignCurveball,
 } from "../sync/api.js";
 
 /** Generate a study set for a captured session via the backend. */
@@ -525,6 +528,33 @@ async function handle(msg) {
       });
       return { task };
     }
+
+    
+
+    case "DESIGN_TASK": {
+      const res = await backendDesignTask({
+        concept: String(msg.concept || ""),
+        reference: Array.isArray(msg.reference) ? msg.reference : [],
+      });
+      return res;
+    }
+
+    case "DESIGN_GRADE": {
+      const res = await backendDesignGrade({
+        task: String(msg.task || ""),
+        answer: String(msg.answer || ""),
+      });
+      return res;
+    }
+
+    case "DESIGN_CURVEBALL": {
+      const res = await backendDesignCurveball({
+        task: String(msg.task || ""),
+        answer: String(msg.answer || ""),
+      });
+      return res;
+    }
+
 
     case "GRADE_CODING": {
       const grading = await backendCodingGrade({
