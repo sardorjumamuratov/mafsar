@@ -426,6 +426,8 @@ function chainsTabHtml(sessionId, studySet) {
       const { filled, total } = chainCoverage(ch);
       const rows = orderedSteps(ch)
         .map(({ key, label, step }, i) => {
+          const prevKey = i ? orderedSteps(ch)[i - 1].key : "";
+          const linkId = i ? `chainlink:${ch.id}:${prevKey}:${key}` : "";
           const edit = `data-action="chain-edit" data-id="${esc(sessionId)}" data-chain="${esc(ch.id)}" data-key="${esc(key)}"`;
           const arrow = i ? `<li class="chain-arrow" aria-hidden="true">↓</li>` : "";
           if (!step) {
@@ -435,7 +437,7 @@ function chainsTabHtml(sessionId, studySet) {
                 <button class="linkbtn" ${edit} aria-label="Add ${esc(label)}">Add</button>
               </li>`;
           }
-          return `${arrow}<li class="chain-step">
+          return `${arrow}<li class="chain-step" data-card-id="${esc(linkId)}">
               <span class="chain-label">${esc(label)}</span>
               <details class="chain-body">
                 <summary class="chain-text">${esc(step.statement)}</summary>
