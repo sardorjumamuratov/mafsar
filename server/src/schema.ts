@@ -99,6 +99,7 @@ export const messageSchema = z.object({
 export const generateSchema = z.object({
   messages: z.array(messageSchema).min(1),
   title: z.string().optional(),
+  mode: z.string().optional(),
 });
 
 export const gradeSchema = z.object({

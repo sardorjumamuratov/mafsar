@@ -40,8 +40,8 @@ export function backendBillingPortal() {
 }
 
 /** messages: [{role, text}] -> { flashcards:[{front,back}], quiz:[{q,options,answer,explain}] } */
-export function backendGenerate(messages, title) {
-  return post("/v1/generate", { messages, title });
+export function backendGenerate(messages, title, mode) {
+  return post("/v1/generate", { messages, title, mode });
 }
 
 /** { question, reference, answer } -> { score, correct, feedback } */
