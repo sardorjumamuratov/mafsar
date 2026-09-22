@@ -2,6 +2,7 @@
 import assert from "node:assert/strict";
 import {
   MAX_TEACH_CARDS, STUCK_TEXT, canFinish, coverageCount, mergeCoverage, reviewGradeFor, selectTeachCards,
+  PERSONAS, personaInfo,
 } from "../src/storage/teach.js";
 
 let passed = 0;
@@ -55,4 +56,23 @@ test("the stuck message is fixed text", () => {
   assert.ok(STUCK_TEXT.includes("stuck"));
 });
 
+
+test("personaInfo falls back to child", () => {
+  assert.equal(personaInfo("child").short, "12-year-old");
+  assert.equal(personaInfo("beginner").short, "beginner");
+  assert.equal(personaInfo("unknown").short, "12-year-old");
+  assert.equal(personaInfo("").short, "12-year-old");
+});
+
+test("every persona has the right shape", () => {
+  for (const key in PERSONAS) {
+    const p = PERSONAS[key];
+    assert.ok(p.emoji);
+    assert.ok(p.short);
+    assert.ok(p.long);
+    assert.ok(p.option);
+  }
+});
+
 console.log(`\n${passed} passed`);
+
