@@ -142,3 +142,11 @@ export function backendTeachTurn(payload) {
 export function backendTeachEvaluate(payload) {
   return post("/v1/teach/evaluate", payload);
 }
+
+
+export function backendEstimationTask({ concept, reference }) {
+  return post("/v1/estimation-task", { concept, reference });
+}
+export function backendEstimationSummary({ results }) {
+  return post("/v1/estimation-summary", { results });
+}

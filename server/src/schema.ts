@@ -184,3 +184,25 @@ export const teachTurnSchema = z
 export const teachEvaluateSchema = z
   .object({ ...teachBase, messages: z.array(teachMessageSchema).min(2).max(MAX_TEACH_MESSAGES) })
   .refine((b) => b.messages.some((m) => m.role === "learner"), { message: "nothing was taught", path: ["messages"] });
+
+
+export const estimationTaskSchema = z.object({
+  concept: z.string().min(1).max(500),
+  reference: z.array(
+    z.object({
+      front: z.string(),
+      back: z.string(),
+    })
+  ).max(50),
+});
+
+export const estimationSummarySchema = z.object({
+  results: z.array(
+    z.object({
+      question: z.string(),
+      expected: z.string(),
+      answer: z.string(),
+      grade: z.string()
+    })
+  ).max(10),
+});
