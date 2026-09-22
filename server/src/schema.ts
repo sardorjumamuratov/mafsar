@@ -184,3 +184,23 @@ export const teachTurnSchema = z
 export const teachEvaluateSchema = z
   .object({ ...teachBase, messages: z.array(teachMessageSchema).min(2).max(MAX_TEACH_MESSAGES) })
   .refine((b) => b.messages.some((m) => m.role === "learner"), { message: "nothing was taught", path: ["messages"] });
+
+
+export const bottleneckTaskSchema = z.object({
+  concept: z.string().min(1).max(500),
+  reference: z.array(
+    z.object({
+      front: z.string(),
+      back: z.string(),
+    })
+  ).max(50),
+});
+
+export const bottleneckHintSchema = z.object({
+  state: z.string(),
+});
+
+export const bottleneckGradeSchema = z.object({
+  state: z.string(),
+  answer: z.string().min(1).max(4000),
+});

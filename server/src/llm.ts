@@ -1,3 +1,4 @@
+import { encryptState, decryptState } from "./crypto.js";
 // Server-side LLM proxy. The extension never holds an API key — generation
 // and grading run here with the server's key (LLM_PROVIDER / LLM_API_KEY).
 // Grounded strictly in user-supplied content; never fabricate facts.
@@ -467,5 +468,79 @@ export async function gradeCode(input: {
       note: String(parsed.conciseness || ""),
     },
     feedback: String(parsed.feedback || ""),
+  };
+}
+
+const BOTTLENECK_TASK_PROMPT = `You are an expert systems design interviewer.
+You create a "Find the bottleneck" drill based on the provided concept and reference cards.
+Describe a small, realistic architecture as a short narrative plus a list of components, with traffic numbers.
+Plant ONE distinct architectural flaw (a bottleneck or failure point) drawn from the set's topics.
+
+Reply with a JSON object containing:
+- "narrative": A short paragraph setting the scene and traffic.
+- "architecture": An array of string components (e.g. "Client", "CDN", "API (3x)", "Postgres primary").
+- "planted_flaw": The hidden flaw.
+- "model_solution": How to fix it.
+`;
+
+export async function generateBottleneckTask(concept: string, reference: {front: string, back: string}[]) {
+  const cards = reference.map(c => `Front: ${c.front}\nBack: ${c.back}`).join("\n\n");
+  const user = `Concept:\n${concept}\n\nReference cards:\n${cards}\n\nGenerate the scenario now.`;
+  
+  const parsed = await callJson(BOTTLENECK_TASK_PROMPT, user);
+  
+  const statePayload = {
+    planted_flaw: String(parsed.planted_flaw || "A flaw"),
+    model_solution: String(parsed.model_solution || "A solution"),
+  };
+  
+  return {
+    narrative: String(parsed.narrative || "A system."),
+    architecture: Array.isArray(parsed.architecture) ? parsed.architecture.map(String) : ["System"],
+    state: encryptState(statePayload),
+  };
+}
+
+const BOTTLENECK_HINT_PROMPT = `You are an expert systems design interviewer.
+You are given a planted flaw in an architecture.
+Provide exactly ONE short hint that points the learner in the right direction without naming the flaw directly.
+
+Reply with a JSON object containing:
+- "hint": The short hint string.
+`;
+
+export async function generateBottleneckHint(state: string) {
+  const decoded = decryptState(state);
+  const user = `Planted flaw: ${decoded.planted_flaw}\n\nProvide the hint now.`;
+  const parsed = await callJson(BOTTLENECK_HINT_PROMPT, user);
+  return { hint: String(parsed.hint || "Look closely at the data flow.") };
+}
+
+const BOTTLENECK_GRADE_PROMPT = `You are an expert systems design interviewer.
+You are given a planted flaw and the learner's answer.
+Evaluate the answer on three criteria:
+1. Did they find the planted flaw (or a different, equally valid genuine problem)?
+2. Is their explanation of why it fails correct?
+3. Does their proposed fix actually work?
+
+Reply with a JSON object containing:
+- "found_flaw": boolean
+- "explanation_correct": boolean
+- "fix_works": boolean
+- "feedback": A short constructive sentence.
+`;
+
+export async function gradeBottleneckAnswer(state: string, answer: string) {
+  const decoded = decryptState(state);
+  const user = `Planted flaw: ${decoded.planted_flaw}\nLearner's answer: ${answer}\n\nGrade the answer now.`;
+  const parsed = await callJson(BOTTLENECK_GRADE_PROMPT, user);
+  
+  return {
+    found_flaw: Boolean(parsed.found_flaw),
+    explanation_correct: Boolean(parsed.explanation_correct),
+    fix_works: Boolean(parsed.fix_works),
+    feedback: String(parsed.feedback || "Good attempt."),
+    planted_flaw: decoded.planted_flaw,
+    model_solution: decoded.model_solution,
   };
 }

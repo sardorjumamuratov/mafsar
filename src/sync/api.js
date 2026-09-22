@@ -142,3 +142,14 @@ export function backendTeachTurn(payload) {
 export function backendTeachEvaluate(payload) {
   return post("/v1/teach/evaluate", payload);
 }
+
+
+export function backendBottleneckTask({ concept, reference }) {
+  return post("/v1/bottleneck-task", { concept, reference });
+}
+export function backendBottleneckHint({ state }) {
+  return post("/v1/bottleneck-hint", { state });
+}
+export function backendBottleneckGrade({ state, answer }) {
+  return post("/v1/bottleneck-grade", { state, answer });
+}
