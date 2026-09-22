@@ -4,7 +4,7 @@ import { setFocusReturn } from "../flows/review.js";
 import { showChrome } from "../nav.js";
 import { appendReviewLog, bumpActivity, uid } from "../../storage/store.js";
 import {
-  STUCK_TEXT, canFinish, coverageCount, mergeCoverage, reviewGradeFor, selectTeachCards,
+  STUCK_TEXT, canFinish, coverageCount, mergeCoverage, reviewGradeFor, selectTeachCards, PERSONAS, personaInfo,
 } from "../../storage/teach.js";
 
 // Teach it back (the Feynman technique). One sitting's state; goReturn() nulls it.
@@ -54,7 +54,7 @@ export function paintTeachIntro() {
       <ul class="teach-ideas">${cards.map((c) => `<li>${esc(c.front)}</li>`).join("")}</ul>
       <div class="t-label" style="margin-top:14px">Who are you teaching?</div>
       <div class="qlens" role="radiogroup" aria-label="Who are you teaching?">
-        ${option("child", "A curious 12-year-old")}${option("beginner", "A complete beginner")}
+        ${option("child", PERSONAS.child.emoji + " " + PERSONAS.child.option)}${option("beginner", PERSONAS.beginner.emoji + " " + PERSONAS.beginner.option)}
       </div>
       <textarea id="teachInput" class="sa-input" rows="6" placeholder="Start explaining in your own words…"></textarea>
       <button class="btn btn-primary btn-block" data-action="teach-send">Start teaching</button>
@@ -79,17 +79,22 @@ const bubble = (m) =>
   }${esc(m.text)}</div>`;
 
 export function paintTeachChat() {
-  const { topic, messages, busy, done } = teachState;
+  const { topic, messages, busy, done, persona } = teachState;
   const off = busy ? " disabled" : "";
+  const info = personaInfo(persona);
+  const capitalizedShort = info.short.charAt(0).toUpperCase() + info.short.slice(1);
   setHTML(app, `
     ${progressBar()}
     <div class="rev-body teach">
-      <div class="t-label">Teaching ${esc(topic)}</div>
+      <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:12px">
+        <div class="t-label" style="margin-bottom:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">Teaching ${esc(topic)}</div>
+        <div class="teach-persona-chip tag" aria-label="You're teaching ${esc(info.long)}" title="Chosen at the start. To teach someone else, finish and start again." style="flex-shrink:0;background:var(--surface-2);color:var(--muted);font-size:11px;padding:4px 8px;border-radius:6px;user-select:none">${info.emoji} ${esc(capitalizedShort)}</div>
+      </div>
       <div class="teach-thread" id="teachThread" aria-live="polite">
         ${messages.map(bubble).join("")}
-        ${busy ? `<div class="bubble student typing" aria-label="Thinking"><span></span><span></span><span></span></div>` : ""}
+        ${busy ? `<div class="bubble student typing" aria-label="The ${esc(info.short)} is thinking"><span></span><span></span><span></span></div>` : ""}
       </div>
-      <textarea id="teachInput" class="sa-input" rows="3" placeholder="Answer, or keep explaining…"${off}></textarea>
+      <textarea id="teachInput" class="sa-input" rows="3" placeholder="Answer the ${esc(info.short)}, or keep explaining…"${off}></textarea>
       <div class="teach-actions">
         <button class="btn btn-ghost" data-action="teach-hint"${off}>I'm stuck</button>
         <button class="btn btn-primary" data-action="teach-send"${off}>Send</button>
@@ -160,7 +165,7 @@ export async function finishTeach() {
       <div class="t-label">Teach it back</div>
       <div style="display:flex;align-items:center;gap:10px;margin-top:8px">
         <span class="spinner" style="border-color:var(--border);border-top-color:var(--primary)"></span>
-        <span style="font-size:13px;color:var(--muted)">Looking at how you taught ${esc(s.topic)}…</span>
+        <span style="font-size:13px;color:var(--muted)">Looking at how you taught ${esc(s.topic)} to ${esc(personaInfo(s.persona).long)}…</span>
       </div>
     </div>`);
   const token = (s.token = {});
@@ -217,7 +222,10 @@ export function paintTeachResult() {
   };
   setHTML(app, `
     <div class="view teach-result">
-      <div class="ahd"><div class="h-title">How you taught</div></div>
+      <div class="ahd">
+        <div class="h-title" style="margin-bottom:2px">How you taught</div>
+        <div style="font-size:12px;color:var(--muted);font-weight:normal">${esc(teachState.topic)} &bull; to ${esc(personaInfo(teachState.persona).long)}</div>
+      </div>
       <div class="block teach-score">
         <div class="score tnum ${u >= 70 ? "ok" : "no"}">${esc(u)}</div>
         <div><b>Understanding</b><div class="feedback">${esc(ev.strengths)}</div></div>

@@ -36,3 +36,15 @@ export function canFinish(messages) {
 export function reviewGradeFor(status) {
   return { taught: 4, taught_with_hints: 3, incorrect: 1 }[status] ?? null;
 }
+
+
+export const PERSONAS = {
+  child:    { emoji: "👶", short: "12-year-old", long: "a curious 12-year-old", option: "A curious 12-year-old" },
+  beginner: { emoji: "🐣", short: "beginner",    long: "a complete beginner",   option: "A complete beginner" },
+};
+
+/** Unknown values fall back to child, matching setTeachPersona. */
+export function personaInfo(id) {
+  if (id === "beginner") return PERSONAS.beginner;
+  return PERSONAS.child;
+}
