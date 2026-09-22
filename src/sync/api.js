@@ -160,3 +160,13 @@ export function backendEstimationTask({ concept, reference }) {
 export function backendEstimationSummary({ results }) {
   return post("/v1/estimation-summary", { results });
 }
+
+export function backendBottleneckTask({ concept, reference }) {
+  return post("/v1/bottleneck-task", { concept, reference });
+}
+export function backendBottleneckHint({ state }) {
+  return post("/v1/bottleneck-hint", { state });
+}
+export function backendBottleneckGrade({ state, answer }) {
+  return post("/v1/bottleneck-grade", { state, answer });
+}

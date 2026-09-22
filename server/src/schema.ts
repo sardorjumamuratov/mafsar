@@ -227,3 +227,22 @@ export const estimationSummarySchema = z.object({
     })
   ).max(10),
 });
+
+export const bottleneckTaskSchema = z.object({
+  concept: z.string().min(1).max(500),
+  reference: z.array(
+    z.object({
+      front: z.string(),
+      back: z.string(),
+    })
+  ).max(50),
+});
+
+export const bottleneckHintSchema = z.object({
+  state: z.string(),
+});
+
+export const bottleneckGradeSchema = z.object({
+  state: z.string(),
+  answer: z.string().min(1).max(4000),
+});
