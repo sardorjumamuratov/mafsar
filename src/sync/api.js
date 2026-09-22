@@ -142,3 +142,14 @@ export function backendTeachTurn(payload) {
 export function backendTeachEvaluate(payload) {
   return post("/v1/teach/evaluate", payload);
 }
+
+
+export function backendDesignTask({ concept, reference }) {
+  return post("/v1/design-task", { concept, reference });
+}
+export function backendDesignGrade({ task, answer }) {
+  return post("/v1/design-grade", { task, answer });
+}
+export function backendDesignCurveball({ task, answer }) {
+  return post("/v1/design-curveball", { task, answer });
+}

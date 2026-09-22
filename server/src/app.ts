@@ -15,7 +15,7 @@ import { deleteUserData } from "./account.js";
 import { nowISO, one, all, run, uid } from "./db.js";
 import { retrievability, forgetBy } from "./fsrs.js";
 import { genTeamCode, leaderboardFor, learningFor } from "./teams.js";
-import { generateStudySet, gradeAnswer, generateHypothetical, summarizeConversation, setBlurb, generateCodingTask, gradeCode } from "./llm.js";
+import { generateStudySet, gradeAnswer, generateHypothetical, summarizeConversation, setBlurb, generateCodingTask, gradeCode, generateDesignTask, gradeDesignAnswer, generateDesignCurveball } from "./llm.js";
 import { DEFAULT_LIMITS, clientIp, corsOrigin, limitByIp, limitByUser, slidingWindow, tooMany, type IpSource } from "./ratelimit.js";
 import { MAX_STUDENT_TURNS, evaluateTeaching, studentTurns, teachTurn } from "./teach.js";
 import { PRIVACY_HTML } from "./privacy.js";
@@ -429,6 +429,22 @@ export function createApp(db: DB) {
   // submitted code. Separate routes rather than extending /v1/hypothetical and
   // /v1/grade — the response shapes differ substantially, and those two are already
   // used by the Apply and Type-answers flows.
+  
+  app.post("/v1/design-task", requireQuota(db, "practice"), async (c) => {
+    const body = designTaskSchema.parse(await c.req.json());
+    return c.json(await generateDesignTask(body.concept, body.reference));
+  });
+
+  app.post("/v1/design-grade", limitByUser(limits.llmPerUser), async (c) => {
+    const body = designGradeSchema.parse(await c.req.json());
+    return c.json(await gradeDesignAnswer(body.task, body.answer));
+  });
+
+  app.post("/v1/design-curveball", limitByUser(limits.llmPerUser), async (c) => {
+    const body = designCurveballSchema.parse(await c.req.json());
+    return c.json(await generateDesignCurveball(body.task, body.answer));
+  });
+
   app.post("/v1/coding-task", requireQuota(db, "coding"), async (c) => {
     const body = codingTaskSchema.parse(await c.req.json());
     return c.json(await generateCodingTask(body.concept, body.reference, body.language));

@@ -1,3 +1,4 @@
+import { startDesignDrill, submitDesign, requestDesignCurveball, submitDesignCurveball } from "./flows/design.js";
 import { confirmDeleteAccount, renderDeleteAccount } from "./views/delete-account.js";
 import { doImport, previewImport, renderImport } from "./views/import.js";
 import { app, bundle, nav, send, setFor, toast } from "./core.js";
@@ -107,6 +108,10 @@ document.addEventListener("click", (e) => {
       })().catch(e => toast(e.message));
       break;
     case "start-coding": startCodingPractice(id); break;
+    case "start-design": startDesignDrill(id); break;
+    case "design-submit": submitDesign(); break;
+    case "design-curveball": requestDesignCurveball(); break;
+    case "design-submit-curveball": submitDesignCurveball(); break;
     case "start-teach": startTeach(id); break;
     case "teach-persona": setTeachPersona((/** @type {any} */ (t)).dataset.persona); break;
     case "teach-send": sendTeach(false); break;

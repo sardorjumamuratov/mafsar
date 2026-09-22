@@ -179,6 +179,7 @@ export function paintDetail() {
           ${[
             ["general", "General", "Flashcards, quiz, written answers"],
             ["coding", "Coding", "Review swaps in small coding tasks"],
+              ["design", "System design", "Design drills with curveballs"],
           ]
             .map(
               ([id, label, hint]) =>
