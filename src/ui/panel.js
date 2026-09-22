@@ -55,7 +55,7 @@ document.addEventListener("click", (e) => {
       break;
     case "start-review": startGlobalReview(); break;
     case "set-review": startSetReview(id); break;
-      case "chain-drill": startChainDrill(id); break;
+      case "start-chain-drill": startChainDrill(id); break;
     case "flip": revealCard(); break;
     case "grade": gradeCard(Number((/** @type {any} */ (t)).dataset.g)); break;
     case "billing-portal":
@@ -113,6 +113,7 @@ document.addEventListener("click", (e) => {
       })().catch(e => toast(e.message));
       break;
     case "start-coding": startCodingPractice(id); break;
+    case "start-clinical-case": startDesignDrill(id, "clinical"); break;
     case "start-design": startDesignDrill(id); break;
     case "design-submit": submitDesign(); break;
     case "design-curveball": requestDesignCurveball(); break;

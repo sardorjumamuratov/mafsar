@@ -110,6 +110,11 @@ export function paintDetail() {
       </div>
       <button class="btn btn-ghost btn-block" data-action="start-teach" data-id="${esc(session.id)}">🧒 Teach it back</button>
       ${studySet.mode === "coding" ? `<button class="btn btn-ghost btn-block" data-action="start-coding" data-id="${esc(session.id)}">⌨️ Coding exercises</button>` : ""}
+      ${studySet.mode === "medicine" ? `<div class="block drill-block">
+          <div class="t-label">Medicine practice</div>
+          <button class="btn btn-ghost btn-block" data-action="start-chain-drill" data-id="${esc(session.id)}">Chain drill</button>
+          <button class="btn btn-ghost btn-block" data-action="start-clinical-case" data-id="${esc(session.id)}">Clinical case</button>
+        </div>` : ""}
       ${studySet.mode === "design" ? `<div class="block drill-block">
           <div class="t-label">System design practice</div>
           <button class="btn btn-ghost btn-block" data-action="start-design" data-id="${esc(session.id)}">🏗️ Design drill</button>

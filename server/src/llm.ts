@@ -570,7 +570,33 @@ two explicit constraints. Also list 4-7 rubric points a strong answer covers.
 Respond with ONLY valid JSON:
 { "brief": string, "rubric": [string] }`;
 
-export async function generateDesignTask(concept: string, reference: Ref[]) {
+export async function generateDesignTask(concept: string, reference: Ref[], mode?: string) {
+  if (mode === "clinical") {
+    const CLINICAL_TASK_PROMPT = `You are a medical case generator. 
+Based on the provided mechanism chain, write a short clinical vignette (age, presenting complaint, relevant history, examination findings). It must read like a real case, not a quiz question.
+Do not introduce findings, tests, or treatments that contradict the source. Do not specify doses unless given.
+Provide a list of plausible tests (investigations), and their expected results for this case.
+
+Respond with ONLY valid JSON:
+{ 
+  "vignette": string,
+  "tests": [{ "name": string, "result": string }],
+  "diagnosis": string,
+  "management": string
+}`;
+    const parsed = await callJson(CLINICAL_TASK_PROMPT, `Chain: ${concept}\n\nStudy cards:\n${refText(reference)}`);
+    const brief = str(parsed?.vignette, 1500);
+    if (!brief) throw new LLMError("The model didn't return a vignette. Try again.");
+    const secret = {
+      tests: Array.isArray(parsed?.tests) ? parsed.tests.map((t: any) => ({ name: str(t.name, 100), result: str(t.result, 300) })) : [],
+      diagnosis: str(parsed?.diagnosis, 500),
+      management: str(parsed?.management, 500),
+      chain: concept
+    };
+    const rubric = secret.tests.map((t: any) => t.name);
+    return { brief, rubric, state: encryptState(secret) };
+  }
+
   const parsed = await callJson(DESIGN_TASK_PROMPT, `Topic: ${concept}\n\nStudy cards:\n${refText(reference)}`);
   const brief = str(parsed?.brief, 1500);
   if (!brief) throw new LLMError("The model didn't return a design brief. Try again.");
@@ -597,8 +623,53 @@ Respond with ONLY valid JSON:
 "sections" uses these names: ${DESIGN_SECTIONS.join(", ")}. Omit "sections" when grading a curveball.`;
 
 export async function gradeDesignAnswer(input: {
-  task: string; answer: string; rubric?: string[]; curveball?: string; originalAnswer?: string;
+  task: string; answer: string; rubric?: string[]; curveball?: string; originalAnswer?: string; mode?: string; state?: string;
 }) {
+  if (input.mode === "clinical" && input.state) {
+    const state = decryptState(input.state);
+    const CLINICAL_GRADE_PROMPT = `You are a clinical educator grading a learner's clinical case performance.
+The case vignette:
+${input.task}
+
+The reference diagnosis and management:
+Diagnosis: ${state.diagnosis}
+Management: ${state.management}
+Reference chain: ${state.chain}
+
+Learner's initial reasoning and requested tests:
+${input.originalAnswer || "(none)"}
+
+Learner's final diagnosis and management:
+${input.answer}
+
+Grade how well the learner identified the diagnosis, requested appropriate tests, and planned management, mapping their reasoning back to the reference chain.
+For each key link in the reference chain (e.g. trigger -> inflammation -> wheeze), evaluate if the learner used it correctly, skipped it, or got it wrong.
+Provide one concrete thing to do next time.
+
+Respond with ONLY valid JSON:
+{
+  "rubric_evaluation": [{ "point": string, "status": "covered" | "partial" | "missed", "note": string }],
+  "sections": [{ "section": string, "verdict": "strong" | "ok" | "weak" | "missing", "note": string }],
+  "next_time": string
+}`;
+    const parsed = await callJson(CLINICAL_GRADE_PROMPT, `Grade the learner.`);
+    const rubric_evaluation = (Array.isArray(parsed?.rubric_evaluation) ? parsed.rubric_evaluation : [])
+      .slice(0, 10)
+      .map((r: any) => ({
+        point: str(r?.point, 300, "A rubric point"),
+        status: (COVERAGE as readonly string[]).includes(r?.status) ? r.status : "missed",
+        note: str(r?.note, 300),
+      }));
+    const sections = (Array.isArray(parsed?.sections) ? parsed.sections : [])
+      .slice(0, 5)
+      .map((x: any) => ({
+        section: str(x?.section, 100, "Section"),
+        verdict: (VERDICTS as readonly string[]).includes(x?.verdict) ? x.verdict : "missing",
+        note: str(x?.note, 1000),
+      }));
+    return { rubric_evaluation, sections, next_time: str(parsed?.next_time, 500) };
+  }
+
   const parts = [
     `Brief:\n${input.task}`,
     `Rubric:\n${(input.rubric || []).map((r) => `- ${r}`).join("\n") || "(derive from the brief)"}`,
@@ -639,7 +710,26 @@ ${DRILL_RULES}
 
 Respond with ONLY valid JSON: { "curveball": string }`;
 
-export async function generateDesignCurveball(task: string, answer: string, previous: string[] = []) {
+export async function generateDesignCurveball(task: string, answer: string, previous: string[] = [], mode?: string, stateToken?: string) {
+  if (mode === "clinical" && stateToken) {
+    const state = decryptState(stateToken);
+    const CLINICAL_CURVEBALL_PROMPT = `You are a clinical simulator.
+The learner has provided their leading diagnosis and requested tests.
+The true test results for this case are:
+${JSON.stringify(state.tests)}
+
+If the learner requested tests from this list, provide their results. If they requested irrelevant tests, gently note they are unremarkable or not indicated.
+Do NOT reveal the final diagnosis or management yet.
+End with: "Now provide your final diagnosis and first-line management."
+
+Respond with ONLY valid JSON: { "curveball": string }`;
+    const user = `Vignette:\n${task}\n\nLearner's answer (diagnosis and requested tests):\n${answer}`;
+    const parsed = await callJson(CLINICAL_CURVEBALL_PROMPT, user);
+    const curveball = str(parsed?.curveball, 600);
+    if (!curveball) throw new LLMError("The model didn't return a curveball. Try again.");
+    return { curveball };
+  }
+
   const user = `Brief:\n${task}\n\nLearner's design:\n${answer}\n\nPrevious curveballs:\n${previous.map((p) => `- ${p}`).join("\n") || "(none)"}`;
   const parsed = await callJson(DESIGN_CURVEBALL_PROMPT, user);
   const curveball = str(parsed?.curveball, 600);
