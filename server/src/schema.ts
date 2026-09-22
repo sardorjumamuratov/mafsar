@@ -246,3 +246,22 @@ export const bottleneckGradeSchema = z.object({
   state: z.string(),
   answer: z.string().min(1).max(4000),
 });
+
+export const chainSchema = z.object({
+  id: z.string().min(1),
+  setId: z.string().min(1),
+  template: z.string().min(1),
+  title: z.string(),
+  updatedAt: z.string().min(1),
+  deleted: z.boolean().optional()
+});
+
+export const chainStepSchema = z.object({
+  id: z.string().min(1),
+  chainId: z.string().min(1),
+  key: z.string().min(1),
+  statement: z.string(),
+  why: z.string(),
+  updatedAt: z.string().min(1),
+  deleted: z.boolean().optional()
+});

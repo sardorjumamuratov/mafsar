@@ -47,6 +47,7 @@ async function generateForSession(session, mode) {
     updatedAt: new Date(now).toISOString(),
     ...initSchedule(now),
   }));
+  generated.chains = generated.chains || [];
   generated.quiz = (generated.quiz || []).map((q) => ({
     id: uid(),
     q: String(q.q),
@@ -78,6 +79,39 @@ async function saveGeneratedStudySet(session, generated) {
         ? { ...c, easiness: old.easiness, interval: old.interval, repetitions: old.repetitions, dueDate: old.dueDate, stability: old.stability, difficulty: old.difficulty, state: old.state, lapses: old.lapses, lastReview: old.lastReview }
         : c;
   });
+  
+  const existingChainsByTitle = new Map(
+    (existing?.chains || [])
+      .filter((ch) => !ch.deleted)
+      .map((ch) => [String(ch.title).trim().toLowerCase(), ch])
+  );
+  
+  const chains = (generated.chains || []).map((ch) => {
+    const oldChain = existingChainsByTitle.get(String(ch.title).trim().toLowerCase());
+    if (!oldChain) {
+      return { id: uid(), template: "medicine-condition", title: ch.title, steps: (ch.steps || []).map(s => ({ id: uid(), key: s.key, statement: s.statement, why: s.why })) };
+    }
+    // merge steps
+    const newSteps = [];
+    const oldStepsByKey = new Map((oldChain.steps || []).filter(s => !s.deleted).map(s => [s.key, s]));
+    for (const newStep of ch.steps || []) {
+      const oldStep = oldStepsByKey.get(newStep.key);
+      if (oldStep && oldStep.editedAt) {
+        newSteps.push(oldStep); // keep manual edits
+      } else {
+        newSteps.push({ id: oldStep ? oldStep.id : uid(), key: newStep.key, statement: newStep.statement, why: newStep.why });
+      }
+      oldStepsByKey.delete(newStep.key);
+    }
+    // Also include any user-edited steps that weren't in the new generated output
+    for (const oldStep of oldStepsByKey.values()) {
+      if (oldStep.editedAt) {
+        newSteps.push(oldStep);
+      }
+    }
+    return { ...oldChain, title: ch.title, steps: newSteps };
+  });
+
   return saveStudySet({
     sessionId: session.id,
     title: existing?.title ?? session.title,

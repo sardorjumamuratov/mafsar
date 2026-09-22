@@ -179,7 +179,8 @@ export function paintDetail() {
           ${[
             ["general", "General", "Flashcards, quiz, written answers"],
             ["coding", "Coding", "Review swaps in small coding tasks"],
-              ["design", "System design", "Design drills with curveballs"],
+            ["design", "System design", "Design drills with curveballs"],
+            ["medicine", "Medicine", "Mechanism chains per condition"],
           ]
             .map(
               ([id, label, hint]) =>
@@ -194,6 +195,20 @@ export function paintDetail() {
       </div>
 
 `;
+  }
+
+  
+  let medicineBanner = "";
+  if (studySet && studySet.suggestMedicineMode && !studySet.dismissedMedicine && studySet.mode !== "medicine") {
+    medicineBanner = `
+      <div class="block tint" style="margin-bottom:12px;display:flex;flex-direction:column;gap:12px">
+        <div style="font-size:14px">This looks like medicine. Organise it as mechanism chains?</div>
+        <div style="display:flex;gap:10px">
+          <button class="btn btn-ghost btn-sm" style="flex:1" data-action="dismiss-medicine" data-id="${esc(session.id)}">Not now</button>
+          <button class="btn btn-primary btn-sm" style="flex:1" data-action="set-mode" data-id="${esc(session.id)}" data-mode="medicine">Use Medicine mode</button>
+        </div>
+      </div>
+    `;
   }
 
   setHTML(app, `
@@ -234,9 +249,11 @@ export function paintDetail() {
                <button data-action="tab" data-tab="cards" class="${tab === "cards" ? "on" : ""}">Flashcards</button>
                <button data-action="tab" data-tab="quiz" class="${tab === "quiz" ? "on" : ""}">Quiz</button>
                <button data-action="tab" data-tab="summary" class="${tab === "summary" ? "on" : ""}">Summary</button>
+               ${studySet.mode === "medicine" ? `<button data-action="tab" data-tab="chains" class="${tab === "chains" ? "on" : ""}">Chains</button>` : ""}
              </div>`
           : ""
       }
+      ${medicineBanner}
       ${body}
     </div>
     ${

@@ -199,7 +199,36 @@ const MIGRATIONS: string[] = [
     ALTER TABLE review_log ADD COLUMN kind TEXT NOT NULL DEFAULT 'flashcard';
     ALTER TABLE review_log ADD COLUMN stability REAL;
     ALTER TABLE review_log ADD COLUMN difficulty REAL;`
-];
+
+  ,
+  `
+  CREATE TABLE chains (
+    id TEXT PRIMARY KEY,
+    set_id TEXT NOT NULL REFERENCES sets(id),
+    user_id TEXT NOT NULL REFERENCES users(id),
+    template TEXT NOT NULL,
+    title TEXT NOT NULL,
+    updated_at TEXT NOT NULL,
+    server_updated_at TEXT NOT NULL,
+    deleted INTEGER NOT NULL DEFAULT 0
+  );
+  CREATE INDEX idx_chains_user_server_updated ON chains(user_id, server_updated_at);
+
+  CREATE TABLE chain_steps (
+    id TEXT PRIMARY KEY,
+    chain_id TEXT NOT NULL REFERENCES chains(id) ON DELETE CASCADE,
+    user_id TEXT NOT NULL REFERENCES users(id),
+    key TEXT NOT NULL,
+    statement TEXT NOT NULL,
+    why TEXT NOT NULL,
+    updated_at TEXT NOT NULL,
+    server_updated_at TEXT NOT NULL,
+    deleted INTEGER NOT NULL DEFAULT 0
+  );
+  CREATE INDEX idx_chain_steps_user_server_updated ON chain_steps(user_id, server_updated_at);
+  `
+  ];
+  
 
 export async function migrate(db: DB): Promise<void> {
   await db.execute(

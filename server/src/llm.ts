@@ -199,7 +199,8 @@ Respond with ONLY valid JSON, no markdown fences, matching exactly:
 {
   "flashcards": [{ "front": string, "back": string }],
   "quiz": [{ "q": string, "options": [string, string, string, string], "answer": number, "explain": string }],
-  "mode": "coding" | "general"
+  "mode": "coding" | "general",
+    "suggest_medicine_mode": boolean
 }`;
 
 const GRADE_PROMPT = `You are a fair, concise exam grader. You get a question, the reference
