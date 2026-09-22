@@ -529,3 +529,48 @@ export async function generateDesignCurveball(task: string, answer: string) {
     curveball: String(parsed.curveball || "What if traffic increases 10x?"),
   };
 }
+
+const ESTIMATION_TASK_PROMPT = `You are an expert systems design interviewer.
+You write 5 back-of-the-envelope estimation questions based on the provided concept and reference cards.
+Each question must be a short scenario asking for a single numeric answer (with units), e.g., "How much storage do 5 years of tweets need?" or "QPS for 50M DAU at 20 requests each?"
+
+Reply with a JSON object containing:
+- "questions": an array of 5 objects, each with:
+  - "question": the question text.
+  - "reference_value": the exact numeric answer (a number, not a string).
+  - "reference_unit": the unit of the answer (e.g. "GB", "QPS", "B/s").
+  - "worked_solution": a step-by-step explanation of the calculation.
+`;
+
+export async function generateEstimationTasks(concept: string, reference: {front: string, back: string}[]) {
+  const cards = reference.map(c => `Front: ${c.front}\nBack: ${c.back}`).join("\n\n");
+  const user = `Concept:\n${concept}\n\nReference cards:\n${cards}\n\nWrite the estimation questions now.`;
+  
+  const parsed = await callJson(ESTIMATION_TASK_PROMPT, user);
+  const questions = Array.isArray(parsed.questions) ? parsed.questions : [];
+  return {
+    questions: questions.slice(0, 5).map((q: any) => ({
+      question: String(q.question || "A question"),
+      reference_value: Number(q.reference_value) || 0,
+      reference_unit: String(q.reference_unit || ""),
+      worked_solution: String(q.worked_solution || "Math."),
+    })),
+  };
+}
+
+const ESTIMATION_SUMMARY_PROMPT = `You are an expert systems design interviewer.
+You review a candidate's performance on 5 estimation questions.
+Provide a single, constructive sentence summarizing their performance and the single most useful habit to fix.
+
+Reply with a JSON object containing:
+- "habit_to_fix": the single sentence of feedback.
+`;
+
+export async function generateEstimationSummary(results: any[]) {
+  const user = `Performance:\n${JSON.stringify(results, null, 2)}\n\nProvide the feedback now.`;
+  const parsed = await callJson(ESTIMATION_SUMMARY_PROMPT, user);
+  
+  return {
+    habit_to_fix: String(parsed.habit_to_fix || "Keep practicing your estimations."),
+  };
+}

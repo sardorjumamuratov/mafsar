@@ -205,3 +205,24 @@ export const designCurveballSchema = z.object({
   task: z.string().min(1).max(2000),
   answer: z.string().min(1).max(4000),
 });
+
+export const estimationTaskSchema = z.object({
+  concept: z.string().min(1).max(500),
+  reference: z.array(
+    z.object({
+      front: z.string(),
+      back: z.string(),
+    })
+  ).max(50),
+});
+
+export const estimationSummarySchema = z.object({
+  results: z.array(
+    z.object({
+      question: z.string(),
+      expected: z.string(),
+      answer: z.string(),
+      grade: z.string()
+    })
+  ).max(10),
+});

@@ -153,3 +153,10 @@ export function backendDesignGrade({ task, answer }) {
 export function backendDesignCurveball({ task, answer }) {
   return post("/v1/design-curveball", { task, answer });
 }
+
+export function backendEstimationTask({ concept, reference }) {
+  return post("/v1/estimation-task", { concept, reference });
+}
+export function backendEstimationSummary({ results }) {
+  return post("/v1/estimation-summary", { results });
+}
