@@ -15,7 +15,15 @@ export const SECTIONS = [
   { key: "bottlenecks", title: "Bottlenecks & trade-offs", hint: "What breaks first, and what you chose not to do." },
 ];
 
-export function emptySections() {
+export const CLINICAL_SECTIONS = [
+  { key: "leading", title: "Leading diagnosis & why", hint: "What is your leading diagnosis and reasoning?" },
+];
+export const CLINICAL_FINAL_SECTIONS = [
+  { key: "final", title: "Final diagnosis & management", hint: "What is your final diagnosis and treatment?" }
+];
+
+export function emptySections(mode) {
+  if (mode === "clinical") return { leading: "" };
   return Object.fromEntries(SECTIONS.map((s) => [s.key, ""]));
 }
 
@@ -23,8 +31,9 @@ export function emptySections() {
  * The answer sent for grading: filled sections under their titles. Never
  * truncated here; the caller checks the length and tells the learner.
  */
-export function assembleAnswer(sections) {
-  return SECTIONS
+export function assembleAnswer(sections, mode) {
+  const arr = mode === "clinical" ? CLINICAL_SECTIONS.concat(CLINICAL_FINAL_SECTIONS) : SECTIONS;
+  return arr
     .map(({ key, title }) => [title, String((sections || {})[key] || "").trim()])
     .filter(([, text]) => text)
     .map(([title, text]) => `${title}:\n${text}`)

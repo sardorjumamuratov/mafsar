@@ -13,6 +13,7 @@ import { captureCurrent, captureLastAnswer } from "./capture.js";
 import { deleteCard, deleteSession, saveStudySet, setExamDate } from "../storage/store.js";
 import { review } from "../../shared/srs.js";
 import { applyNext, goReturn, gradeCard, revealCard, startGlobalReview, startSetReview } from "./flows/review.js";
+import { startChainDrill } from "./flows/chain-drill.js";
 import { confirmSheet } from "./confirm.js";
 import { dismissUpdateBanner } from "./update-banner.js";
 import { authGoogle, authSubmit, exportBackup, exportSetTsv, generateSummary, googleAbortController, importBackupFile, renderAuthGate, renderYou } from "./views/you.js";
@@ -54,6 +55,7 @@ document.addEventListener("click", (e) => {
       break;
     case "start-review": startGlobalReview(); break;
     case "set-review": startSetReview(id); break;
+      case "start-chain-drill": startChainDrill(id); break;
     case "flip": revealCard(); break;
     case "grade": gradeCard(Number((/** @type {any} */ (t)).dataset.g)); break;
     case "billing-portal":
@@ -111,6 +113,7 @@ document.addEventListener("click", (e) => {
       })().catch(e => toast(e.message));
       break;
     case "start-coding": startCodingPractice(id); break;
+    case "start-clinical-case": startDesignDrill(id, "clinical"); break;
     case "start-design": startDesignDrill(id); break;
     case "design-submit": submitDesign(); break;
     case "design-curveball": requestDesignCurveball(); break;

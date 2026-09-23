@@ -13,7 +13,7 @@ import {
 export let designState = null;
 export function setDesignState(v) { designState = v; }
 
-export async function startDesignDrill(sessionId) {
+export async function startDesignDrill(sessionId, forceMode) {
   const { sessions, studySets } = await bundle();
   const set = setFor(sessionId, studySets);
   const cards = (set?.flashcards || []).filter((c) => c.front && c.back).slice(0, 50);
@@ -25,7 +25,8 @@ export async function startDesignDrill(sessionId) {
     cards: cards.map((c) => ({ front: String(c.front).slice(0, 500), back: String(c.back).slice(0, 2000) })),
     brief: null,
     rubric: [],
-    sections: emptySections(),
+    mode: forceMode || "design",
+    sections: emptySections(forceMode || "design"),
     grading: null,
     curveballs: [],
     logged: false,
@@ -37,9 +38,10 @@ export async function startDesignDrill(sessionId) {
   paintLoader("Writing a brief…");
   const token = (s.token = {});
   try {
-    const res = await send({ type: "DESIGN_TASK", concept: s.topic, reference: s.cards });
+    const res = await send({ type: "DESIGN_TASK", concept: s.topic, reference: s.cards, mode: s.mode });
     if (designState !== s || s.token !== token) return;
     s.brief = res.brief;
+    s.encryptedState = res.state;
     s.rubric = Array.isArray(res.rubric) ? res.rubric : [];
     paintForm();
   } catch (e) {
@@ -74,7 +76,7 @@ function counter(len) {
 
 function paintForm() {
   const s = designState;
-  const len = assembleAnswer(s.sections).length;
+  const len = assembleAnswer(s.sections, s.mode).length;
   setHTML(app, `
     <div class="rev-top">${XBTN}</div>
     <div class="rev-body teach">
@@ -97,7 +99,7 @@ function paintForm() {
     box.addEventListener("input", () => {
       s.sections[box.dataset.key] = box.value;
       const out = document.getElementById("designCount");
-      if (out) setHTML(out, counter(assembleAnswer(s.sections).length));
+      if (out) setHTML(out, counter(assembleAnswer(s.sections, s.mode).length));
     });
   });
 }
@@ -105,7 +107,7 @@ function paintForm() {
 export async function submitDesign() {
   const s = designState;
   if (!s) return;
-  const answer = assembleAnswer(s.sections);
+  const answer = assembleAnswer(s.sections, s.mode);
   if (!answer) return toast("Write at least one section.");
   if (answerTooLong(answer)) return toast(`Your design is over ${MAX_DESIGN_CHARS.toLocaleString()} characters. Trim it first.`);
   paintLoader("Reviewing your design…");
@@ -166,7 +168,7 @@ export async function requestDesignCurveball() {
     const res = await send({
       type: "DESIGN_CURVEBALL",
       task: s.brief,
-      answer: assembleAnswer(s.sections),
+      answer: assembleAnswer(s.sections, s.mode),
       previous: s.curveballs.map((c) => c.question),
     });
     if (designState !== s || s.token !== token) return;
@@ -211,7 +213,7 @@ export async function submitDesignCurveball() {
       rubric: [],
       answer,
       curveball: cb.question,
-      originalAnswer: assembleAnswer(s.sections),
+      originalAnswer: assembleAnswer(s.sections, s.mode),
     });
     if (designState !== s || s.token !== token) return;
     cb.grading = res;

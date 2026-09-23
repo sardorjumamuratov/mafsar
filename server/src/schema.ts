@@ -218,7 +218,7 @@ const drillReference = z.array(z.object({ front: z.string().max(500), back: z.st
 const drillSource = { concept: z.string().min(1).max(500), reference: drillReference };
 export const MAX_DESIGN_ANSWER = 4000;
 
-export const designTaskSchema = z.object(drillSource);
+export const designTaskSchema = z.object({ ...drillSource, mode: z.string().optional() });
 
 /** Grades the first answer, or (with curveball) the adaptation to a curveball. */
 export const designGradeSchema = z.object({

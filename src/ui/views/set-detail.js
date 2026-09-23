@@ -110,6 +110,11 @@ export function paintDetail() {
       </div>
       <button class="btn btn-ghost btn-block" data-action="start-teach" data-id="${esc(session.id)}">🧒 Teach it back</button>
       ${studySet.mode === "coding" ? `<button class="btn btn-ghost btn-block" data-action="start-coding" data-id="${esc(session.id)}">⌨️ Coding exercises</button>` : ""}
+      ${studySet.mode === "medicine" ? `<div class="block drill-block">
+          <div class="t-label">Medicine practice</div>
+          <button class="btn btn-ghost btn-block" data-action="start-chain-drill" data-id="${esc(session.id)}">Chain drill</button>
+          <button class="btn btn-ghost btn-block" data-action="start-clinical-case" data-id="${esc(session.id)}">Clinical case</button>
+        </div>` : ""}
       ${studySet.mode === "design" ? `<div class="block drill-block">
           <div class="t-label">System design practice</div>
           <button class="btn btn-ghost btn-block" data-action="start-design" data-id="${esc(session.id)}">🏗️ Design drill</button>
@@ -426,6 +431,8 @@ function chainsTabHtml(sessionId, studySet) {
       const { filled, total } = chainCoverage(ch);
       const rows = orderedSteps(ch)
         .map(({ key, label, step }, i) => {
+          const prevKey = i ? orderedSteps(ch)[i - 1].key : "";
+          const linkId = i ? `chainlink:${ch.id}:${prevKey}:${key}` : "";
           const edit = `data-action="chain-edit" data-id="${esc(sessionId)}" data-chain="${esc(ch.id)}" data-key="${esc(key)}"`;
           const arrow = i ? `<li class="chain-arrow" aria-hidden="true">↓</li>` : "";
           if (!step) {
@@ -435,7 +442,7 @@ function chainsTabHtml(sessionId, studySet) {
                 <button class="linkbtn" ${edit} aria-label="Add ${esc(label)}">Add</button>
               </li>`;
           }
-          return `${arrow}<li class="chain-step">
+          return `${arrow}<li class="chain-step" data-card-id="${esc(linkId)}">
               <span class="chain-label">${esc(label)}</span>
               <details class="chain-body">
                 <summary class="chain-text">${esc(step.statement)}</summary>
