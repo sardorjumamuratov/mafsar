@@ -1,3 +1,4 @@
+import { startCompare, selectComparePair, toggleCompareSame, createForkCards } from "./flows/compare.js";
 import { finishDesignDrill, requestDesignCurveball, startDesignDrill, submitDesign, submitDesignCurveball } from "./flows/design.js";
 import { estimationNext, startEstimationDrill, submitEstimation } from "./flows/estimation.js";
 import { requestBottleneckHint, startBottleneckDrill, submitBottleneck } from "./flows/bottleneck.js";
@@ -56,6 +57,10 @@ document.addEventListener("click", (e) => {
     case "start-review": startGlobalReview(); break;
     case "set-review": startSetReview(id); break;
       case "start-chain-drill": startChainDrill(id); break;
+      case "start-compare": startCompare(id); break;
+      case "compare-select": selectComparePair((/** @type {any} */ (t)).dataset.id1, (/** @type {any} */ (t)).dataset.id2); break;
+      case "compare-toggle": toggleCompareSame((/** @type {any} */ (t)).dataset.key); break;
+      case "compare-fork-cards": createForkCards(); break;
     case "flip": revealCard(); break;
     case "grade": gradeCard(Number((/** @type {any} */ (t)).dataset.g)); break;
     case "billing-portal":

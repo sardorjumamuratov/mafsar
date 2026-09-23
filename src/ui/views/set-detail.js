@@ -119,6 +119,7 @@ export function paintDetail() {
           <div class="t-label">Medicine practice</div>
           <button class="btn btn-ghost btn-block" data-action="start-chain-drill" data-id="${esc(session.id)}">Chain drill</button>
           <button class="btn btn-ghost btn-block" data-action="start-clinical-case" data-id="${esc(session.id)}">Clinical case</button>
+          ${(studySet.chains && Object.keys(studySet.chains).length >= 2) ? `<button class="btn btn-ghost btn-block" data-action="start-compare" data-id="${esc(session.id)}">Compare differentials</button>` : ""}
         </div>` : ""}
       ${studySet.mode === "design" ? `<div class="block drill-block">
           <div class="t-label">System design practice</div>

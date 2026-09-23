@@ -57,6 +57,10 @@ test("the stuck message is fixed text", () => {
 });
 
 
+test("personaInfo handles patient", () => {
+  assert.equal(personaInfo("patient").short, "patient");
+});
+
 test("personaInfo falls back to child", () => {
   assert.equal(personaInfo("child").short, "12-year-old");
   assert.equal(personaInfo("beginner").short, "beginner");

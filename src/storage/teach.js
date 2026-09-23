@@ -41,10 +41,12 @@ export function reviewGradeFor(status) {
 export const PERSONAS = {
   child:    { emoji: "🧒", short: "12-year-old", long: "a curious 12-year-old", option: "A curious 12-year-old" },
   beginner: { emoji: "🙋", short: "beginner",    long: "a complete beginner",   option: "A complete beginner" },
+  patient:  { emoji: "🧑‍⚕️", short: "patient",     long: "a worried patient",     option: "A worried patient" },
 };
 
 /** Unknown values fall back to child, matching setTeachPersona. */
 export function personaInfo(id) {
   if (id === "beginner") return PERSONAS.beginner;
+  if (id === "patient") return PERSONAS.patient;
   return PERSONAS.child;
 }
