@@ -1,5 +1,5 @@
 
-import { app, bundle, esc, setHTML, setFor, send, toast } from "../core.js";
+import { XBTN, app, bundle, esc, setHTML, setFor, send, toast } from "../core.js";
 import { appendReviewLog, bumpActivity, updateCard } from "../../storage/store.js";
 import { orderedSteps } from "../../storage/chains.js";
 import { linkId } from "../../storage/chain-links.js";
@@ -60,7 +60,7 @@ function finishDrill(failedLinks) {
   
   setHTML(app, `
     <div class="view" style="padding:16px; overflow-y:auto; padding-bottom:100px;">
-      <div class="h-title" style="margin-bottom:16px">Drill complete</div>
+      <div class="ahd"><div class="h-title">Drill complete</div></div>
       <div class="help" style="margin-bottom:16px">${esc(takeaway)}</div>
       <div class="block chain">
         <ol class="chain-steps">
@@ -124,7 +124,8 @@ function renderRebuild() {
   }).join("");
   
   setHTML(app, `
-    <div class="view" style="padding:16px; overflow-y:auto; padding-bottom:100px;">
+    <div class="rev-top">${XBTN}</div>
+    <div class="rev-body" style="padding-bottom:100px;">
       <div class="h-title" style="margin-bottom:16px">Rebuild the chain</div>
       <div class="help">Tap the next step in the sequence.</div>
       <div class="block chain" style="margin-bottom:20px;min-height:40px;border:1px dashed var(--border);padding:10px;border-radius:8px">
@@ -193,7 +194,8 @@ function renderGap() {
   }).join("");
 
   setHTML(app, `
-    <div class="view" style="padding:16px; overflow-y:auto; padding-bottom:100px;">
+    <div class="rev-top">${XBTN}</div>
+    <div class="rev-body" style="padding-bottom:100px;">
       <div class="h-title" style="margin-bottom:16px">Fill the gap</div>
       <div class="block chain">
         ${stepsHtml}
@@ -259,7 +261,8 @@ function renderBackwards() {
   }
 
   setHTML(app, `
-    <div class="view" style="padding:16px; overflow-y:auto; padding-bottom:100px;">
+    <div class="rev-top">${XBTN}</div>
+    <div class="rev-body" style="padding-bottom:100px;">
       <div class="h-title" style="margin-bottom:16px">Work backwards</div>
       <div class="help">What directly causes or precedes the step below?</div>
       <div class="block chain">

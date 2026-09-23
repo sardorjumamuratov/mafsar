@@ -882,6 +882,21 @@ test("one account's sets are never uploaded to another without an answer", () =>
   assert.ok(you.includes("${esc(email"), "the account email is interpolated, so it must be escaped");
 });
 
+test("every drill screen opens with a header, and the chain drill has a way out", () => {
+  // A focus view that starts with bare content sits flush against the browser's
+  // own side-panel bar, which reads as a seam; and a drill with no close button
+  // stranded the learner in it.
+  for (const flow of ["chain-drill", "compare", "design", "estimation", "bottleneck"]) {
+    const src = readSrc("../src/ui/flows/" + flow + ".js");
+    for (const m of src.matchAll(/setHTML\(app, `/g)) {
+      const head = src.slice(m.index, m.index + 160);
+      assert.ok(/rev-top|ahd|progressBar\(\)/.test(head), flow + ".js paints a view with no header");
+    }
+  }
+  const drill = readSrc("../src/ui/flows/chain-drill.js");
+  assert.ok(drill.includes("${XBTN}"), "the chain drill needs the same close button as every other drill");
+});
+
 console.log(`\n${passed} tests passed`);
 
 
