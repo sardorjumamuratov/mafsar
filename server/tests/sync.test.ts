@@ -30,6 +30,34 @@ describe("auth", () => {
 });
 
 describe("sync", () => {
+
+  it("preserves chainOverrides when an old client omits them, but overwrites them when a new client sends them", async () => {
+    const user = await register(db, USER.email, USER.password);
+    const userId = user!.id;
+    
+    // New client sends overrides
+    await applySync(db, userId, baseBody({
+      sets: [{ id: "set1", title: "s1", createdAt: "t0", updatedAt: "t1", chainOverrides: { "key1": "same" } }]
+    }));
+    let changes = await changesSince(db, userId);
+    expect(changes.sets[0].chainOverrides).toEqual({ "key1": "same" });
+
+    // Old client updates the set but doesn't send chainOverrides
+    await applySync(db, userId, baseBody({
+      sets: [{ id: "set1", title: "s1 edited", createdAt: "t0", updatedAt: "t2" }]
+    }));
+    changes = await changesSince(db, userId);
+    expect(changes.sets[0].title).toBe("s1 edited");
+    expect(changes.sets[0].chainOverrides).toEqual({ "key1": "same" }); // Pre-existing overrides preserved!
+
+    // New client explicitly clears overrides
+    await applySync(db, userId, baseBody({
+      sets: [{ id: "set1", title: "s1 cleared", createdAt: "t0", updatedAt: "t3", chainOverrides: {} }]
+    }));
+    changes = await changesSince(db, userId);
+    expect(changes.sets[0].chainOverrides).toEqual({}); // Overrides cleared!
+  });
+
   const baseBody = (over: Record<string, unknown> = {}) => ({
     sets: [], cards: [], quiz: [], activity: [], reviews: [], ...over,
   });
