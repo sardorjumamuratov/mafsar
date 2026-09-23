@@ -439,7 +439,7 @@ export function createApp(db: DB) {
   // bounded by the per-user limit instead.
   app.post("/v1/design-task", requireQuota(db, "practice"), async (c) => {
     const body = designTaskSchema.parse(await c.req.json());
-    return c.json(await generateDesignTask(body.concept, body.reference));
+    return c.json(await generateDesignTask(body.concept, body.reference, body.mode));
   });
 
   app.post("/v1/design-grade", limitByUser(limits.llmPerUser), async (c) => {
@@ -449,7 +449,7 @@ export function createApp(db: DB) {
 
   app.post("/v1/design-curveball", limitByUser(limits.llmPerUser), async (c) => {
     const body = designCurveballSchema.parse(await c.req.json());
-    return c.json(await generateDesignCurveball(body.task, body.answer, body.previous));
+    return c.json(await generateDesignCurveball(body.task, body.answer, body.previous, body.mode, body.state));
   });
 
   app.post("/v1/estimation-task", requireQuota(db, "practice"), async (c) => {

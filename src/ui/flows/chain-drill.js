@@ -1,7 +1,10 @@
 
 import { app, bundle, esc, setHTML, setFor, send, toast } from "../core.js";
 import { appendReviewLog, bumpActivity, updateCard } from "../../storage/store.js";
-import { liveChains, orderedSteps, chainCoverage } from "../../storage/chains.js";
+import { orderedSteps } from "../../storage/chains.js";
+import { linkId } from "../../storage/chain-links.js";
+import { failedLinkIds, pickDrillChain, roundScore, shuffledOrder, EXERCISES } from "../../storage/chain-drill.js";
+import { drillLogEntry } from "../../storage/drill-log.js";
 import { renderSetDetail } from "../views/set-detail.js";
 import { review } from "../../../shared/srs.js";
 
@@ -17,25 +20,12 @@ export async function startChainDrill(sessionId) {
   const set = setFor(sessionId, studySets);
   if (!set || !set.chains) return;
   
-  const chains = liveChains(set.chains).filter(ch => chainCoverage(ch).filled > 1);
-  if (!chains.length) return toast("No chains have enough steps to drill yet.");
-  
-  // count drills per chain
-  const drills = {};
-  for (const log of (reviewLog || [])) {
-    if (log.kind === "chain-drill" && log.sessionId === sessionId && log.cardId) {
-      drills[log.cardId] = (drills[log.cardId] || 0) + 1;
-    }
-  }
-  
-  chains.sort((a, b) => (drills[a.id] || 0) - (drills[b.id] || 0));
-  
-  cSetId = sessionId;
-  cChain = chains[0]; // pick the least drilled one
+  const chain = pickDrillChain(set.chains, reviewLog, sessionId);
+  if (!chain) return toast("Fill in at least two steps of a chain to drill it.");
 
-  
-  const exercises = ["rebuild", "gap", "backwards"];
-  const ex = exercises[Math.floor(Math.random() * exercises.length)];
+  cSetId = sessionId;
+  cChain = chain;
+  const ex = EXERCISES[Math.floor(Math.random() * EXERCISES.length)];
   
   cSteps = orderedSteps(cChain).filter(s => s.step && s.step.statement);
   if (cSteps.length < 2) return toast("Not enough filled steps in this chain.");
@@ -55,14 +45,16 @@ function finishDrill(failedLinks) {
     penalizeLinks(failedLinks).catch(console.error);
   }
   
-  bumpActivity(1).catch(()=>{});
-  appendReviewLog({
+  bumpActivity(1).catch(() => {});
+  // Through drillLogEntry: a row without a grade, or with an empty cardId,
+  // fails validation for the whole sync batch (server/src/schema.ts).
+  appendReviewLog(drillLogEntry({
     kind: "chain-drill",
-    id: `cd-${Date.now()}`,
     sessionId: cSetId,
-    cardId: cChain.id,
-    reviewedAt: new Date().toISOString()
-  }).catch(()=>{});
+    chainId: cChain.id,
+    fraction: roundScore(cSteps),
+    id: `cd-${Date.now()}`,
+  })).catch(() => {});
   
   const takeaway = failedLinks?.length ? "Keep at it! Some links need a bit more practice." : "Perfect! You nailed this chain.";
   
@@ -73,7 +65,7 @@ function finishDrill(failedLinks) {
       <div class="block chain">
         <ol class="chain-steps">
           ${cSteps.map((s, i) => {
-             const arrow = i ? `<li class="chain-arrow" aria-hidden="true">v</li>` : "";
+             const arrow = i ? `<li class="chain-arrow" aria-hidden="true">↓</li>` : "";
              const failedStyle = s.failed ? `style="border:1px solid var(--danger);"` : "";
              return `${arrow}<li class="chain-step" ${failedStyle}>
                  <span class="chain-label">${esc(s.label)}</span>
@@ -86,7 +78,7 @@ function finishDrill(failedLinks) {
         </ol>
       </div>
       <div style="display:flex;gap:10px;margin-top:20px">
-        <button class="btn btn-secondary" style="flex:1" data-drill-action="done">Done</button>
+        <button class="btn btn-ghost" style="flex:1" data-drill-action="done">Done</button>
         <button class="btn btn-primary" style="flex:2" data-drill-action="another">Another round</button>
       </div>
     </div>
@@ -110,13 +102,13 @@ async function penalizeLinks(linkIds) {
 function renderRebuild() {
   if (!state.placed) {
     state.placed = [];
-    state.remaining = cSteps.map((_, i) => i).sort(() => Math.random() - 0.5);
+    state.remaining = shuffledOrder(cSteps.length);
     state.errorIdx = null;
     state.revealIdx = null;
   }
   
   const placedHtml = state.placed.map((i, idx) => {
-    const arrow = idx ? `<div class="chain-arrow">v</div>` : "";
+    const arrow = idx ? `<div class="chain-arrow" aria-hidden="true">↓</div>` : "";
     return `${arrow}<div class="chain-step"><span class="chain-label">${esc(cSteps[i].label)}</span><div class="chain-text">${esc(cSteps[i].step.statement)}</div></div>`;
   }).join("");
   
@@ -153,11 +145,7 @@ function handleRebuildPick(idx) {
     state.errorIdx = null;
     state.revealIdx = null;
     if (state.placed.length === cSteps.length) {
-       const failedLinks = [];
-       for (let i = 1; i < cSteps.length; i++) {
-         if (cSteps[i].failed) failedLinks.push(`chainlink:${cChain.id}:${cSteps[i-1].key}:${cSteps[i].key}`);
-       }
-       finishDrill(failedLinks);
+       finishDrill(failedLinkIds(cChain, cSteps));
     } else {
        renderRebuild();
     }
@@ -184,7 +172,7 @@ function renderGap() {
   }
   
   const stepsHtml = cSteps.map((s, i) => {
-    const arrow = i ? `<div class="chain-arrow">v</div>` : "";
+    const arrow = i ? `<div class="chain-arrow" aria-hidden="true">↓</div>` : "";
     if (i === state.blankIdx) {
       if (state.result) {
          const cl = state.result.correct ? "" : `border:1px solid var(--danger);`;
@@ -253,7 +241,7 @@ function renderBackwards() {
   
   const stepsHtml = [];
   for (let i = state.currentIndex; i <= state.startIdx; i++) {
-    const arrow = i < state.startIdx ? `<div class="chain-arrow">v</div>` : "";
+    const arrow = i < state.startIdx ? `<div class="chain-arrow" aria-hidden="true">↓</div>` : "";
     if (i === state.currentIndex) {
        stepsHtml.push(`<div class="chain-step" style="padding:10px">
            <span class="chain-label">Upstream: ${esc(cSteps[i].label)}</span>
@@ -304,7 +292,7 @@ async function handleBackwardsSubmit() {
     if (state.currentIndex === 0) {
        const failedLinks = [];
        for (let i = 0; i <= state.startIdx; i++) {
-         if (cSteps[i].failed && i < cSteps.length - 1) failedLinks.push(`chainlink:${cChain.id}:${cSteps[i].key}:${cSteps[i+1].key}`);
+         if (cSteps[i].failed && i < cSteps.length - 1) failedLinks.push(linkId(cChain.id, cSteps[i].key, cSteps[i + 1].key));
        }
        finishDrill(failedLinks);
     } else {
@@ -334,8 +322,8 @@ document.addEventListener("click", (e) => {
   } else if (a === "gap-next") {
     const failedLinks = [];
     if (cSteps[state.blankIdx].failed) {
-       if (state.blankIdx > 0) failedLinks.push(`chainlink:${cChain.id}:${cSteps[state.blankIdx-1].key}:${cSteps[state.blankIdx].key}`);
-       if (state.blankIdx < cSteps.length - 1) failedLinks.push(`chainlink:${cChain.id}:${cSteps[state.blankIdx].key}:${cSteps[state.blankIdx+1].key}`);
+       if (state.blankIdx > 0) failedLinks.push(linkId(cChain.id, cSteps[state.blankIdx - 1].key, cSteps[state.blankIdx].key));
+       if (state.blankIdx < cSteps.length - 1) failedLinks.push(linkId(cChain.id, cSteps[state.blankIdx].key, cSteps[state.blankIdx + 1].key));
     }
     finishDrill(failedLinks);
   } else if (a === "backwards-submit") {

@@ -208,3 +208,75 @@ describe("Find the bottleneck", () => {
     expect((await post("/v1/bottleneck-task", SOURCE)).status).toBe(502);
   });
 });
+
+describe("Clinical cases (Medicine mode, same routes as the Design drill)", () => {
+  const CASE = {
+    vignette: "A 24-year-old with a night-time cough and chest tightness, worse in spring. Expiratory wheeze on examination.",
+    tests: [{ name: "Spirometry", result: "FEV1 reduced, reversible after salbutamol" }, { name: "Chest X-ray", result: "Normal" }],
+    diagnosis: "Asthma",
+    management: "Inhaled salbutamol as needed plus a low-dose inhaled corticosteroid",
+  };
+
+  it("returns the vignette and the test menu, but never the diagnosis", async () => {
+    vi.stubGlobal("fetch", reply(CASE));
+    const res = await post("/v1/design-task", { ...SOURCE, mode: "clinical" });
+    expect(res.status).toBe(200);
+    const raw = await res.text();
+    expect(raw).toContain("night-time cough");
+    expect(raw).not.toContain("Asthma");
+    expect(raw).not.toContain("corticosteroid");
+    const body = JSON.parse(raw);
+    expect(body.rubric).toEqual(["Spirometry", "Chest X-ray"]);
+    expect(typeof body.state).toBe("string");
+    expect(await practiceUnits()).toBe(1);
+  });
+
+  it("reports results for the tests asked for, without giving the diagnosis away", async () => {
+    vi.stubGlobal("fetch", reply(CASE));
+    const { state } = await (await post("/v1/design-task", { ...SOURCE, mode: "clinical" })).json();
+    const fetchMock = reply({ curveball: "Spirometry: FEV1 reduced, reversible. Now give your final diagnosis." });
+    vi.stubGlobal("fetch", fetchMock);
+    const res = await post("/v1/design-curveball", { mode: "clinical", state, task: CASE.vignette, answer: "Asthma; I'd request spirometry" });
+    expect(res.status).toBe(200);
+    const sent = JSON.stringify(fetchMock.mock.calls[0][1]);
+    expect(sent).toContain("reversible after salbutamol");
+    expect(sent).toContain("Learner's answer");
+  });
+
+  it("grades against the hidden reference, with the learner's text as data", async () => {
+    vi.stubGlobal("fetch", reply(CASE));
+    const { state } = await (await post("/v1/design-task", { ...SOURCE, mode: "clinical" })).json();
+    const fetchMock = reply({
+      rubric_evaluation: [{ point: "Reversibility", status: "missed", note: "Didn't mention it." }],
+      sections: [{ section: "Diagnosis", verdict: "strong", note: "" }],
+      next_time: "Say why the obstruction is reversible.",
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    const res = await post("/v1/design-grade", { mode: "clinical", state, task: CASE.vignette, answer: "Asthma; start an inhaler", originalAnswer: "Asthma" });
+    expect(res.status).toBe(200);
+    const call = fetchMock.mock.calls[0][1] as any;
+    const body = JSON.parse(call.body);
+    const system = JSON.stringify(body.system_instruction);
+    const user = JSON.stringify(body.contents);
+    expect(system).not.toContain("start an inhaler");
+    expect(user).toContain("start an inhaler");
+    expect(system).not.toContain("Asthma");
+    expect(user).toContain("Asthma");
+    expect((await res.json()).next_time).toMatch(/reversible/);
+  });
+
+  it("a tampered case state is a 400, not a crash", async () => {
+    vi.stubGlobal("fetch", reply({ curveball: "x" }));
+    const res = await post("/v1/design-grade", { mode: "clinical", state: "forged.state.token", task: "Case", answer: "Asthma" });
+    expect(res.status).toBe(400);
+    expect((await res.json()).error).toBe("bad_state");
+  });
+
+  it("design drills are unaffected: no state, no clinical prompt", async () => {
+    const fetchMock = reply({ brief: "Design a URL shortener.", rubric: ["keys"] });
+    vi.stubGlobal("fetch", fetchMock);
+    const body = await (await post("/v1/design-task", SOURCE)).json();
+    expect(body.state).toBeUndefined();
+    expect(JSON.stringify(fetchMock.mock.calls[0][1])).not.toContain("vignette");
+  });
+});

@@ -551,11 +551,12 @@ async function handle(msg) {
     
 
     case "DESIGN_TASK": {
-      const res = await backendDesignTask({
+      // mode "clinical" runs the same route as a Medicine clinical case.
+      return backendDesignTask({
         concept: String(msg.concept || ""),
         reference: Array.isArray(msg.reference) ? msg.reference : [],
+        mode: msg.mode === "clinical" ? "clinical" : "design",
       });
-      return res;
     }
 
     case "DESIGN_GRADE": {
@@ -563,6 +564,8 @@ async function handle(msg) {
         task: String(msg.task || ""),
         answer: String(msg.answer || ""),
         rubric: Array.isArray(msg.rubric) ? msg.rubric.map(String) : [],
+        mode: msg.mode === "clinical" ? "clinical" : "design",
+        ...(msg.state ? { state: String(msg.state) } : {}),
         ...(msg.curveball ? { curveball: String(msg.curveball), originalAnswer: String(msg.originalAnswer || "") } : {}),
       });
     }
@@ -572,6 +575,8 @@ async function handle(msg) {
         task: String(msg.task || ""),
         answer: String(msg.answer || ""),
         previous: Array.isArray(msg.previous) ? msg.previous.map(String) : [],
+        mode: msg.mode === "clinical" ? "clinical" : "design",
+        ...(msg.state ? { state: String(msg.state) } : {}),
       });
     }
 

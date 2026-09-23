@@ -626,25 +626,17 @@ export async function gradeDesignAnswer(input: {
   task: string; answer: string; rubric?: string[]; curveball?: string; originalAnswer?: string; mode?: string; state?: string;
 }) {
   if (input.mode === "clinical" && input.state) {
-    const state = decryptState(input.state);
-    const CLINICAL_GRADE_PROMPT = `You are a clinical educator grading a learner's clinical case performance.
-The case vignette:
-${input.task}
+    const state = openState<ClinicalState>(input.state, "diagnosis");
+    const CLINICAL_GRADE_PROMPT = `You are a clinical educator grading a learner's work on a practice case.
+Judge against the reference below, not your own clinical knowledge, and never introduce
+findings or treatments the reference doesn't have.
 
-The reference diagnosis and management:
-Diagnosis: ${state.diagnosis}
-Management: ${state.management}
-Reference chain: ${state.chain}
+Map the learner's reasoning onto the reference chain: for each link, say whether they used it,
+skipped it, or got it wrong. Credit a sensible differential even when they landed elsewhere.
+"sections" holds one row each for Diagnosis, Tests requested, and Management. Finish with one
+concrete thing to do next time.
 
-Learner's initial reasoning and requested tests:
-${input.originalAnswer || "(none)"}
-
-Learner's final diagnosis and management:
-${input.answer}
-
-Grade how well the learner identified the diagnosis, requested appropriate tests, and planned management, mapping their reasoning back to the reference chain.
-For each key link in the reference chain (e.g. trigger -> inflammation -> wheeze), evaluate if the learner used it correctly, skipped it, or got it wrong.
-Provide one concrete thing to do next time.
+${DRILL_RULES}
 
 Respond with ONLY valid JSON:
 {
@@ -652,7 +644,15 @@ Respond with ONLY valid JSON:
   "sections": [{ "section": string, "verdict": "strong" | "ok" | "weak" | "missing", "note": string }],
   "next_time": string
 }`;
-    const parsed = await callJson(CLINICAL_GRADE_PROMPT, `Grade the learner.`);
+    const user = [
+      `Case:\n${input.task}`,
+      `Reference diagnosis:\n${state.diagnosis}`,
+      `Reference management:\n${state.management}`,
+      `Reference chain:\n${state.chain}`,
+      `Learner's first answer (diagnosis and tests requested):\n${input.originalAnswer || "(none)"}`,
+      `Learner's final answer:\n${input.answer}`,
+    ].join("\n\n");
+    const parsed = await callJson(CLINICAL_GRADE_PROMPT, user);
     const rubric_evaluation = (Array.isArray(parsed?.rubric_evaluation) ? parsed.rubric_evaluation : [])
       .slice(0, 10)
       .map((r: any) => ({
@@ -712,18 +712,22 @@ Respond with ONLY valid JSON: { "curveball": string }`;
 
 export async function generateDesignCurveball(task: string, answer: string, previous: string[] = [], mode?: string, stateToken?: string) {
   if (mode === "clinical" && stateToken) {
-    const state = decryptState(stateToken);
-    const CLINICAL_CURVEBALL_PROMPT = `You are a clinical simulator.
-The learner has provided their leading diagnosis and requested tests.
-The true test results for this case are:
-${JSON.stringify(state.tests)}
+    const state = openState<ClinicalState>(stateToken, "diagnosis");
+    const CLINICAL_CURVEBALL_PROMPT = `You are running a practice clinical case.
+The learner has given a leading diagnosis and asked for some investigations. Report the results of
+the tests they asked for, from the reference results given below. If they asked for something not in
+that list, say it is unremarkable or not indicated here. Note gently if they ordered something
+clearly unnecessary. Do NOT reveal the diagnosis or the management yet.
+End with: "Now give your final diagnosis and first-line management."
 
-If the learner requested tests from this list, provide their results. If they requested irrelevant tests, gently note they are unremarkable or not indicated.
-Do NOT reveal the final diagnosis or management yet.
-End with: "Now provide your final diagnosis and first-line management."
+${DRILL_RULES}
 
 Respond with ONLY valid JSON: { "curveball": string }`;
-    const user = `Vignette:\n${task}\n\nLearner's answer (diagnosis and requested tests):\n${answer}`;
+    const user = [
+      `Case:\n${task}`,
+      `Reference test results:\n${state.tests.map((t) => `- ${t.name}: ${t.result}`).join("\n") || "(none)"}`,
+      `Learner's answer (diagnosis and tests requested):\n${answer}`,
+    ].join("\n\n");
     const parsed = await callJson(CLINICAL_CURVEBALL_PROMPT, user);
     const curveball = str(parsed?.curveball, 600);
     if (!curveball) throw new LLMError("The model didn't return a curveball. Try again.");
@@ -832,15 +836,20 @@ export class BadStateError extends Error {
 }
 
 /** Decrypt the scenario state; a forged or corrupted token is a 400, not a 500. */
-function openState(state: string) {
+function openState<T>(state: string, required: keyof T & string): T {
   try {
-    const s = decryptState(state);
-    if (!s || typeof s.planted_flaw !== "string") throw new BadStateError();
-    return s as { narrative: string; architecture: string[]; planted_flaw: string; why_it_fails: string; model_solution: string };
+    const parsed = decryptState(state);
+    if (!parsed || typeof parsed[required] !== "string") throw new BadStateError();
+    return parsed as T;
   } catch {
     throw new BadStateError();
   }
 }
+
+/** The hidden half of a bottleneck exercise. */
+type BottleneckState = { narrative: string; architecture: string[]; planted_flaw: string; why_it_fails: string; model_solution: string };
+/** The hidden half of a clinical case: results, diagnosis and management. */
+type ClinicalState = { tests: { name: string; result: string }[]; diagnosis: string; management: string; chain: string };
 
 const BOTTLENECK_HINT_PROMPT = `You give ONE short hint for a find-the-bottleneck exercise: point at the
 area to look at without naming the flaw. One sentence.
@@ -850,7 +859,7 @@ ${DRILL_RULES}
 Respond with ONLY valid JSON: { "hint": string }`;
 
 export async function generateBottleneckHint(state: string) {
-  const s = openState(state);
+  const s = openState<BottleneckState>(state, "planted_flaw");
   const parsed = await callJson(BOTTLENECK_HINT_PROMPT, `Architecture:\n${s.architecture.join(" → ")}\n\nPlanted flaw (do not reveal): ${s.planted_flaw}`);
   return { hint: str(parsed?.hint, 300, "Follow a single write request end to end.") };
 }
@@ -867,7 +876,7 @@ Respond with ONLY valid JSON:
 { "found_flaw": boolean, "other_valid_issue": string, "explanation_correct": boolean, "fix_works": boolean, "feedback": string }`;
 
 export async function gradeBottleneckAnswer(state: string, answer: string, usedHint = false) {
-  const s = openState(state);
+  const s = openState<BottleneckState>(state, "planted_flaw");
   const user = [
     `Scenario:\n${s.narrative}`,
     `Architecture:\n${s.architecture.join(" → ")}`,

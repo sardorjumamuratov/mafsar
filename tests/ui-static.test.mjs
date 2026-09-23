@@ -787,6 +787,40 @@ test("the medicine suggestion reads the same field the worker saves", () => {
   assert.ok(!detail.includes("suggestMedicineMode"), "no field that nothing sets");
 });
 
+test("every review-log row has a grade (a row without one fails the whole sync batch)", () => {
+  for (const f of walkJs("../src/ui/")) {
+    const src = readSrc(f);
+    for (const m of src.matchAll(/appendReviewLog\(\{[\s\S]*?\}\)/g)) {
+      // Either `grade: g` or the shorthand `grade,`.
+      assert.ok(/\bgrade\s*[,:]/.test(m[0]), f + " logs a review row without a grade");
+    }
+  }
+});
+
+test("Medicine practice drills log their own kind through drillLogEntry", () => {
+  const drill = readSrc("../src/ui/flows/chain-drill.js");
+  assert.ok(drill.includes("drillLogEntry("), "chain drills log through the shared helper");
+  assert.ok(!/appendReviewLog\(\{/.test(drill), "no hand-rolled row without a grade");
+  const kinds = readSrc("../src/storage/drill-log.js");
+  for (const k of ["chain-drill", "clinical"]) assert.ok(kinds.includes('"' + k + '"'), k + " must be a known drill kind");
+});
+
+test("link cards can't be edited from the card list: the chain owns them", () => {
+  const detail = readSrc("../src/ui/views/set-detail.js");
+  assert.ok(detail.includes("isLinkCard(c)"), "the card list knows which cards come from a chain");
+  assert.ok(!detail.includes("chainlink:"), "ids come from linkId(), never hand-built");
+});
+
+test("every btn-* class the UI uses is styled", () => {
+  const css = readSrc("../src/ui/panel.css");
+  const defined = new Set([...css.matchAll(/\.(btn-[a-z0-9-]+)/g)].map((m) => m[1]));
+  const used = new Set();
+  for (const f of walkJs("../src/ui/")) {
+    for (const m of readSrc(f).matchAll(/class="[^"]*\b(btn-[a-z0-9-]+)/g)) used.add(m[1]);
+  }
+  assert.deepEqual([...used].filter((c) => !defined.has(c)), [], "an unstyled button variant renders plain");
+});
+
 console.log(`\n${passed} tests passed`);
 
 

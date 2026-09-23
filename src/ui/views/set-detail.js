@@ -10,6 +10,7 @@ import { syncNow } from "../../sync/sync.js";
 import { addCard, updateCard } from "../../storage/store.js";
 import { confirmSheet } from "../confirm.js";
 import { chainCoverage, liveChains, orderedSteps } from "../../storage/chains.js";
+import { isLinkCard, linkId } from "../../storage/chain-links.js";
 
 // ================================================================ SET DETAIL
 export let detail = null; // { session, studySet, summary, tab }
@@ -94,16 +95,20 @@ export function paintDetail() {
         ${
           studySet.flashcards.length
             ? studySet.flashcards
-                .map(
-                  (c) =>
-                    `<div class="cardrow" data-card-id="${esc(c.id)}"><span class="sdot ${masteryOf(c)}"></span><span class="q">${esc(c.front)}</span><span class="due">${
+                .map((c) => {
+                  // Link cards belong to a chain: editing one here would be
+                  // overwritten on the next regeneration, so they're read-only.
+                  const fromChain = isLinkCard(c);
+                  return `<div class="cardrow" data-card-id="${esc(c.id)}"><span class="sdot ${masteryOf(c)}"></span><span class="q">${esc(c.front)}</span><span class="due">${
                       isDue(c) ? "Due now" : timeUntil(c.dueDate)
                     }</span>
-                     <span class="rowbtns">
-                       <button class="iconbtn ic-xs" data-action="card-edit" data-id="${esc(c.id)}" aria-label="Edit"><svg class="ic" viewBox="0 0 24 24"><path d="M4 20l4-1L20 7l-3-3L5 16l-1 4z"/></svg></button>
-                       <button class="iconbtn ic-xs" data-action="card-del" data-id="${esc(c.id)}" aria-label="Delete"><svg class="ic" viewBox="0 0 24 24"><path d="M5 7h14M9 7V5h6v2m-8 0l1 13h8l1-13"/></svg></button>
-                     </span></div>`
-                )
+                     <span class="rowbtns">${
+                       fromChain
+                         ? `<span class="tag" title="Made from a mechanism chain. Edit it in the Chains tab.">chain</span>`
+                         : `<button class="iconbtn ic-xs" data-action="card-edit" data-id="${esc(c.id)}" aria-label="Edit"><svg class="ic" viewBox="0 0 24 24"><path d="M4 20l4-1L20 7l-3-3L5 16l-1 4z"/></svg></button>
+                       <button class="iconbtn ic-xs" data-action="card-del" data-id="${esc(c.id)}" aria-label="Delete"><svg class="ic" viewBox="0 0 24 24"><path d="M5 7h14M9 7V5h6v2m-8 0l1 13h8l1-13"/></svg></button>`
+                     }</span></div>`;
+                })
                 .join("")
             : '<div class="empty">No flashcards.</div>'
         }
@@ -432,7 +437,7 @@ function chainsTabHtml(sessionId, studySet) {
       const rows = orderedSteps(ch)
         .map(({ key, label, step }, i) => {
           const prevKey = i ? orderedSteps(ch)[i - 1].key : "";
-          const linkId = i ? `chainlink:${ch.id}:${prevKey}:${key}` : "";
+          const cardId = i ? linkId(ch.id, prevKey, key) : "";
           const edit = `data-action="chain-edit" data-id="${esc(sessionId)}" data-chain="${esc(ch.id)}" data-key="${esc(key)}"`;
           const arrow = i ? `<li class="chain-arrow" aria-hidden="true">↓</li>` : "";
           if (!step) {
@@ -442,7 +447,7 @@ function chainsTabHtml(sessionId, studySet) {
                 <button class="linkbtn" ${edit} aria-label="Add ${esc(label)}">Add</button>
               </li>`;
           }
-          return `${arrow}<li class="chain-step" data-card-id="${esc(linkId)}">
+          return `${arrow}<li class="chain-step" data-card-id="${esc(cardId)}">
               <span class="chain-label">${esc(label)}</span>
               <details class="chain-body">
                 <summary class="chain-text">${esc(step.statement)}</summary>

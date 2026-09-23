@@ -15,15 +15,18 @@ export const SECTIONS = [
   { key: "bottlenecks", title: "Bottlenecks & trade-offs", hint: "What breaks first, and what you chose not to do." },
 ];
 
+// Clinical cases run in two stages: reason to a diagnosis and ask for tests,
+// then commit once the results come back.
 export const CLINICAL_SECTIONS = [
-  { key: "leading", title: "Leading diagnosis & why", hint: "What is your leading diagnosis and reasoning?" },
+  { key: "leading", title: "Leading diagnosis & why", hint: "What do you think this is, and what in the history or examination points there?" },
+  { key: "tests", title: "Tests you would request", hint: "Which investigations, and what would each one tell you?" },
 ];
 export const CLINICAL_FINAL_SECTIONS = [
-  { key: "final", title: "Final diagnosis & management", hint: "What is your final diagnosis and treatment?" }
+  { key: "final", title: "Final diagnosis & management", hint: "Your diagnosis now, and the first-line management." },
 ];
 
 export function emptySections(mode) {
-  if (mode === "clinical") return { leading: "" };
+  if (mode === "clinical") return Object.fromEntries(CLINICAL_SECTIONS.map((s) => [s.key, ""]));
   return Object.fromEntries(SECTIONS.map((s) => [s.key, ""]));
 }
 

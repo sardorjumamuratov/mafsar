@@ -218,10 +218,14 @@ const drillReference = z.array(z.object({ front: z.string().max(500), back: z.st
 const drillSource = { concept: z.string().min(1).max(500), reference: drillReference };
 export const MAX_DESIGN_ANSWER = 4000;
 
-export const designTaskSchema = z.object({ ...drillSource, mode: z.string().optional() });
+export const designTaskSchema = z.object({ ...drillSource, mode: z.enum(["design", "clinical"]).default("design") });
 
 /** Grades the first answer, or (with curveball) the adaptation to a curveball. */
 export const designGradeSchema = z.object({
+  // "clinical" reuses this route for Medicine clinical cases; state carries the
+  // encrypted case (diagnosis, tests) the client must not see.
+  mode: z.enum(["design", "clinical"]).default("design"),
+  state: z.string().max(8000).optional(),
   task: z.string().min(1).max(2000),
   answer: z.string().min(1).max(MAX_DESIGN_ANSWER),
   curveball: z.string().max(1000).optional(),
@@ -229,6 +233,8 @@ export const designGradeSchema = z.object({
 });
 
 export const designCurveballSchema = z.object({
+  mode: z.enum(["design", "clinical"]).default("design"),
+  state: z.string().max(8000).optional(),
   task: z.string().min(1).max(2000),
   answer: z.string().min(1).max(MAX_DESIGN_ANSWER),
   previous: z.array(z.string().max(1000)).max(5).default([]),

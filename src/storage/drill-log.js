@@ -6,7 +6,7 @@
 // re-sent forever. Drills use a stable per-set id instead. It matches no card,
 // so "Needs work" and scheduling ignore these rows.
 
-export const DRILL_KINDS = ["design", "estimation", "bottleneck"];
+export const DRILL_KINDS = ["design", "estimation", "bottleneck", "chain-drill", "clinical"];
 
 export function drillCardId(sessionId) {
   return `set:${sessionId}`;
@@ -18,7 +18,10 @@ export function drillGrade(fraction) {
   return f >= 0.85 ? 5 : f >= 0.6 ? 4 : f >= 0.35 ? 3 : 1;
 }
 
-export function drillLogEntry({ kind, sessionId, fraction, id, reviewedAt = new Date().toISOString() }) {
+/**
+ * @param {{ kind: string, sessionId: string, fraction: number, id: string, chainId?: string, reviewedAt?: string }} row
+ */
+export function drillLogEntry({ kind, sessionId, fraction, id, chainId = "", reviewedAt = new Date().toISOString() }) {
   if (!DRILL_KINDS.includes(kind)) throw new Error(`unknown drill kind: ${kind}`);
   if (!sessionId) throw new Error("drill log needs a sessionId");
   return {
@@ -30,5 +33,7 @@ export function drillLogEntry({ kind, sessionId, fraction, id, reviewedAt = new 
     prevInterval: 0,
     newInterval: 0,
     reviewedAt,
+    // Chain drills record which chain, so the picker can favour less-drilled ones.
+    ...(chainId ? { chainId } : {}),
   };
 }
