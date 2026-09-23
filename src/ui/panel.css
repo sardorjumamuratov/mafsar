@@ -101,6 +101,19 @@ body {
   color-scheme: light;
 }
 
+html {
+  background: var(--bg);
+}
+@media (min-width: 481px) {
+  body {
+    margin: 0 auto;
+    max-width: 480px;
+    border-left: 1px solid var(--border);
+    border-right: 1px solid var(--border);
+    box-shadow: 0 0 20px rgba(0,0,0,0.05);
+  }
+}
+
 body {
   margin: 0;
   min-width: 300px;

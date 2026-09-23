@@ -925,6 +925,29 @@ test("YouTube and PDF capture: permission first, and no dead caption endpoint", 
   );
 });
 
+
+test("open in tab rules", () => {
+  const read = (p) => fs.readFileSync(join(__dirname, p), "utf8").replace(/\r\n/g, "\n");
+
+  const core = read("../src/ui/core.js");
+  assert.ok(core.includes("getLastContentTabId()"), "queryActiveTab must fall back to the last content tab if Mafsar itself is active");
+  assert.ok(core.includes("!isMafsarUrl(current?.url)"), "queryActiveTab must skip the Mafsar tab");
+
+  const sw = read("../src/background/service-worker.js");
+  assert.ok(sw.includes('case "SET_OPEN_IN_TAB":'), "service-worker must listen for SET_OPEN_IN_TAB to flip the panel behaviour");
+  assert.ok(sw.includes("openPanelOnActionClick: !msg.value"), "SET_OPEN_IN_TAB must flip openPanelOnActionClick");
+  assert.ok(sw.includes("chrome.tabs.update") && sw.includes("chrome.windows.update"), "onClicked must focus an existing tab, not open five");
+  assert.ok(sw.includes("chrome.tabs.create"), "onClicked must create the tab if none exists");
+  assert.ok(sw.includes("chrome.storage.local.get([\"settings\"]"), "onClicked must read the persisted setting from local storage directly");
+
+  const you = read("../src/ui/views/you.js");
+  assert.ok(you.includes('id="openInTabCheck"'), "You view must have the checkbox");
+
+  const panel = read("../src/ui/panel.js");
+  assert.ok(panel.includes('id === "openInTabCheck"'), "panel.js must wire the checkbox");
+  assert.ok(panel.includes("saveSettings({ openInTab"), "panel.js must persist the preference");
+});
+
 console.log(`\n${passed} tests passed`);
 
 

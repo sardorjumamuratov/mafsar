@@ -19,7 +19,7 @@ export const KEYS = {
   REVIEW_LOG: "reviewLog",
 };
 
-const DEFAULT_SETTINGS = { provider: "gemini", apiKey: "", model: "" };
+const DEFAULT_SETTINGS = { provider: "gemini", apiKey: "", model: "", openInTab: false };
 const REVIEW_LOG_CAP = 2000;
 
 // --- Per-account partitions --------------------------------------------------

@@ -1,3 +1,4 @@
+import { isMafsarUrl, getLastContentTabId, setLastContentTabId } from "./tab-watch.js";
 import { BUNDLE_KEYS, readRaw, selectSessions, selectSettings, selectStudySets } from "../storage/store.js";
 import { isDue, masteryOf } from "../../shared/srs.js";
 
@@ -82,10 +83,26 @@ export function send(msg) {
     });
   });
 }
-export function queryActiveTab() {
-  return new Promise((resolve) => {
-    chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => resolve(tabs && tabs[0]));
+export async function queryActiveTab() {
+  const tabs = await new Promise((resolve) => {
+    chrome.tabs.query({ active: true, currentWindow: true }, resolve);
   });
+  const current = tabs?.[0];
+  if (current && !isMafsarUrl(current?.url)) {
+    if (current.id) setLastContentTabId(current.id);
+    return current;
+  }
+  
+  // If Mafsar is open in a tab, current is Mafsar itself.
+  // Fall back to the last known content tab we saw.
+  const lastId = getLastContentTabId();
+  if (lastId) {
+    const lastTab = await new Promise((resolve) => {
+      chrome.tabs.get(lastId, (t) => resolve(chrome.runtime.lastError ? null : t));
+    });
+    if (lastTab && !isMafsarUrl(lastTab.url)) return lastTab;
+  }
+  return null;
 }
 /**
  * Ask a tab something, resolving `null` if it has no listener, errors, or never

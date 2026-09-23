@@ -1,3 +1,4 @@
+import { saveSettings } from "../storage/store.js";
 import { startCompare, selectComparePair, toggleCompareSame, createForkCards } from "./flows/compare.js";
 import { finishDesignDrill, requestDesignCurveball, startDesignDrill, submitDesign, submitDesignCurveball } from "./flows/design.js";
 import { estimationNext, startEstimationDrill, submitEstimation } from "./flows/estimation.js";
@@ -263,7 +264,12 @@ document.addEventListener("change", (e) => {
     if (examDraft) examDraft.date = (/** @type {any} */ (t)).value ? new Date(`${(/** @type {any} */ (t)).value}T23:59:59`).getTime() : null;
   } else if ((/** @type {any} */ (t)).classList?.contains("picker-check")) {
     if (examDraft) (/** @type {any} */ (t)).checked ? examDraft.picked.add((/** @type {any} */ (t)).dataset.id) : examDraft.picked.delete((/** @type {any} */ (t)).dataset.id);
-  } else if ((/** @type {any} */ (t)).id === "backupFile" && (/** @type {any} */ (t)).files?.[0]) {
+  } else if ((/** @type {any} */ (t)).id === "openInTabCheck") {
+      const openInTab = !!(/** @type {any} */ (t)).checked;
+      saveSettings({ openInTab }).then(() => {
+        send({ type: "SET_OPEN_IN_TAB", value: openInTab }).catch(() => {});
+      }).catch(e => toast(e.message));
+    } else if ((/** @type {any} */ (t)).id === "backupFile" && (/** @type {any} */ (t)).files?.[0]) {
     importBackupFile((/** @type {any} */ (t)).files[0]);
     (/** @type {any} */ (t)).value = "";
   } else if ((/** @type {any} */ (t)).id === "importFile" && (/** @type {any} */ (t)).files?.[0]) {
