@@ -5,6 +5,7 @@ Thumbs.db
 # Editor
 .vscode/
 .idea/
+.claude/settings.local.json
 
 # Node (not used yet, but in case tooling is added later)
 node_modules/

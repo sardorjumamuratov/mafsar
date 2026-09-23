@@ -40,6 +40,9 @@ libSQL (Turso) backend in `server/`, deployed on Railway.
 - **Stay in scope.** Change only what the task asks, and match the surrounding style and comment density. Comments explain *why*, not *what*.
 - **Line endings:** the Windows working tree is CRLF (`core.autocrlf=true`). Tests that parse file text must normalize `\r\n` to `\n` first.
 - **Leave other people's work alone.** If uncommitted changes you didn't make are present, don't touch them, and mention them in your report.
+- **Merging is its own job.** When you're asked to check, merge or push finished
+  branches, follow `docs/integrating.md` — it's the standing procedure, not a
+  one-off. Only ever on request: never merge or push on your own initiative.
 - **Search, don't guess.** File paths and line numbers in prompts can drift. If an anchor isn't where the prompt says, find it with a search before editing, and never guess at an import path.
 
 ## Verify before you say you're done
