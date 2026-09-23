@@ -2,10 +2,9 @@
 // under `auth`; everything works without them (offline-first).
 
 import { API_BASE } from "../config.js";
+import { switchActiveAccount } from "../storage/store.js";
 
 const KEY = "auth";
-const LAST_USER_KEY = "lastUserId";
-const SWITCH_KEY = "accountSwitchPending";
 
 /** No request may block the panel forever; a stalled one has to become an error. */
 export const REQUEST_TIMEOUT_MS = 30_000;
@@ -63,40 +62,15 @@ export function setAuth(patch) {
   return new Promise((resolve) => {
     chrome.storage.local.get(KEY, (obj) => {
       const next = { ...(obj[KEY] || {}), ...patch };
-      chrome.storage.local.set({ [KEY]: next }, () => resolve(next));
+      chrome.storage.local.set({ [KEY]: next }, () => {
+        if (patch.user && patch.user.id) {
+          switchActiveAccount(patch.user.id).then(() => resolve(next));
+        } else {
+          resolve(next);
+        }
+      });
     });
   });
-}
-
-/** Whose study data is on this device, from the last resolved sign-in. */
-export function getLastUserId() {
-  return new Promise((resolve) => chrome.storage.local.get(LAST_USER_KEY, (obj) => resolve(obj[LAST_USER_KEY] || null)));
-}
-
-/** This device now belongs to `userId`, and may sync again. */
-export function rememberAccount(userId) {
-  return new Promise((resolve) =>
-    chrome.storage.local.set({ [LAST_USER_KEY]: userId || null, [SWITCH_KEY]: false }, () => resolve())
-  );
-}
-
-/**
- * Record who just signed in. "switched" means the sets on this device belong to
- * someone else: until the learner says what to do with them, syncing would
- * upload one account's library into another, so it is blocked.
- */
-export async function noteSignedInUser(userId) {
-  const last = await getLastUserId();
-  if (last && userId && last !== userId) {
-    await new Promise((resolve) => chrome.storage.local.set({ [SWITCH_KEY]: true }, () => resolve()));
-    return "switched";
-  }
-  await rememberAccount(userId);
-  return last ? "same" : "first";
-}
-
-export function accountSwitchPending() {
-  return new Promise((resolve) => chrome.storage.local.get(SWITCH_KEY, (obj) => resolve(!!obj[SWITCH_KEY])));
 }
 
 /** Drop tokens (local study data is kept — logging out never deletes it). */
