@@ -92,4 +92,4 @@ describe("POST /v1/extract/pdf", () => {
     expect(codes.slice(0, 10).every((s) => s === 422)).toBe(true);
     expect(codes[10]).toBe(429);
   });
-});
+});

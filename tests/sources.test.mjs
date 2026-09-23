@@ -128,4 +128,4 @@ test("the toast note says what was left out", () => {
   );
 });
 
-console.log(`\n${passed} passed`);
+console.log(`\n${passed} passed`);

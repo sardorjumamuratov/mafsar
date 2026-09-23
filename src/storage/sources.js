@@ -100,4 +100,4 @@ export function captureNote({ truncated = false, keptPercent = 100, pages = 0, p
   if (pages && pagesRead && pagesRead < pages) bits.push(`read ${pagesRead} of ${pages} pages`);
   if (truncated) bits.push(`used the first ${keptPercent}% of the text`);
   return bits.length ? ` (${bits.join(", ")})` : "";
-}
+}

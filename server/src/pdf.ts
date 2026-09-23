@@ -36,4 +36,4 @@ export async function extractPdfText(bytes: Uint8Array): Promise<PdfResult> {
     }
     return { ok: false, error: "unreadable", message: "Couldn't read this PDF." };
   }
-}
+}

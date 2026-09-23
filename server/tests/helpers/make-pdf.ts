@@ -29,4 +29,4 @@ export function makePdf(pages: string[]): Uint8Array {
   for (let id = 1; id < objects.length; id++) out += `${String(offsets[id]).padStart(10, "0")} 00000 n \n`;
   out += `trailer\n<< /Size ${objects.length} /Root 1 0 R >>\nstartxref\n${xrefAt}\n%%EOF\n`;
   return new Uint8Array(Buffer.from(out, "latin1"));
-}
+}

@@ -86,7 +86,8 @@ export async function renderSets() {
       <button class="btn btn-primary btn-block" data-action="share-lookup">Look up set</button>
       <div id="sharePreview"></div>
       <button class="btn btn-ghost btn-block hidden" id="captureAnswerBtn" data-action="capture-last-answer">✨ Capture last answer</button>
-      <button class="btn btn-ghost btn-block" id="captureCurrentBtn" data-action="capture-current">＋ Capture this page</button>＋ Capture this page</button>
+      <button class="btn btn-ghost btn-block" id="captureCurrentBtn" data-action="capture-current">＋ Capture this page</button>
+＋ Capture this page</button>
     </div>`);
   topOfView();
   refreshCaptureAnswerButton().catch(() => {});

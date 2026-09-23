@@ -43,7 +43,8 @@ export function createApp(db: DB) {
   const requestIp = (c: any): string | null =>
     clientIp(c.req.raw.headers, c.env?.incoming?.socket?.remoteAddress, ipSource());
   const limits = {
-    extractPerUser: slidingWindow(DEFAULT_LIMITS.extractPerUser),
+    extractPerUser: slidingWindow(DEFAULT_LIMITS.extractPerUser),
+
     loginPerIp: slidingWindow(DEFAULT_LIMITS.loginPerIp),
     loginFailuresPerEmail: slidingWindow(DEFAULT_LIMITS.loginFailuresPerEmail),
     registerPerIp: slidingWindow(DEFAULT_LIMITS.registerPerIp),
