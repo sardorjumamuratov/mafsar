@@ -14,55 +14,92 @@ export const KEYS = {
   SETTINGS: "settings",
   SESSIONS: "sessions",
   STUDY_SETS: "studySets",
+  LAST_SYNC: "lastSync",
   ACTIVITY: "activity",
   REVIEW_LOG: "reviewLog",
 };
 
 const DEFAULT_SETTINGS = { provider: "gemini", apiKey: "", model: "" };
 const REVIEW_LOG_CAP = 2000;
-KEYS.LAST_SYNC = "lastSync";
+
+// --- Per-account partitions --------------------------------------------------
+// Study data is stored under "<accountId>_<key>", so two accounts on one device
+// never see or upload each other's sets. Settings stay device-wide.
+//
+// The id is cached per context (panel and service worker are separate), so a
+// storage listener drops the cache when another context switches account —
+// without it the worker would keep filing captures under the previous account.
+
+const DATA_KEYS = ["sessions", "studySets", "activity", "reviewLog", "lastSync"];
+/** Data captured before anyone signed in; the next sign-in adopts it. */
+const NO_ACCOUNT = "local";
 
 let activeAccountIdCache = null;
 
-export async function getActiveAccountId() {
-  if (activeAccountIdCache) return activeAccountIdCache;
-  return new Promise((resolve) => {
-    chrome.storage.local.get(null, (all) => {
-      if (all.sessions !== undefined || all.studySets !== undefined) {
-        const id = all.auth?.user?.id || "local";
-        const updates = { activeAccountId: id };
-        const toDelete = [];
-        for (const k of ["sessions", "studySets", "activity", "reviewLog", "lastSync"]) {
-          if (all[k] !== undefined) {
-            updates[`${id}_${k}`] = all[k];
-            toDelete.push(k);
-          }
-        }
-        chrome.storage.local.set(updates, () => {
-          chrome.storage.local.remove(toDelete, () => {
-            activeAccountIdCache = id;
-            resolve(id);
-          });
-        });
-        return;
-      }
-      if (all.activeAccountId) {
-        activeAccountIdCache = all.activeAccountId;
-        resolve(activeAccountIdCache);
-      } else {
-        const id = all.auth?.user?.id || "local";
-        chrome.storage.local.set({ activeAccountId: id }, () => {
-          activeAccountIdCache = id;
-          resolve(id);
-        });
-      }
-    });
+try {
+  chrome.storage.onChanged?.addListener((changes, area) => {
+    if (area === "local" && changes.activeAccountId) activeAccountIdCache = changes.activeAccountId.newValue || null;
   });
+} catch {
+  /* no chrome.storage in tests that don't need it */
 }
 
+export async function getActiveAccountId() {
+  if (activeAccountIdCache) return activeAccountIdCache;
+  const known = await new Promise((resolve) => chrome.storage.local.get(["activeAccountId", "auth"], resolve));
+  if (known.activeAccountId) {
+    activeAccountIdCache = known.activeAccountId;
+    return activeAccountIdCache;
+  }
+  const id = known.auth?.user?.id || NO_ACCOUNT;
+  // First run on this build: anything under the old flat keys belongs to
+  // whoever is signed in now. Read everything once, then never again.
+  const all = await new Promise((resolve) => chrome.storage.local.get(null, resolve));
+  const updates = { activeAccountId: id };
+  const stale = [];
+  for (const k of DATA_KEYS) {
+    if (all[k] !== undefined) {
+      updates[scopedKey(id, k)] = all[k];
+      stale.push(k);
+    }
+  }
+  await new Promise((resolve) => chrome.storage.local.set(updates, () => resolve()));
+  if (stale.length) await new Promise((resolve) => chrome.storage.local.remove(stale, () => resolve()));
+  activeAccountIdCache = id;
+  return id;
+}
+
+/**
+ * Hand the device to `newId`. Anything captured before a sign-in (or migrated
+ * while signed out) is adopted by the first account to claim it, rather than
+ * being stranded under an id nobody signs in as.
+ */
 export async function switchActiveAccount(newId) {
+  const previous = activeAccountIdCache;
   activeAccountIdCache = newId;
-  return new Promise(resolve => chrome.storage.local.set({ activeAccountId: newId }, () => resolve()));
+  await new Promise((resolve) => chrome.storage.local.set({ activeAccountId: newId }, () => resolve()));
+  if (newId && newId !== NO_ACCOUNT && previous !== newId) await adoptOrphanData(newId);
+}
+
+/** Move the no-account partition into `id`, but never over data it already has. */
+async function adoptOrphanData(id) {
+  const orphanKeys = DATA_KEYS.map((k) => scopedKey(NO_ACCOUNT, k));
+  const mineKeys = DATA_KEYS.map((k) => scopedKey(id, k));
+  const found = await new Promise((resolve) => chrome.storage.local.get([...orphanKeys, ...mineKeys], resolve));
+  const moved = {};
+  const drop = [];
+  for (const k of DATA_KEYS) {
+    const from = scopedKey(NO_ACCOUNT, k);
+    if (found[from] === undefined) continue;
+    drop.push(from);
+    if (found[scopedKey(id, k)] === undefined) moved[scopedKey(id, k)] = found[from];
+  }
+  if (!drop.length) return;
+  // A fresh account inherits the sets but not the old sync cursor, or the
+  // server would be told those rows were already pushed.
+  delete moved[scopedKey(id, KEYS.LAST_SYNC)];
+  if (Object.keys(moved).length) await new Promise((resolve) => chrome.storage.local.set(moved, () => resolve()));
+  await new Promise((resolve) => chrome.storage.local.remove(drop, () => resolve()));
 }
 
 function scopedKey(id, k) {
@@ -77,10 +114,11 @@ export async function setLastSync(time) {
   return set(KEYS.LAST_SYNC, time);
 }
 
+/** Drop everything the signed-in account owns here. Other accounts are untouched. */
 export async function deleteActiveAccountData() {
   const id = await getActiveAccountId();
-  const keys = [KEYS.SESSIONS, KEYS.STUDY_SETS, KEYS.ACTIVITY, KEYS.REVIEW_LOG, KEYS.LAST_SYNC].map(k => scopedKey(id, k));
-  await new Promise(resolve => chrome.storage.local.remove(keys, () => resolve()));
+  await new Promise((resolve) => chrome.storage.local.remove(DATA_KEYS.map((k) => scopedKey(id, k)), () => resolve()));
+  activeAccountIdCache = null;
 }
 
 function get(key, fallback) {
@@ -100,7 +138,6 @@ function set(key, value) {
   });
 }
 
-/** Raw multi-key read (sync layer needs tombstones the UI filters out). */
 export function nowISO() {
   return new Date().toISOString();
 }
@@ -309,7 +346,7 @@ export async function appendReviewLog(entry) {
 
 // --- Backup / restore --------------------------------------------------------
 
-/** Everything user-owned in one JSON-serializable object. */
+/** Raw multi-key read (the sync layer needs the tombstones the UI filters out). */
 export async function readRaw(keys) {
   const id = await getActiveAccountId();
   const actualKeys = keys.map(k => scopedKey(id, k));
@@ -324,6 +361,7 @@ export async function readRaw(keys) {
   });
 }
 
+/** Raw multi-key write into the active account's partition. */
 export async function saveRaw(patch) {
   const id = await getActiveAccountId();
   const actualPatch = {};
@@ -333,6 +371,10 @@ export async function saveRaw(patch) {
   return new Promise(resolve => chrome.storage.local.set(actualPatch, () => resolve()));
 }
 
+/**
+ * Everything the signed-in account owns, as a JSON-serializable object. Never
+ * the auth record: a backup file is shared, and it would carry live tokens.
+ */
 export async function exportAll() {
   return await readRaw([KEYS.SESSIONS, KEYS.STUDY_SETS, KEYS.ACTIVITY, KEYS.REVIEW_LOG]);
 }

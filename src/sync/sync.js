@@ -25,9 +25,8 @@ export async function syncNow() {
   if (syncing) return { skipped: "in-progress" };
   const auth = await getAuth();
   if (!auth?.accessToken) return { skipped: "signed-out" };
-  // Someone signed in as a different account and hasn't said what to do with
-  // the sets already on this device. Uploading them now would move one
-  // learner's library into another's account.
+  // Both the rows and the cursor come from this account's partition, so a
+  // second account on the same device can't be pushed under these tokens.
   const lastSync = await getLastSync();
   syncing = true;
   try {

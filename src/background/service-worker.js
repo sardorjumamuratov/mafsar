@@ -5,6 +5,7 @@ import "../storage/last-answer.js";
 
 import {
   addSession,
+  deleteActiveAccountData,
   getSessions,
   deleteSession,
   getStudySetForSession,
@@ -689,9 +690,10 @@ async function handle(msg) {
 
     case "DELETE_ACCOUNT": {
       await backendDeleteAccount({ password: msg.password ? String(msg.password) : "" });
-      // The account is gone; nothing local is useful without it, and leaving the
-      // auth tokens behind would keep a dead session around.
-      await chrome.storage.local.clear();
+      // The account is gone, so its sets and its dead session go with it — but
+      // another account signed in on this device keeps its own partition.
+      await deleteActiveAccountData();
+      await new Promise((resolve) => chrome.storage.local.remove(["auth", "activeAccountId"], () => resolve()));
       return { deleted: true };
     }
     case "BILLING_PORTAL": {

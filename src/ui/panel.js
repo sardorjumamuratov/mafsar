@@ -317,7 +317,6 @@ nav.addEventListener("click", (e) => {
     renderAuthGate();
     return;
   }
-  // An unanswered account switch blocks sync, so ask before anything else.
   renderHome();
   syncNow().catch(() => {});
 })().catch(e => {

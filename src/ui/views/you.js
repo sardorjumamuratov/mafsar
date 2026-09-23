@@ -1,7 +1,7 @@
 import { activeTab, setNav, showChrome } from "../nav.js";
 import { FLAME, GOOGLE_G, app, bundle, esc, send, setFor, setHTML, summarize, toast, topOfView } from "../core.js";
 import { computeStreak, dayKey, exportAll, importAll } from "../../storage/store.js";
-import { getAuth, googleSignIn, login, register, } from "../../sync/auth.js";
+import { getAuth, googleSignIn, login, register } from "../../sync/auth.js";
 import { renderHome } from "../views/home.js";
 import { syncNow } from "../../sync/sync.js";
 import { renderSetDetail } from "../views/set-detail.js";
@@ -265,13 +265,16 @@ export async function afterSignIn(wasSignedIn) {
   finishSignIn(wasSignedIn);
 }
 
+/**
+ * Being signed in doesn't wait on the network. The first sync after a sign-in
+ * can be slow or fail; that's a sync problem to report, not a sign-in that
+ * never finishes.
+ */
 function finishSignIn(wasSignedIn) {
   if (!wasSignedIn) toast("Signed in");
-  syncNow().catch(() => toast("Failed to sync"));
-  import("../nav.js").then(({ activeTab }) => {
-    if (!wasSignedIn && activeTab !== "you") renderHome();
-    else renderYou();
-  });
+  syncNow().catch(() => toast("Signed in, but couldn't sync yet."));
+  if (!wasSignedIn && activeTab !== "you") renderHome();
+  else renderYou();
 }
 
 export async function authSubmit(kind, btn) {
