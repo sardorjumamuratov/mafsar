@@ -29,6 +29,18 @@ for example: *"Implement docs/prompts/02-abuse-protection.md. Follow AGENTS.md."
 | 20 | [Google sign-in hangs when switching accounts](20-google-account-switch.md) | — | `src/ui/views/you.js`, `src/sync/auth.js`, `server/src/app.ts` (live bug) |
 | 21 | [One device, several accounts](21-per-account-data.md) | **20** | `src/storage/store.js`, `src/sync/`, the worker (replaces 20's switch screen) |
 | 22 | [The panel's top edge looks bolted on](22-panel-top-seam.md) | — | `src/ui/panel.css`, view headers (visual only) |
+| 23 | [Run Mafsar in a tab](23-open-in-tab.md) | **21** | `service-worker.js`, `core.js`, You tab, `panel.css` |
+| 24 | [Request limits, IP trust, signing secret](24-server-hardening.md) | — | `server/src/app.ts`, `schema.ts`, `auth.ts` (security) |
+| 25 | [Saving a set destroys its tombstones](25-tombstone-loss.md) | **21** | `src/storage/store.js`, 6 panel call sites (data bug) |
+| 26 | [Local data hygiene](26-local-data-hygiene.md) | **21**, after **25** | `src/storage/store.js` |
+| 27 | [Sync the compare overrides](27-sync-compare-overrides.md) | **19** | `db.ts` migration, `sync-map.js`, server schema |
+| 28 | [Scraper resilience](28-scraper-resilience.md) | **07** | YouTube + AI Studio extractors, HTML fixtures |
+| 29 | [Split the big three](29-split-the-big-three.md) | — | `llm.ts`, `service-worker.js`, `app.ts` (run alone) |
+| 30 | [Usage counts](30-usage-counts.md) | — | `server/src/app.ts`, `privacy.ts` |
+
+**24 to 30 in order:** 24 and 25 are the two that matter; 29 rewrites the
+files almost everything else touches, so run it on its own and merge it the same
+day. 24, 29 and 30 all edit `server/src/app.ts` — never two at once.
 
 **Running in parallel:** 02, 03, 05, 06, 07 and 08 all edit
 `server/src/app.ts`, and 03 to 08 all edit `server/src/privacy.ts`. Run those one
