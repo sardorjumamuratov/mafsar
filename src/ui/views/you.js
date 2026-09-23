@@ -215,9 +215,7 @@ export let googleAbortController = null;
 export async function authGoogle(btn) {
   if (googleAbortController) {
     googleAbortController.abort();
-    googleAbortController = null;
-    renderHome();
-    return;
+    // A stale attempt is ended and a new one started
   }
   btn.disabled = true;
   
@@ -225,6 +223,14 @@ export async function authGoogle(btn) {
   setHTML(btn, 'Waiting for Google... <button class="btn btn-ghost" style="margin-left:auto;padding:2px 8px;font-size:12px;min-height:0" data-action="auth-google-cancel">Cancel</button>');
   
   googleAbortController = new AbortController();
+  
+  const tabListener = (closedTabId) => { 
+    if (closedTabId === googleAbortController?.tabId) { 
+      googleAbortController.abort(); 
+    } 
+  };
+  chrome.tabs.onRemoved.addListener(tabListener);
+  
   try {
     const user = await googleSignIn({
       onTab: (url) => chrome.tabs.create({ url, active: true }, (tab) => {
@@ -232,12 +238,21 @@ export async function authGoogle(btn) {
       }),
       cancelSignal: googleAbortController.signal
     });
-    if ((/** @type {any} */ (googleAbortController)).tabId) chrome.tabs.remove((/** @type {any} */ (googleAbortController)).tabId);
+    
+    if ((/** @type {any} */ (googleAbortController)).tabId) {
+      chrome.tabs.remove((/** @type {any} */ (googleAbortController)).tabId).catch(() => {});
+    }
     googleAbortController = null;
+    chrome.tabs.onRemoved.removeListener(tabListener);
+    
     await afterSignIn(false);
   } catch (e) {
-    if (/** @type {any} */ (googleAbortController)?.tabId) chrome.tabs.remove((/** @type {any} */ (googleAbortController)).tabId).catch(() => {});
+    if (/** @type {any} */ (googleAbortController)?.tabId) {
+      chrome.tabs.remove((/** @type {any} */ (googleAbortController)).tabId).catch(() => {});
+    }
     googleAbortController = null;
+    chrome.tabs.onRemoved.removeListener(tabListener);
+    
     if (e.message !== 'cancelled') {
       toast(e.message === 'google_unavailable' ? "Google sign-in isn't available right now." : e.message);
     }
@@ -247,13 +262,54 @@ export async function authGoogle(btn) {
 }
 
 export async function afterSignIn(wasSignedIn) {
-  if (!wasSignedIn) toast("Signed in");
-  try {
-    await syncNow();
-  } catch (e) {
+  const auth = await getAuth();
+  const lastUserId = await new Promise(r => chrome.storage.local.get("lastUserId", obj => r(obj.lastUserId)));
+  
+  if (lastUserId && auth.user && auth.user.id !== lastUserId) {
+    // We switched accounts
+    setHTML(app, `
+      <div class="view" style="justify-content:center;min-height:100%">
+        <div style="text-align:center;margin-bottom:12px">
+          <div style="font-size:18px;font-weight:600;margin-bottom:8px">Account switched</div>
+          <div style="font-size:14px;line-height:1.4">You are now signed in as <b>${auth.user.email}</b>.<br><br>What would you like to do with the sets currently on this device?</div>
+        </div>
+        <div class="block" style="display:flex;flex-direction:column;gap:10px">
+          <button class="btn btn-primary btn-block" data-action="auth-keep-data">Keep sets (merge into new account)</button>
+          <button class="btn btn-ghost btn-block" data-action="auth-clear-data">Clear device (start fresh)</button>
+        </div>
+      </div>
+    `);
+    return;
   }
+  
+  await finalizeSignIn(wasSignedIn, auth.user?.id);
+}
+
+export async function finalizeSignIn(wasSignedIn, userId) {
+  if (userId) {
+    await new Promise(r => chrome.storage.local.set({ lastUserId: userId }, () => r()));
+  }
+  
+  if (!wasSignedIn) toast("Signed in");
+  
+  // Try sync, but don't block UI state on it
+  syncNow().catch(e => {
+    toast("Couldn't sync yet");
+  });
+  
   if (!wasSignedIn && activeTab !== "you") renderHome();
   else renderYou();
+}
+
+export async function clearLocalDataAndFinalize() {
+  await new Promise(r => chrome.storage.local.remove(["sessions", "studySets", "activity", "reviewLog"], () => r()));
+  const auth = await getAuth();
+  await finalizeSignIn(false, auth.user?.id);
+}
+
+export async function keepLocalDataAndFinalize() {
+  const auth = await getAuth();
+  await finalizeSignIn(false, auth.user?.id);
 }
 
 export async function authSubmit(kind, btn) {

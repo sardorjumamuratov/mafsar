@@ -17,7 +17,7 @@ import { applyNext, goReturn, gradeCard, revealCard, startGlobalReview, startSet
 import { startChainDrill } from "./flows/chain-drill.js";
 import { confirmSheet } from "./confirm.js";
 import { dismissUpdateBanner } from "./update-banner.js";
-import { authGoogle, authSubmit, exportBackup, exportSetTsv, generateSummary, googleAbortController, importBackupFile, renderAuthGate, renderYou } from "./views/you.js";
+import { authGoogle, authSubmit, exportBackup, exportSetTsv, generateSummary, googleAbortController, importBackupFile, renderAuthGate, renderYou, clearLocalDataAndFinalize, keepLocalDataAndFinalize } from "./views/you.js";
 import { checkApply, startApply } from "./flows/apply.js";
 import { checkCode, codingNext, startCodingPractice } from "./flows/coding.js";
 import { startTeach, setTeachPersona, sendTeach, finishTeach } from "./flows/teach.js";
@@ -184,6 +184,8 @@ document.addEventListener("click", (e) => {
     case "import-backup": document.getElementById("backupFile")?.click(); break;
     case "auth-signin": authSubmit("login", t); break;
     case "auth-register": authSubmit("register", t); break;
+      case "auth-keep-data": keepLocalDataAndFinalize(); break;
+      case "auth-clear-data": clearLocalDataAndFinalize(); break;
     case "auth-google": authGoogle(t); break;
     case "auth-google-cancel":
       if (googleAbortController) googleAbortController.abort();

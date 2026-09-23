@@ -119,26 +119,30 @@ export async function authedFetch(path, opts = {}) {
 export async function googleSignIn({ onTab, cancelSignal }) {
   const res = await fetch(API_BASE + '/v1/auth/google/start', {
     method: 'POST',
+    headers: versionHeader()
   });
   if (res.status === 501) throw new Error('google_unavailable');
   if (!res.ok) throw new Error('Could not start Google sign in');
   
-  const { authUrl, pollToken } = await res.json();
+  const { authUrl, pollId, pollToken } = await res.json();
   onTab(authUrl);
 
+  let delay = 1500;
+  const start = Date.now();
   let attempts = 0;
-  while (attempts < 200) {
+  while (Date.now() - start < 10 * 60 * 1000 && attempts < 150) {
     if (cancelSignal?.aborted) throw new Error('cancelled');
-    await new Promise(r => setTimeout(r, 1500));
+    await new Promise(r => setTimeout(r, delay));
     if (cancelSignal?.aborted) throw new Error('cancelled');
     
+    delay = Math.min(5000, delay * 1.2);
     attempts++;
     let pollRes;
     try {
       pollRes = await fetch(API_BASE + '/v1/auth/google/poll', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', ...versionHeader() },
-        body: JSON.stringify({ pollToken })
+        body: JSON.stringify({ pollId, pollToken })
       });
     } catch (e) {
       continue;

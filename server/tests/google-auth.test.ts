@@ -122,14 +122,14 @@ describe("Google Auth Backend", () => {
   test("poll returns pending, then ready, then expired", async () => {
     vi.spyOn(google, "googleConfigured").mockReturnValue(true);
     const res = await app.request("/v1/auth/google/start", { method: "POST" });
-    const { pollToken, authUrl } = await res.json();
+    const { pollToken, authUrl, pollId } = await res.json();
     
     const state = new URL(authUrl).searchParams.get("state");
 
     // poll 1: pending
     let p = await app.request("/v1/auth/google/poll", {
       method: "POST",
-      body: JSON.stringify({ pollToken }),
+      body: JSON.stringify({ pollId, pollToken }),
       headers: { "Content-Type": "application/json" }
     });
     expect((await p.json()).status).toBe("pending");
@@ -143,7 +143,7 @@ describe("Google Auth Backend", () => {
     // poll 2: ready
     p = await app.request("/v1/auth/google/poll", {
       method: "POST",
-      body: JSON.stringify({ pollToken }),
+      body: JSON.stringify({ pollId, pollToken }),
       headers: { "Content-Type": "application/json" }
     });
     const readyJson = await p.json();
@@ -153,7 +153,7 @@ describe("Google Auth Backend", () => {
     // poll 3: expired (deleted)
     p = await app.request("/v1/auth/google/poll", {
       method: "POST",
-      body: JSON.stringify({ pollToken }),
+      body: JSON.stringify({ pollId, pollToken }),
       headers: { "Content-Type": "application/json" }
     });
     expect(p.status).toBe(410);
