@@ -31,7 +31,7 @@ export async function syncNow() {
   syncing = true;
   try {
     const raw = await readRaw([KEYS.SESSIONS, KEYS.STUDY_SETS, KEYS.ACTIVITY, KEYS.REVIEW_LOG]);
-    const local = {
+    let local = {
       sessions: raw.sessions || [],
       studySets: raw.studySets || [],
       activity: raw.activity || {},
