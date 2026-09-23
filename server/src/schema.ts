@@ -194,7 +194,7 @@ const teachMessageSchema = z.object({
 });
 const teachBase = {
   topic: z.string().min(1).max(200),
-  persona: z.enum(["child", "beginner"]).default("child"),
+  persona: z.enum(["child", "beginner", "patient"]).default("child"),
   cards: z.array(teachCardSchema).min(1).max(6),
 };
 

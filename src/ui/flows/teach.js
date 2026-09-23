@@ -54,7 +54,7 @@ export function paintTeachIntro() {
       <ul class="teach-ideas">${cards.map((c) => `<li>${esc(c.front)}</li>`).join("")}</ul>
       <div class="t-label" style="margin-top:14px">Who are you teaching?</div>
       <div class="qlens" role="radiogroup" aria-label="Who are you teaching?">
-        ${option("child", PERSONAS.child.emoji + " " + PERSONAS.child.option)}${option("beginner", PERSONAS.beginner.emoji + " " + PERSONAS.beginner.option)}
+        ${option("child", PERSONAS.child.emoji + " " + PERSONAS.child.option)}${option("beginner", PERSONAS.beginner.emoji + " " + PERSONAS.beginner.option)}${teachState.isMedicine ? option("patient", PERSONAS.patient.emoji + " " + PERSONAS.patient.option) : ""}
       </div>
       <textarea id="teachInput" class="sa-input" rows="6" placeholder="Start explaining in your own words…"></textarea>
       <button class="btn btn-primary btn-block" data-action="teach-send">Start teaching</button>
@@ -64,7 +64,7 @@ export function paintTeachIntro() {
 
 export function setTeachPersona(persona) {
   if (!teachState || teachState.messages.length) return;
-  teachState.persona = persona === "beginner" ? "beginner" : "child";
+  teachState.persona = persona === "beginner" ? "beginner" : (persona === "patient" && teachState.isMedicine) ? "patient" : "child";
   app.querySelectorAll('[data-action="teach-persona"]').forEach((el) => {
     const b = /** @type {HTMLElement} */ (el);
     const on = b.dataset.persona === teachState.persona;
@@ -234,6 +234,7 @@ export function paintTeachResult() {
         <div class="stat"><div class="v tnum">${esc(ev.scores.accuracy)}</div><div class="k">Accuracy</div></div>
         <div class="stat"><div class="v tnum">${esc(ev.scores.completeness)}</div><div class="k">Completeness</div></div>
         <div class="stat"><div class="v tnum">${esc(ev.scores.simplicity)}</div><div class="k">Simplicity</div></div>
+          ${teachState.persona === "patient" ? `<div class="stat"><div class="v tnum">${esc(ev.scores.reassurance || 0)}</div><div class="k">Reassurance</div></div>` : ""}
       </div>
       <div class="listhd"><span class="t-label">Ideas</span></div>
       <div class="block" style="padding:6px 14px">${ev.ideas.map(row).join("")}</div>
