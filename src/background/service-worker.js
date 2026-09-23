@@ -1,4 +1,51 @@
-//
+// Background service worker (ES module). Orchestrates capture storage and
+// generation through the Mafsar backend (server-side LLM key), and opens the
+// side panel when the toolbar icon is clicked.
+import "../storage/last-answer.js";
+
+import {
+  addSession,
+  deleteActiveAccountData,
+  getSessions,
+  deleteSession,
+  getStudySetForSession,
+  saveStudySet,
+  uid,
+} from "../storage/store.js";
+import { initSchedule } from "../../shared/srs.js";
+import { mergeChains } from "../storage/chains.js";
+import {
+  backendGenerate,
+  backendGrade,
+  backendHypothetical,
+  backendSummarize,
+  backendBlurb,
+  backendBillingCheckout,
+  backendBillingPortal,
+  backendShareCreate,
+  backendShareFetch,
+  backendShareRevoke,
+  backendTeamCreate,
+  backendTeamJoin,
+  backendTeamList,
+  backendTeamGet,
+  backendTeamLeave, backendDeleteAccount, backendTeachTurn, backendTeachEvaluate,
+  backendCodingTask,
+  backendCodingGrade,
+  backendDesignTask,
+  backendDesignGrade,
+  backendDesignCurveball,
+  backendEstimationTask,
+  backendEstimationSummary,
+  backendBottleneckTask,
+  backendBottleneckHint,
+  backendBottleneckGrade,
+  backendExtractPdf,
+} from "../sync/api.js";
+import {
+  MAX_PDF_BYTES, captureNote, classifyUrl, pdfTitleFromUrl, transcriptToText, truncateForGeneration,
+} from "../storage/sources.js";
+
 async function captureYouTube(tabId, source) {
   let result;
   try {
@@ -96,53 +143,6 @@ async function extractYouTubeTranscript() {
     .trim();
   return { ok: true, title, segments };
 }
-// Background service worker (ES module). Orchestrates capture storage and
-// generation through the Mafsar backend (server-side LLM key), and opens the
-// side panel when the toolbar icon is clicked.
-import "../storage/last-answer.js";
-
-import {
-  addSession,
-  deleteActiveAccountData,
-  getSessions,
-  deleteSession,
-  getStudySetForSession,
-  saveStudySet,
-  uid,
-} from "../storage/store.js";
-import { initSchedule } from "../../shared/srs.js";
-import { mergeChains } from "../storage/chains.js";
-import {
-  backendGenerate,
-  backendGrade,
-  backendHypothetical,
-  backendSummarize,
-  backendBlurb,
-  backendBillingCheckout,
-  backendBillingPortal,
-  backendShareCreate,
-  backendShareFetch,
-  backendShareRevoke,
-  backendTeamCreate,
-  backendTeamJoin,
-  backendTeamList,
-  backendTeamGet,
-  backendTeamLeave, backendDeleteAccount, backendTeachTurn, backendTeachEvaluate,
-  backendCodingTask,
-  backendCodingGrade,
-  backendDesignTask,
-  backendDesignGrade,
-  backendDesignCurveball,
-  backendEstimationTask,
-  backendEstimationSummary,
-  backendBottleneckTask,
-  backendBottleneckHint,
-  backendBottleneckGrade,
-  backendExtractPdf,
-} from "../sync/api.js";
-import {
-  MAX_PDF_BYTES, captureNote, classifyUrl, pdfTitleFromUrl, transcriptToText, truncateForGeneration,
-} from "../storage/sources.js";
 
 /** Generate a study set for a captured session via the backend. */
 async function generateForSession(session, mode) {

@@ -33,8 +33,7 @@ export async function captureCurrent(btnElement) {
     // Repaint the view the user is already on, then report — so the message
     // stays up until the new set is actually visible.
     await goToActiveTab();
-        if (r.generated) toast(`${r.cards} flashcards ready${r.note || ""}`);
-
+    if (r.generated) toast(`${r.cards} flashcards ready${r.note || ""}`);
     else toast(r.reason || "Saved, but we couldn't make flashcards. Open the set to try again.");
   } catch (e) {
     toast(e.message);
