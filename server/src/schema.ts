@@ -175,7 +175,7 @@ export const shareRevokeSchema = z.object({ code: z.string().min(1) });
 export const teamCreateSchema = z.object({ name: z.string().trim().min(1).max(80) });
 export const teamJoinSchema = z.object({ code: z.string().trim().min(1).max(32) });
 
-export const pollSchema = z.object({ pollToken: z.string().min(20).max(200) });
+export const pollSchema = z.object({ pollId: z.string().min(1).max(200), pollToken: z.string().min(20).max(200) });
 
 // Teach it back. The client sends the whole conversation on every turn (nothing
 // is stored server-side), so every size is capped here.

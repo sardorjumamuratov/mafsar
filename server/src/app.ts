@@ -192,7 +192,7 @@ export function createApp(db: DB) {
     const expiresAt = new Date(Date.now() + 600 * 1000).toISOString();
     
     await run(db, "INSERT INTO pending_logins (id, poll_hash, code_verifier, created_at, expires_at) VALUES (?, ?, ?, ?, ?)", [state, pollHash, verifier, nowISO(), expiresAt]);
-    return c.json({ authUrl, pollToken, expiresIn: 600 });
+    return c.json({ authUrl, pollId: state, pollToken, expiresIn: 600 });
   });
 
   app.get("/v1/auth/google/callback", async (c) => {
@@ -231,14 +231,13 @@ export function createApp(db: DB) {
   });
 
   app.post("/v1/auth/google/poll", limitByIp(limits.googlePollPerIp, requestIp), async (c) => {
-    const { pollToken } = pollSchema.parse(await c.req.json());
+    const { pollId, pollToken } = pollSchema.parse(await c.req.json());
     const pollHash = createHash("sha256").update(pollToken).digest("hex");
     
-    const rows = await all<{ id: string; poll_hash: string; status: string; error: string; user_id: string; access_token: string; refresh_token: string; email: string; expires_at: string }>(db, "SELECT * FROM pending_logins", []);
-    const row = rows.find(r => {
-      if (r.poll_hash.length !== pollHash.length) return false;
-      return timingSafeEqual(Buffer.from(r.poll_hash, 'hex'), Buffer.from(pollHash, 'hex'));
-    });
+    const row = await one<{ id: string; poll_hash: string; status: string; error: string; user_id: string; access_token: string; refresh_token: string; email: string; expires_at: string }>(db, "SELECT * FROM pending_logins WHERE id = ?", [pollId]);
+    if (row && (row.poll_hash.length !== pollHash.length || !timingSafeEqual(Buffer.from(row.poll_hash, 'hex'), Buffer.from(pollHash, 'hex')))) {
+      return c.json({ status: "expired" }, 410);
+    }
     
     if (!row || row.expires_at < nowISO()) {
       return c.json({ status: "expired" }, 410);
