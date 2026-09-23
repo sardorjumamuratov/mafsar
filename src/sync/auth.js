@@ -153,8 +153,9 @@ export async function authedFetch(path, opts = {}) {
     timedFetch(API_BASE + path, {
       ...opts,
       headers: {
-        ...(opts.headers || {}),
+        // A default, not a rule: the PDF upload sends raw bytes as application/pdf.
         "content-type": "application/json",
+        ...(opts.headers || {}),
         authorization: `Bearer ${token}`,
         ...versionHeader(),
       },

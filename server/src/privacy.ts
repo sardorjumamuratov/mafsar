@@ -85,6 +85,13 @@ details, the part of our API involved, and your random account ID. It never
 includes your email address, password, sign-in tokens, or the content you
 capture.</p>
 
+<h2>YouTube videos and PDFs</h2>
+<p>When you capture a YouTube video, Mafsar reads the transcript shown on the
+video's page. When you capture a PDF, the file is sent to our backend only to
+extract its text: the file itself is processed in memory and not stored. In both
+cases the text is then handled like any other captured content, as described
+above.</p>
+
 <h2>Children's privacy</h2>
 <p>Mafsar is not directed at children under 13, and we do not knowingly
 collect data from them.</p>

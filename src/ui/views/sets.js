@@ -1,4 +1,5 @@
-import { app, bundle, isAIChatTab, esc, send, setFor, setHTML, sourceLabel, summarize, toast, topOfView } from "../core.js";
+import { classifyUrl } from "../../storage/sources.js";
+import { queryActiveTab, app, bundle, isAIChatTab, esc, send, setFor, setHTML, sourceLabel, summarize, toast, topOfView } from "../core.js";
 import { setNav, showChrome } from "../nav.js";
 import { parseShareCode } from ".././share-link.js";
 import { setSharedPreview, sharedPreview } from "../views/teams.js";
@@ -22,6 +23,25 @@ export function setRow(session, s) {
 }
 
 let captureAnswerToken = 0;
+
+/**
+ * Keeps kind/origin on "Capture this page" in step with the active tab, so the
+ * click handler can request site access before any await. The browser only
+ * honours a permission request made directly inside the click.
+ */
+export async function refreshCaptureCurrentButton() {
+  const btn = document.getElementById("captureCurrentBtn");
+  if (!btn) return;
+  const tab = await queryActiveTab();
+  const source = classifyUrl(tab?.url || "");
+  if (source.kind === "page") {
+    delete btn.dataset.kind;
+    delete btn.dataset.origin;
+    return;
+  }
+  btn.dataset.kind = source.kind;
+  btn.dataset.origin = source.origin;
+}
 
 export async function refreshCaptureAnswerButton() {
   const btn = document.getElementById("captureAnswerBtn");
@@ -66,10 +86,11 @@ export async function renderSets() {
       <button class="btn btn-primary btn-block" data-action="share-lookup">Look up set</button>
       <div id="sharePreview"></div>
       <button class="btn btn-ghost btn-block hidden" id="captureAnswerBtn" data-action="capture-last-answer">✨ Capture last answer</button>
-      <button class="btn btn-ghost btn-block" data-action="capture-current">＋ Capture this page</button>
+      <button class="btn btn-ghost btn-block" id="captureCurrentBtn" data-action="capture-current">＋ Capture this page</button>＋ Capture this page</button>
     </div>`);
   topOfView();
   refreshCaptureAnswerButton().catch(() => {});
+  refreshCaptureCurrentButton().catch(() => {});
 }
 
 export async function lookupShare() {

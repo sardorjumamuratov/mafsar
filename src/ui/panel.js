@@ -7,7 +7,7 @@ import { confirmDeleteAccount, renderDeleteAccount } from "./views/delete-accoun
 import { doImport, previewImport, renderImport } from "./views/import.js";
 import { app, bundle, nav, send, setFor, toast } from "./core.js";
 import { goToActiveTab, registerTabs } from "./nav.js";
-import { importSharedSet, lookupShare, renderSets, refreshCaptureAnswerButton } from "./views/sets.js";
+import { importSharedSet, lookupShare, renderSets, refreshCaptureAnswerButton, refreshCaptureCurrentButton } from "./views/sets.js";
 import { onActiveTabChange } from "./tab-watch.js";
 import { currentDetail, makeSet, openDetailTab, paintDetail, promptAddCard, renderSetDetail, saveCardEdit, saveNewCard, setEditingCardId, startQuizForCurrentSet, toggleSetMenu } from "./views/set-detail.js";
 import { captureCurrent, captureLastAnswer } from "./capture.js";
@@ -48,7 +48,7 @@ document.addEventListener("click", (e) => {
     case "open-set": renderSetDetail(id); break;
     case "open-weak": openWeakCard(id, (/** @type {any} */ (t)).dataset.card).catch((e) => toast(e.message)); break;
     case "make-set": makeSet(id); break;
-    case "capture-current": captureCurrent(); break;
+    case "capture-current": captureCurrent(/** @type {HTMLElement} */ (t)); break;
     case "capture-last-answer": captureLastAnswer(t); break;
     case "tab": openDetailTab((/** @type {any} */ (t)).dataset.tab); break;
     case "delete-set":
@@ -313,7 +313,10 @@ nav.addEventListener("click", (e) => {
 // --- first-launch auth gate: an account is required (backend-first) ---------
 (async function init() {
   registerTabs({ home: renderHome, sets: renderSets, teams: renderTeams, you: renderYou });
-  onActiveTabChange(() => { refreshCaptureAnswerButton().catch(() => {}); });
+  onActiveTabChange(() => {
+    refreshCaptureAnswerButton().catch(() => {});
+    refreshCaptureCurrentButton().catch(() => {});
+  });
   const auth = await getAuth();
   if (!auth?.accessToken) {
     renderAuthGate();

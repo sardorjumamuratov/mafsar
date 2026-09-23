@@ -16,6 +16,8 @@
  */
 
 export const DEFAULT_LIMITS = {
+  // PDF extraction: CPU only, no model call, but big uploads.
+  extractPerUser: { limit: 10, windowMs: 60_000 },
   // Sign-in attempts from one IP. Tight to stop credential stuffing.
   loginPerIp: { limit: 10, windowMs: 15 * 60 * 1000 },
   

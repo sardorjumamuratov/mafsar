@@ -152,3 +152,15 @@ export const backendEstimationSummary = (payload) => post("/v1/estimation-summar
 export const backendBottleneckTask = (payload) => post("/v1/bottleneck-task", payload);
 export const backendBottleneckHint = (payload) => post("/v1/bottleneck-hint", payload);
 export const backendBottleneckGrade = (payload) => post("/v1/bottleneck-grade", payload);
+
+/** Upload a PDF's bytes for text extraction. Resolves { text, pages, pagesRead }. */
+export async function backendExtractPdf(bytes) {
+  const res = await authedFetch("/v1/extract/pdf", {
+    method: "POST",
+    headers: { "content-type": "application/pdf" },
+    body: bytes,
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(data.message || data.error || `Couldn't read this PDF (${res.status}).`);
+  return data;
+}
