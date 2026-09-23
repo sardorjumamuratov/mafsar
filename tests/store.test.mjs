@@ -246,7 +246,7 @@ console.log("review log cap");
 
 await test("appendReviewLog keeps only the newest 2000 entries", async () => {
   const seed = Array.from({ length: 2000 }, (_, i) => ({ id: "r" + i, cardId: "c", grade: 3, reviewedAt: "2026-01-01T00:00:00.000Z" }));
-  await new Promise((r) => chrome.storage.local.set({ reviewLog: seed }, r));
+  await store.saveRaw({ reviewLog: seed });
   await store.appendReviewLog({ id: "newest", cardId: "c", grade: 5, reviewedAt: "2026-02-01T00:00:00.000Z" });
   const log = await store.getReviewLog();
   assert.equal(log.length, 2000, "capped at 2000");

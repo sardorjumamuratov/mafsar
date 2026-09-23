@@ -2,24 +2,18 @@
 // last-write-wins. No-ops when signed out or offline — local data is the
 // source of truth and never blocked on the network.
 
-import { readRaw, uid } from "../storage/store.js";
-import { accountSwitchPending, getAuth, setAuth, authedFetch } from "./auth.js";
+import { readRaw, saveRaw, uid, getLastSync, setLastSync, KEYS } from "../storage/store.js";
+import { getAuth, setAuth, authedFetch } from "./auth.js";
 import { toServer, applyServer } from "../../shared/sync-map.js";
 
-const KEYS = ["sessions", "studySets", "activity", "reviewLog"];
 let syncing = false;
 
 function writeAll(state) {
-  return new Promise((resolve) => {
-    chrome.storage.local.set(
-      {
-        sessions: state.sessions,
-        studySets: state.studySets,
-        activity: state.activity,
-        reviewLog: state.reviewLog,
-      },
-      () => resolve()
-    );
+  return saveRaw({
+    sessions: state.sessions,
+    studySets: state.studySets,
+    activity: state.activity,
+    reviewLog: state.reviewLog,
   });
 }
 
@@ -34,28 +28,27 @@ export async function syncNow() {
   // Someone signed in as a different account and hasn't said what to do with
   // the sets already on this device. Uploading them now would move one
   // learner's library into another's account.
-  if (await accountSwitchPending()) return { skipped: "account-switch" };
-
+  const lastSync = await getLastSync();
   syncing = true;
   try {
-    const raw = await readRaw(KEYS);
+    const raw = await readRaw([KEYS.SESSIONS, KEYS.STUDY_SETS, KEYS.ACTIVITY, KEYS.REVIEW_LOG]);
     const local = {
       sessions: raw.sessions || [],
       studySets: raw.studySets || [],
       activity: raw.activity || {},
       reviewLog: raw.reviewLog || [],
     };
-    const payload = toServer(local, auth.lastSync);
+    const payload = toServer(local, lastSync);
     const res = await authedFetch("/v1/sync", {
       method: "POST",
-      body: JSON.stringify({ since: auth.lastSync || undefined, ...payload }),
+      body: JSON.stringify({ since: lastSync || undefined, ...payload }),
     });
     if (!res.ok) throw new Error(`sync failed (${res.status})`);
     const resp = await res.json();
 
     const merged = applyServer(resp, local, uid);
     await writeAll(merged);
-    await setAuth({ lastSync: resp.serverTime });
+    await setLastSync(resp.serverTime);
 
     return {
       pushed: payload.sets.length + payload.cards.length + payload.quiz.length + payload.reviews.length,

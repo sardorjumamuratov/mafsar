@@ -10,7 +10,7 @@ import { syncLinkCards } from "./chain-links.js";
 //   studySets       -> StudySet[]         (generated cards, keyed by sessionId)
 // A StudySet card carries its own SM-2 scheduling fields (see srs.js).
 
-const KEYS = {
+export const KEYS = {
   SETTINGS: "settings",
   SESSIONS: "sessions",
   STUDY_SETS: "studySets",
@@ -20,26 +20,87 @@ const KEYS = {
 
 const DEFAULT_SETTINGS = { provider: "gemini", apiKey: "", model: "" };
 const REVIEW_LOG_CAP = 2000;
+KEYS.LAST_SYNC = "lastSync";
+
+let activeAccountIdCache = null;
+
+export async function getActiveAccountId() {
+  if (activeAccountIdCache) return activeAccountIdCache;
+  return new Promise((resolve) => {
+    chrome.storage.local.get(null, (all) => {
+      if (all.sessions !== undefined || all.studySets !== undefined) {
+        const id = all.auth?.user?.id || "local";
+        const updates = { activeAccountId: id };
+        const toDelete = [];
+        for (const k of ["sessions", "studySets", "activity", "reviewLog", "lastSync"]) {
+          if (all[k] !== undefined) {
+            updates[`${id}_${k}`] = all[k];
+            toDelete.push(k);
+          }
+        }
+        chrome.storage.local.set(updates, () => {
+          chrome.storage.local.remove(toDelete, () => {
+            activeAccountIdCache = id;
+            resolve(id);
+          });
+        });
+        return;
+      }
+      if (all.activeAccountId) {
+        activeAccountIdCache = all.activeAccountId;
+        resolve(activeAccountIdCache);
+      } else {
+        const id = all.auth?.user?.id || "local";
+        chrome.storage.local.set({ activeAccountId: id }, () => {
+          activeAccountIdCache = id;
+          resolve(id);
+        });
+      }
+    });
+  });
+}
+
+export async function switchActiveAccount(newId) {
+  activeAccountIdCache = newId;
+  return new Promise(resolve => chrome.storage.local.set({ activeAccountId: newId }, () => resolve()));
+}
+
+function scopedKey(id, k) {
+  return k === KEYS.SETTINGS ? k : `${id}_${k}`;
+}
+
+export async function getLastSync() {
+  return get(KEYS.LAST_SYNC, null);
+}
+
+export async function setLastSync(time) {
+  return set(KEYS.LAST_SYNC, time);
+}
+
+export async function deleteActiveAccountData() {
+  const id = await getActiveAccountId();
+  const keys = [KEYS.SESSIONS, KEYS.STUDY_SETS, KEYS.ACTIVITY, KEYS.REVIEW_LOG, KEYS.LAST_SYNC].map(k => scopedKey(id, k));
+  await new Promise(resolve => chrome.storage.local.remove(keys, () => resolve()));
+}
 
 function get(key, fallback) {
-  return new Promise((resolve) => {
-    chrome.storage.local.get(key, (obj) => resolve(obj[key] ?? fallback));
+  return getActiveAccountId().then(id => {
+    return new Promise((resolve) => {
+      const sk = scopedKey(id, key);
+      chrome.storage.local.get(sk, (obj) => resolve(obj[sk] ?? fallback));
+    });
   });
 }
 
 function set(key, value) {
-  return new Promise((resolve) => {
-    chrome.storage.local.set({ [key]: value }, () => resolve());
+  return getActiveAccountId().then(id => {
+    return new Promise((resolve) => {
+      chrome.storage.local.set({ [scopedKey(id, key)]: value }, () => resolve());
+    });
   });
 }
 
 /** Raw multi-key read (sync layer needs tombstones the UI filters out). */
-export function readRaw(keys) {
-  return new Promise((resolve) => {
-    chrome.storage.local.get(keys, (obj) => resolve(obj));
-  });
-}
-
 export function nowISO() {
   return new Date().toISOString();
 }
@@ -249,11 +310,31 @@ export async function appendReviewLog(entry) {
 // --- Backup / restore --------------------------------------------------------
 
 /** Everything user-owned in one JSON-serializable object. */
+export async function readRaw(keys) {
+  const id = await getActiveAccountId();
+  const actualKeys = keys.map(k => scopedKey(id, k));
+  return new Promise((resolve) => {
+    chrome.storage.local.get(actualKeys, (obj) => {
+      const res = {};
+      for (let i = 0; i < keys.length; i++) {
+        res[keys[i]] = obj[actualKeys[i]];
+      }
+      resolve(res);
+    });
+  });
+}
+
+export async function saveRaw(patch) {
+  const id = await getActiveAccountId();
+  const actualPatch = {};
+  for (const [k, v] of Object.entries(patch)) {
+    actualPatch[scopedKey(id, k)] = v;
+  }
+  return new Promise(resolve => chrome.storage.local.set(actualPatch, () => resolve()));
+}
+
 export async function exportAll() {
-  const obj = await new Promise((resolve) =>
-    chrome.storage.local.get(null, (all) => resolve(all))
-  );
-  return obj;
+  return await readRaw([KEYS.SESSIONS, KEYS.STUDY_SETS, KEYS.ACTIVITY, KEYS.REVIEW_LOG]);
 }
 
 /** Replace all local data from a backup object (as produced by exportAll). */
@@ -261,8 +342,12 @@ export async function importAll(data) {
   if (!data || typeof data !== "object" || !Array.isArray(data[KEYS.STUDY_SETS])) {
     throw new Error("Not a Mafsar backup file.");
   }
-  await new Promise((resolve) => chrome.storage.local.clear(() => resolve()));
-  await new Promise((resolve) => chrome.storage.local.set(data, () => resolve()));
+  await saveRaw({
+    [KEYS.SESSIONS]: data[KEYS.SESSIONS] || [],
+    [KEYS.STUDY_SETS]: data[KEYS.STUDY_SETS] || [],
+    [KEYS.ACTIVITY]: data[KEYS.ACTIVITY] || {},
+    [KEYS.REVIEW_LOG]: data[KEYS.REVIEW_LOG] || []
+  });
 }
 
 // --- Activity & streaks -----------------------------------------------------

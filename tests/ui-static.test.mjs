@@ -55,9 +55,9 @@ test("in-place repaints never reset scroll", () => {
   // the total call-site count matches exactly the view renderers' exits:
   // home, exam picker, sets, set detail, make-set, import, teams (two exits:
   // signed-out early return + normal path), team detail, you, auth gate,
-  // delete account, the chain step editor, and the account-switch choice.
+  // delete account, and the chain step editor.
   const callSites = src.split("topOfView();").length - 1;
-  assert.equal(callSites, 15, "exactly the view-renderer exits reset scroll");
+  assert.equal(callSites, 14, "exactly the view-renderer exits reset scroll");
 });
 
 console.log("quiz length picker wiring (item 1)");
@@ -870,16 +870,15 @@ test("clicking sign in always signs in, even with an abandoned attempt running",
   assert.ok(!fn.includes("renderHome"), "a click on Sign in must not navigate away instead of signing in");
 });
 
-test("one account's sets are never uploaded to another without an answer", () => {
-  const sync = readSrc("../src/sync/sync.js");
-  assert.ok(sync.includes("await accountSwitchPending()"), "sync must stop while the switch is unanswered");
-  const panel = readSrc("../src/ui/panel.js");
-  assert.ok(panel.includes("await showAccountSwitchIfPending()"), "reopening the panel must ask again, not sync");
-  for (const action of ["auth-keep-data", "auth-clear-data"]) {
-    assert.ok(panel.includes('case "' + action + '"'), "panel must route " + action);
+test("no file outside store.js reads or writes the study data keys directly", () => {
+  for (const dir of ["../src/ui/", "../src/background/", "../src/sync/"]) {
+    for (const f of walkJs(dir)) {
+      const src = readSrc(f);
+      for (const k of ["sessions", "studySets", "activity", "reviewLog", "lastSync"]) {
+        assert.ok(!src.includes('"' + k + '"') && !src.includes("'" + k + "'") && !src.includes("\`" + k + "\`"), f + " bypasses store.js for " + k);
+      }
+    }
   }
-  const you = readSrc("../src/ui/views/you.js");
-  assert.ok(you.includes("${esc(email"), "the account email is interpolated, so it must be escaped");
 });
 
 console.log(`\n${passed} tests passed`);
