@@ -58,7 +58,10 @@ async function captureYouTube(tabId, source) {
   } catch {
     throw new Error("Mafsar can't read this YouTube tab. Allow access when asked, then try again.");
   }
-  if (!result?.ok) throw new Error("This video has no transcript to learn from.");
+  if (!result?.ok) {
+      if (result?.reason === "scraper-failed") throw new Error("YouTube might have changed its layout. We couldn't read the transcript.");
+      throw new Error("This video has no transcript to learn from.");
+    }
   const full = transcriptToText(result.segments);
   if (full.length < 200) throw new Error("This video's transcript is too short to make cards from.");
   const { text, truncated, keptPercent } = truncateForGeneration(full);
@@ -114,30 +117,60 @@ async function capturePdf(url, source) {
  */
 async function extractYouTubeTranscript() {
   const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
-  const readSegments = () =>
-    Array.from(document.querySelectorAll("ytd-transcript-segment-renderer"))
-      .map((el) => ({
-        start: (el.querySelector(".segment-timestamp")?.textContent || "").trim(),
-        text: (el.querySelector(".segment-text")?.textContent || "").trim(),
-      }))
-      .filter((s) => s.text);
+  
+  const readSegments = () => {
+    // Primary: ytd-transcript-segment-renderer
+    // Fallback: ytd-transcript-segment-list-renderer > div
+    let els = Array.from(document.querySelectorAll("ytd-transcript-segment-renderer"));
+    if (!els.length) els = Array.from(document.querySelectorAll("ytd-transcript-segment-list-renderer > div"));
+    
+    return els.map((el) => {
+      // Primary: .segment-timestamp / .segment-text
+      // Fallback: [class*="timestamp"] / [class*="text"]
+      const tsNode = el.querySelector(".segment-timestamp") || el.querySelector("[class*='timestamp']");
+      const textNode = el.querySelector(".segment-text") || el.querySelector("[class*='text']");
+      return {
+        start: (tsNode?.textContent || "").trim(),
+        text: (textNode?.textContent || "").trim(),
+      };
+    }).filter((s) => s.text);
+  };
 
   let segments = readSegments();
+  let clickedButton = false;
   if (!segments.length) {
     // The "Show transcript" button lives in the collapsed description.
-    /** @type {HTMLElement|null} */ (document.querySelector("#description-inline-expander #expand"))?.click();
-    await sleep(300);
-    const button = /** @type {HTMLElement|null} */ (
-      document.querySelector("ytd-video-description-transcript-section-renderer button")
+    // Primary: #description-inline-expander #expand
+    // Fallback: button[aria-label="Expand"]
+    const expandBtn = /** @type {HTMLElement|null} */ (
+      document.querySelector("#description-inline-expander #expand") ||
+      document.querySelector('button[aria-label="Expand"]')
     );
-    if (!button) return { ok: false, reason: "no-transcript" };
+    expandBtn?.click();
+    await sleep(300);
+    
+    // Primary: ytd-video-description-transcript-section-renderer button
+    // Fallback: button[aria-label="Show transcript"]
+    const button = /** @type {HTMLElement|null} */ (
+      document.querySelector("ytd-video-description-transcript-section-renderer button") ||
+      document.querySelector('button[aria-label="Show transcript"]')
+    );
+    
+    if (!button) return { ok: false, reason: "no-transcript" }; // Genuine absence
+    
     button.click();
+    clickedButton = true;
     for (let i = 0; i < 25 && !segments.length; i++) {
       await sleep(200);
       segments = readSegments();
     }
   }
-  if (!segments.length) return { ok: false, reason: "no-transcript" };
+  
+  if (!segments.length) {
+    // If we clicked the button but no segments appeared, the markup changed and our parser broke.
+    return { ok: false, reason: clickedButton ? "scraper-failed" : "no-transcript" };
+  }
+  
   const title = (document.querySelector("h1.ytd-watch-metadata")?.textContent || document.title || "")
     .replace(/\s*-\s*YouTube\s*$/, "")
     .trim();
