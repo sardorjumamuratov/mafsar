@@ -2,7 +2,21 @@ import { queryActiveTab, send, sendToTab, toast } from "./core.js";
 import { goToActiveTab } from "./nav.js";
 
 // ================================================================ capture current tab
-export async function captureCurrent() {
+export async function captureCurrent(btnElement) {
+  const kind = btnElement?.dataset.kind;
+  const origin = btnElement?.dataset.origin;
+  if ((kind === "youtube" || kind === "pdf") && origin && origin !== "file://") {
+    // Must be the first thing the click does: the browser only shows the
+    // permission prompt while this click's user gesture is still live.
+    const granted = await new Promise((resolve) => {
+      try {
+        chrome.permissions.request({ origins: [origin + "/*"] }, (ok) => resolve(!!ok));
+      } catch {
+        resolve(false);
+      }
+    });
+    if (!granted) return toast("Mafsar needs access to this site to read it.");
+  }
   toast("Capturing…", 0);
   const tab = await queryActiveTab();
   if (!tab?.id) return toast("Open a page to capture first.");
@@ -19,7 +33,7 @@ export async function captureCurrent() {
     // Repaint the view the user is already on, then report — so the message
     // stays up until the new set is actually visible.
     await goToActiveTab();
-    if (r.generated) toast(`${r.cards} flashcards ready`);
+        if (r.generated) toast(`${r.cards} flashcards ready${r.note || ""}`);
     else toast(r.reason || "Saved, but we couldn't make flashcards. Open the set to try again.");
   } catch (e) {
     toast(e.message);

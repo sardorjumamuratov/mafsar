@@ -1,3 +1,5 @@
+import { bodyLimit } from "hono/body-limit";
+import { MAX_PDF_BYTES, extractPdfText } from "./pdf.js";
 import { Hono } from "hono";
 import { compareVersions } from "./version.js";
 import { serveStatic } from "@hono/node-server/serve-static";
@@ -41,6 +43,7 @@ export function createApp(db: DB) {
   const requestIp = (c: any): string | null =>
     clientIp(c.req.raw.headers, c.env?.incoming?.socket?.remoteAddress, ipSource());
   const limits = {
+    extractPerUser: slidingWindow(DEFAULT_LIMITS.extractPerUser),
     loginPerIp: slidingWindow(DEFAULT_LIMITS.loginPerIp),
     loginFailuresPerEmail: slidingWindow(DEFAULT_LIMITS.loginFailuresPerEmail),
     registerPerIp: slidingWindow(DEFAULT_LIMITS.registerPerIp),
@@ -401,6 +404,23 @@ export function createApp(db: DB) {
   // each one — inline per-route rather than a separate hand-maintained path
   // list (Hono's `use()` also has no array-of-paths overload to hang that list
   // off), so a new metered route can't be added here without its gate.
+  // PDFs open in the browser's built-in viewer, where no script can read the page,
+  // so the worker downloads the file and we extract its text here. In memory only;
+  // the file is never stored. No quota: generating cards from the text is charged
+  // by /v1/generate as usual.
+  app.post(
+    "/v1/extract/pdf",
+    limitByUser(limits.extractPerUser),
+    bodyLimit({
+      maxSize: MAX_PDF_BYTES,
+      onError: (c) => c.json({ error: "too_large", message: "This PDF is too large. The limit is 15 MB." }, 413),
+    }),
+    async (c) => {
+      const result = await extractPdfText(new Uint8Array(await c.req.arrayBuffer()));
+      if (!result.ok) return c.json({ error: result.error, message: result.message }, 422);
+      return c.json({ text: result.text, pages: result.pages, pagesRead: result.pagesRead });
+    }
+  );
   app.post("/v1/generate", requireQuota(db, "set"), async (c) => {
     const body = generateSchema.parse(await c.req.json());
     const generated = await generateStudySet(body.messages, body.mode);

@@ -896,6 +896,35 @@ test("every drill screen opens with a header, and the chain drill has a way out"
   assert.ok(drill.includes("${XBTN}"), "the chain drill needs the same close button as every other drill");
 });
 
+test("YouTube and PDF capture: permission first, and no dead caption endpoint", () => {
+  const read = (p) => fs.readFileSync(join(__dirname, p), "utf8").replace(/\r\n/g, "\n");
+
+  const cap = read("../src/ui/capture.js");
+  const fn = cap.slice(cap.indexOf("export async function captureCurrent"));
+  const body = fn.slice(0, fn.indexOf("\n}\n") + 2);
+  assert.ok(body.includes("chrome.permissions.request"), "captureCurrent must ask for site access");
+  assert.ok(
+    body.indexOf("chrome.permissions.request") < body.indexOf("queryActiveTab"),
+    "request the permission before anything is awaited, or the click's user gesture is lost"
+  );
+
+  const sw = read("../src/background/service-worker.js");
+  assert.ok(sw.includes("function extractYouTubeTranscript"), "the transcript extractor must exist");
+  assert.ok(sw.includes("classifyUrl("), "captureTabAndSave must route by URL kind");
+  assert.ok(
+    !/timedtext|captionTracks/.test(sw),
+    "YouTube's caption URLs return empty bodies without a proof-of-origin token: read the transcript panel instead"
+  );
+
+  const sets = read("../src/ui/views/sets.js");
+  assert.ok(sets.includes('id="captureCurrentBtn"') && sets.includes("refreshCaptureCurrentButton"), "the capture button must carry kind/origin");
+
+  assert.ok(
+    /"content-type": "application\/json",\s*\.\.\.\(opts\.headers \|\| \{\}\)/.test(read("../src/sync/auth.js")),
+    "authedFetch must let a caller override content-type (the PDF upload sends raw bytes)"
+  );
+});
+
 console.log(`\n${passed} tests passed`);
 
 

@@ -1,3 +1,101 @@
+//
+async function captureYouTube(tabId, source) {
+  let result;
+  try {
+    const results = await new Promise((resolve, reject) => {
+      chrome.scripting.executeScript({ target: { tabId }, func: extractYouTubeTranscript }, (r) =>
+        chrome.runtime.lastError ? reject(new Error(chrome.runtime.lastError.message)) : resolve(r)
+      );
+    });
+    result = results?.[0]?.result;
+  } catch {
+    throw new Error("Mafsar can't read this YouTube tab. Allow access when asked, then try again.");
+  }
+  if (!result?.ok) throw new Error("This video has no transcript to learn from.");
+  const full = transcriptToText(result.segments);
+  if (full.length < 200) throw new Error("This video's transcript is too short to make cards from.");
+  const { text, truncated, keptPercent } = truncateForGeneration(full);
+  const r = await saveAndGenerate({
+    source: "youtube",
+    sourceLabel: "YouTube",
+    title: result.title || "YouTube video",
+    url: `https://www.youtube.com/watch?v=${source.videoId}`,
+    capturedAt: Date.now(),
+    messages: [{ role: "user", text }],
+  });
+  if (!r.generated) throw new Error(r.reason || "generation-failed");
+  return { ...r, note: captureNote({ truncated, keptPercent }) };
+}
+
+async function capturePdf(url, source) {
+  if (source.local) {
+    throw new Error("Mafsar can't open PDFs from your computer yet. Open one from a website instead.");
+  }
+  let bytes;
+  try {
+    // With the user's cookies, so a PDF behind a course or library login still works.
+    const res = await fetch(url, { credentials: "include" });
+    if (!res.ok) throw new Error(String(res.status));
+    bytes = await res.arrayBuffer();
+  } catch {
+    throw new Error("Couldn't download this PDF. Allow Mafsar to read this site when asked, then try again.");
+  }
+  if (bytes.byteLength > MAX_PDF_BYTES) throw new Error("This PDF is too large. The limit is 15 MB.");
+  const extracted = await backendExtractPdf(bytes);
+  const { text, truncated, keptPercent } = truncateForGeneration(extracted.text);
+  const r = await saveAndGenerate({
+    source: "pdf",
+    sourceLabel: "PDF",
+    title: pdfTitleFromUrl(url),
+    url,
+    capturedAt: Date.now(),
+    messages: [{ role: "user", text }],
+  });
+  if (!r.generated) throw new Error(r.reason || "generation-failed");
+  return { ...r, note: captureNote({ truncated, keptPercent, pages: extracted.pages, pagesRead: extracted.pagesRead }) };
+}
+
+/**
+ * Runs INSIDE a YouTube watch page (serialized by executeScript, so it must stay
+ * self-contained). Reads the transcript panel YouTube itself renders.
+ *
+ * ⚠ UNVERIFIED: these selectors were not checked against the live site when this
+ * was written. See docs/prompts/07-youtube-pdf-capture.md, "Live check".
+ *
+ * Deliberately does NOT fetch cTracks[].baseUrl / tText: since 2025
+ * those return an empty body without a proof-of-origin token from YouTube's player.
+ */
+async function extractYouTubeTranscript() {
+  const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+  const readSegments = () =>
+    Array.from(document.querySelectorAll("ytd-transcript-segment-renderer"))
+      .map((el) => ({
+        start: (el.querySelector(".segment-timestamp")?.textContent || "").trim(),
+        text: (el.querySelector(".segment-text")?.textContent || "").trim(),
+      }))
+      .filter((s) => s.text);
+
+  let segments = readSegments();
+  if (!segments.length) {
+    // The "Show transcript" button lives in the collapsed description.
+    /** @type {HTMLElement|null} */ (document.querySelector("#description-inline-expander #expand"))?.click();
+    await sleep(300);
+    const button = /** @type {HTMLElement|null} */ (
+      document.querySelector("ytd-video-description-transcript-section-renderer button")
+    );
+    if (!button) return { ok: false, reason: "no-transcript" };
+    button.click();
+    for (let i = 0; i < 25 && !segments.length; i++) {
+      await sleep(200);
+      segments = readSegments();
+    }
+  }
+  if (!segments.length) return { ok: false, reason: "no-transcript" };
+  const title = (document.querySelector("h1.ytd-watch-metadata")?.textContent || document.title || "")
+    .replace(/\s*-\s*YouTube\s*$/, "")
+    .trim();
+  return { ok: true, title, segments };
+}
 // Background service worker (ES module). Orchestrates capture storage and
 // generation through the Mafsar backend (server-side LLM key), and opens the
 // side panel when the toolbar icon is clicked.
@@ -40,7 +138,11 @@ import {
   backendBottleneckTask,
   backendBottleneckHint,
   backendBottleneckGrade,
+  backendExtractPdf,
 } from "../sync/api.js";
+import {
+  MAX_PDF_BYTES, captureNote, classifyUrl, pdfTitleFromUrl, transcriptToText, truncateForGeneration,
+} from "../storage/sources.js";
 
 /** Generate a study set for a captured session via the backend. */
 async function generateForSession(session, mode) {
@@ -177,6 +279,12 @@ function notify(message) {
 
 /** Extract text from a tab and run the normal save → generate flow. */
 async function captureTabAndSave(tabId) {
+  const tab = await new Promise((resolve) =>
+    chrome.tabs.get(tabId, (t) => resolve(chrome.runtime.lastError ? null : t))
+  );
+  const source = classifyUrl(tab?.url || "");
+  if (source.kind === "youtube") return captureYouTube(tabId, source);
+  if (source.kind === "pdf") return capturePdf(tab.url, source);
   let page;
   try {
     const results = await new Promise((resolve, reject) => {
