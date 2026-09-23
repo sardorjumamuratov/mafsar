@@ -27,6 +27,8 @@ for example: *"Implement docs/prompts/02-abuse-protection.md. Follow AGENTS.md."
 | 18 | [Medicine: clinical cases](18-clinical-cases.md) | **15**, **11** | Design drill engine, new routes, `privacy.ts` |
 | 19 | [Medicine: differentials + patient persona](19-differentials-and-patient-persona.md) | **15**, **16**, **10** | compare view, fork cards, Teach it back personas |
 | 20 | [Google sign-in hangs when switching accounts](20-google-account-switch.md) | — | `src/ui/views/you.js`, `src/sync/auth.js`, `server/src/app.ts` (live bug) |
+| 21 | [One device, several accounts](21-per-account-data.md) | **20** | `src/storage/store.js`, `src/sync/`, the worker (replaces 20's switch screen) |
+| 22 | [The panel's top edge looks bolted on](22-panel-top-seam.md) | — | `src/ui/panel.css`, view headers (visual only) |
 
 **Running in parallel:** 02, 03, 05, 06, 07 and 08 all edit
 `server/src/app.ts`, and 03 to 08 all edit `server/src/privacy.ts`. Run those one
