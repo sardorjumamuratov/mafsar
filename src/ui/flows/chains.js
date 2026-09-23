@@ -1,6 +1,6 @@
 import { app, bundle, esc, setFor, setHTML, toast, topOfView } from "../core.js";
 import { showChrome } from "../nav.js";
-import { saveStudySet, uid } from "../../storage/store.js";
+import { updateStudySet, uid } from "../../storage/store.js";
 import { editStep, stepLabel } from "../../storage/chains.js";
 import { renderSetDetail } from "../views/set-detail.js";
 
@@ -47,7 +47,7 @@ async function commit(values) {
   const chain = (set?.chains || []).find((c) => c.id === chainId);
   if (!set || !chain) return toast("That chain no longer exists.");
   const updated = editStep(chain, key, values, { uid });
-  await saveStudySet({ ...set, chains: set.chains.map((c) => (c.id === chainId ? updated : c)) });
+  await updateStudySet(sessionId, { chains: set.chains.map((c) => (c.id === chainId ? updated : c)) });
   editing = null;
   renderSetDetail(sessionId, "chains");
 }
@@ -74,6 +74,6 @@ export async function dismissMedicineSuggestion(sessionId) {
   const { studySets } = await bundle();
   const set = setFor(sessionId, studySets);
   if (!set) return;
-  await saveStudySet({ ...set, dismissedMedicine: true });
+  await updateStudySet(sessionId, { dismissedMedicine: true });
   renderSetDetail(sessionId);
 }

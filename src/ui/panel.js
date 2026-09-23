@@ -11,7 +11,7 @@ import { importSharedSet, lookupShare, renderSets, refreshCaptureAnswerButton, r
 import { onActiveTabChange } from "./tab-watch.js";
 import { currentDetail, makeSet, openDetailTab, paintDetail, promptAddCard, renderSetDetail, saveCardEdit, saveNewCard, setEditingCardId, startQuizForCurrentSet, toggleSetMenu } from "./views/set-detail.js";
 import { captureCurrent, captureLastAnswer } from "./capture.js";
-import { deleteCard, deleteSession, saveStudySet, setExamDate } from "../storage/store.js";
+import { deleteCard, deleteSession, updateStudySet, setExamDate } from "../storage/store.js";
 import { review } from "../../shared/srs.js";
 import { applyNext, goReturn, gradeCard, revealCard, startGlobalReview, startSetReview } from "./flows/review.js";
 import { startChainDrill } from "./flows/chain-drill.js";
@@ -109,10 +109,11 @@ document.addEventListener("click", (e) => {
     case "set-mode":
       (async () => {
         const { studySets } = await bundle();
-        const set = setFor((/** @type {any} */ (t)).dataset.id, studySets);
-        if (!set || (set.mode || "general") === (/** @type {any} */ (t)).dataset.mode) return;
-        set.mode = (/** @type {any} */ (t)).dataset.mode;
-        await saveStudySet(set);
+        const setId = (/** @type {any} */ (t)).dataset.id;
+        const targetMode = (/** @type {any} */ (t)).dataset.mode;
+        const set = setFor(setId, studySets);
+        if (!set || (set.mode || "general") === targetMode) return;
+        await updateStudySet(setId, { mode: targetMode });
         toast((/** @type {any} */ (t)).dataset.mode === "coding" ? "Coding mode on — review now asks for code." : "General mode on.");
         renderSetDetail((/** @type {any} */ (t)).dataset.id, "summary");
       })().catch(e => toast(e.message));
