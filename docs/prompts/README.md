@@ -26,6 +26,7 @@ for example: *"Implement docs/prompts/02-abuse-protection.md. Follow AGENTS.md."
 | 17 | [Medicine: chain drills](17-chain-drills.md) | **15** | new flow, `/v1/grade` reuse |
 | 18 | [Medicine: clinical cases](18-clinical-cases.md) | **15**, **11** | Design drill engine, new routes, `privacy.ts` |
 | 19 | [Medicine: differentials + patient persona](19-differentials-and-patient-persona.md) | **15**, **16**, **10** | compare view, fork cards, Teach it back personas |
+| 20 | [Google sign-in hangs when switching accounts](20-google-account-switch.md) | — | `src/ui/views/you.js`, `src/sync/auth.js`, `server/src/app.ts` (live bug) |
 
 **Running in parallel:** 02, 03, 05, 06, 07 and 08 all edit
 `server/src/app.ts`, and 03 to 08 all edit `server/src/privacy.ts`. Run those one

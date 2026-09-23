@@ -17,7 +17,7 @@ import { applyNext, goReturn, gradeCard, revealCard, startGlobalReview, startSet
 import { startChainDrill } from "./flows/chain-drill.js";
 import { confirmSheet } from "./confirm.js";
 import { dismissUpdateBanner } from "./update-banner.js";
-import { authGoogle, authSubmit, exportBackup, exportSetTsv, generateSummary, googleAbortController, importBackupFile, renderAuthGate, renderYou, clearLocalDataAndFinalize, keepLocalDataAndFinalize } from "./views/you.js";
+import { authGoogle, authSubmit, clearLocalDataAndFinalize, exportBackup, exportSetTsv, generateSummary, googleAbortController, importBackupFile, keepLocalDataAndFinalize, renderAuthGate, renderYou, showAccountSwitchIfPending } from "./views/you.js";
 import { checkApply, startApply } from "./flows/apply.js";
 import { checkCode, codingNext, startCodingPractice } from "./flows/coding.js";
 import { startTeach, setTeachPersona, sendTeach, finishTeach } from "./flows/teach.js";
@@ -56,11 +56,11 @@ document.addEventListener("click", (e) => {
       break;
     case "start-review": startGlobalReview(); break;
     case "set-review": startSetReview(id); break;
-      case "start-chain-drill": startChainDrill(id); break;
-      case "start-compare": startCompare(id); break;
-      case "compare-select": selectComparePair((/** @type {any} */ (t)).dataset.id1, (/** @type {any} */ (t)).dataset.id2); break;
-      case "compare-toggle": toggleCompareSame((/** @type {any} */ (t)).dataset.key); break;
-      case "compare-fork-cards": createForkCards(); break;
+    case "start-chain-drill": startChainDrill(id); break;
+    case "start-compare": startCompare(id); break;
+    case "compare-select": selectComparePair((/** @type {any} */ (t)).dataset.id1, (/** @type {any} */ (t)).dataset.id2); break;
+    case "compare-toggle": toggleCompareSame((/** @type {any} */ (t)).dataset.key); break;
+    case "compare-fork-cards": createForkCards(); break;
     case "flip": revealCard(); break;
     case "grade": gradeCard(Number((/** @type {any} */ (t)).dataset.g)); break;
     case "billing-portal":
@@ -184,8 +184,8 @@ document.addEventListener("click", (e) => {
     case "import-backup": document.getElementById("backupFile")?.click(); break;
     case "auth-signin": authSubmit("login", t); break;
     case "auth-register": authSubmit("register", t); break;
-      case "auth-keep-data": keepLocalDataAndFinalize(); break;
-      case "auth-clear-data": clearLocalDataAndFinalize(); break;
+    case "auth-keep-data": keepLocalDataAndFinalize(); break;
+    case "auth-clear-data": clearLocalDataAndFinalize(); break;
     case "auth-google": authGoogle(t); break;
     case "auth-google-cancel":
       if (googleAbortController) googleAbortController.abort();
@@ -319,6 +319,8 @@ nav.addEventListener("click", (e) => {
     renderAuthGate();
     return;
   }
+  // An unanswered account switch blocks sync, so ask before anything else.
+  if (await showAccountSwitchIfPending()) return;
   renderHome();
   syncNow().catch(() => {});
 })().catch(e => {

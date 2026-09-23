@@ -16,15 +16,17 @@ global.chrome = {
 };
 
 let fetchResponses = [];
+let pollCalls = [];
 global.fetch = async (url, opts) => {
   if (url.includes("/start")) {
     return {
       status: 200,
       ok: true,
-      json: async () => ({ authUrl: "https://auth", pollToken: "test" })
+      json: async () => ({ authUrl: "https://auth", pollId: "row-1", pollToken: "test" })
     };
   }
   if (url.includes("/poll")) {
+    pollCalls.push({ at: Date.now(), body: JSON.parse(opts.body) });
     const r = fetchResponses.shift();
     if (r instanceof Error) throw r;
     return r;
@@ -92,7 +94,27 @@ async function testPollCancel() {
   console.log("cancel passed");
 }
 
+// 400 polls at a fixed 1.5s burned most of the per-IP hourly budget in one
+// attempt, so a second attempt failed on the rate limit rather than on anything
+// the learner did.
+async function testPollBackoff() {
+  pollCalls = [];
+  fetchResponses = [
+    { ok: true, json: async () => ({ status: "pending" }) },
+    { ok: true, json: async () => ({ status: "pending" }) },
+    { ok: true, json: async () => ({ status: "ready", accessToken: "a", refreshToken: "r", user: { email: "u" } }) },
+  ];
+  await googleSignIn({ onTab: () => {} });
+  assert.equal(pollCalls.length, 3);
+  assert.equal(pollCalls[0].body.pollId, "row-1", "the server must be able to look the row up by id");
+  const first = pollCalls[1].at - pollCalls[0].at;
+  const second = pollCalls[2].at - pollCalls[1].at;
+  assert.ok(second > first + 100, `polling must slow down, got ${first}ms then ${second}ms`);
+  console.log("backoff passed");
+}
+
 (async () => {
+  await testPollBackoff();
   await testPollReady();
   await testPollExpired();
   await testPollCancel();

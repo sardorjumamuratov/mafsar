@@ -4,7 +4,7 @@ import { setFocusReturn } from "../flows/review.js";
 import { showChrome } from "../nav.js";
 import { appendReviewLog, bumpActivity, uid } from "../../storage/store.js";
 import {
-  STUCK_TEXT, canFinish, coverageCount, mergeCoverage, reviewGradeFor, selectTeachCards, PERSONAS, personaInfo,
+  STUCK_TEXT, canFinish, coverageCount, mergeCoverage, personaOptions, pickPersona, reviewGradeFor, selectTeachCards, PERSONAS, personaInfo,
 } from "../../storage/teach.js";
 
 // Teach it back (the Feynman technique). One sitting's state; goReturn() nulls it.
@@ -20,6 +20,8 @@ export async function startTeach(sessionId) {
   const session = sessions.find((s) => s.id === sessionId);
   teachState = {
     sessionId,
+    // The worried-patient persona is only offered on a Medicine set.
+    isMedicine: (set?.mode || "") === "medicine",
     topic: String(session?.title || set?.title || "this topic").slice(0, 200),
     cards,
     persona: "child",
@@ -54,7 +56,7 @@ export function paintTeachIntro() {
       <ul class="teach-ideas">${cards.map((c) => `<li>${esc(c.front)}</li>`).join("")}</ul>
       <div class="t-label" style="margin-top:14px">Who are you teaching?</div>
       <div class="qlens" role="radiogroup" aria-label="Who are you teaching?">
-        ${option("child", PERSONAS.child.emoji + " " + PERSONAS.child.option)}${option("beginner", PERSONAS.beginner.emoji + " " + PERSONAS.beginner.option)}${teachState.isMedicine ? option("patient", PERSONAS.patient.emoji + " " + PERSONAS.patient.option) : ""}
+        ${personaOptions(teachState.isMedicine).map((id) => option(id, PERSONAS[id].emoji + " " + PERSONAS[id].option)).join("")}
       </div>
       <textarea id="teachInput" class="sa-input" rows="6" placeholder="Start explaining in your own words…"></textarea>
       <button class="btn btn-primary btn-block" data-action="teach-send">Start teaching</button>
@@ -64,7 +66,7 @@ export function paintTeachIntro() {
 
 export function setTeachPersona(persona) {
   if (!teachState || teachState.messages.length) return;
-  teachState.persona = persona === "beginner" ? "beginner" : (persona === "patient" && teachState.isMedicine) ? "patient" : "child";
+  teachState.persona = pickPersona(persona, teachState.isMedicine);
   app.querySelectorAll('[data-action="teach-persona"]').forEach((el) => {
     const b = /** @type {HTMLElement} */ (el);
     const on = b.dataset.persona === teachState.persona;

@@ -55,9 +55,9 @@ test("in-place repaints never reset scroll", () => {
   // the total call-site count matches exactly the view renderers' exits:
   // home, exam picker, sets, set detail, make-set, import, teams (two exits:
   // signed-out early return + normal path), team detail, you, auth gate,
-  // delete account, and the chain step editor.
+  // delete account, the chain step editor, and the account-switch choice.
   const callSites = src.split("topOfView();").length - 1;
-  assert.equal(callSites, 14, "exactly the view-renderer exits reset scroll");
+  assert.equal(callSites, 15, "exactly the view-renderer exits reset scroll");
 });
 
 console.log("quiz length picker wiring (item 1)");
@@ -751,7 +751,7 @@ test("System design sets show all three drills", () => {
 
 test("leaving a drill drops its state", () => {
   const review = readSrc("../src/ui/flows/review.js");
-  for (const fn of ["setDesignState(null)", "setEstimationState(null)", "setBottleneckState(null)", "setTeachState(null)"]) {
+  for (const fn of ["setDesignState(null)", "setEstimationState(null)", "setBottleneckState(null)", "setTeachState(null)", "setCompareState(null)"]) {
     assert.ok(review.includes(fn), "goReturn must call " + fn);
   }
 });
@@ -819,6 +819,67 @@ test("every btn-* class the UI uses is styled", () => {
     for (const m of readSrc(f).matchAll(/class="[^"]*\b(btn-[a-z0-9-]+)/g)) used.add(m[1]);
   }
   assert.deepEqual([...used].filter((c) => !defined.has(c)), [], "an unstyled button variant renders plain");
+});
+
+test("Compare conditions is wired end to end and offered only when there are two chains", () => {
+  const detail = readSrc("../src/ui/views/set-detail.js");
+  assert.ok(detail.includes('data-action="start-compare"'), "set detail needs the Compare entry point");
+  assert.ok(detail.includes("liveChains(studySet.chains).length >= 2"), "a tombstoned chain must not count towards the two");
+  const panel = readSrc("../src/ui/panel.js");
+  for (const action of ["start-compare", "compare-select", "compare-toggle", "compare-fork-cards"]) {
+    assert.ok(panel.includes('case "' + action + '"'), "panel must route " + action);
+  }
+  const flow = readSrc("../src/ui/flows/compare.js");
+  assert.ok(flow.includes("storage/compare.js"), "the judgement lives in the pure module");
+  assert.ok(flow.includes("await saveStudySet"), "an override that is not saved is not an override");
+});
+
+test("fork cards are ordinary review cards: scheduled, stamped, and never duplicated", () => {
+  const src = readSrc("../src/storage/compare.js");
+  assert.ok(src.includes("dueDate"), "a card with no dueDate is never scheduled like the rest");
+  assert.ok(src.includes("updatedAt"), "an unstamped card never syncs");
+  assert.ok(src.includes("cards.find((c) => c.id === id)"), "ids are derived, so making cards twice is a no-op");
+});
+
+test("the worried patient is a Medicine-only persona, decided by one rule", () => {
+  const flow = readSrc("../src/ui/flows/teach.js");
+  assert.ok(flow.includes("personaOptions(teachState.isMedicine)"), "the option list comes from the rule");
+  assert.ok(flow.includes("pickPersona(persona, teachState.isMedicine)"), "the click handler applies the same rule");
+  assert.ok(flow.includes('isMedicine: (set?.mode || "") === "medicine"'), "startTeach must set isMedicine from the set mode");
+});
+
+test("no request in the auth client can hang: they all go through timedFetch", () => {
+  const src = readSrc("../src/sync/auth.js");
+  // timedFetch itself is the one place that may call fetch directly.
+  const rest = src.slice(src.indexOf("export function getAuth"));
+  for (const call of ["await fetch(", "= fetch(", "return fetch("]) {
+    assert.ok(!rest.includes(call), "a bare fetch() in the auth client has no ceiling and can hang the panel");
+  }
+});
+
+test("signing in never waits on a sync, and a failed sync says so", () => {
+  const you = readSrc("../src/ui/views/you.js");
+  assert.ok(!you.includes("await syncNow()"), "awaiting the first sync is what left the button on 'Waiting for Google…'");
+  assert.ok(you.includes("syncNow().catch("), "a sync that fails must still surface");
+});
+
+test("clicking sign in always signs in, even with an abandoned attempt running", () => {
+  const you = readSrc("../src/ui/views/you.js");
+  const fn = you.slice(you.indexOf("export async function authGoogle"), you.indexOf("export async function afterSignIn"));
+  assert.ok(fn.includes("googleAbortController.abort()"), "the stale attempt is ended");
+  assert.ok(!fn.includes("renderHome"), "a click on Sign in must not navigate away instead of signing in");
+});
+
+test("one account's sets are never uploaded to another without an answer", () => {
+  const sync = readSrc("../src/sync/sync.js");
+  assert.ok(sync.includes("await accountSwitchPending()"), "sync must stop while the switch is unanswered");
+  const panel = readSrc("../src/ui/panel.js");
+  assert.ok(panel.includes("await showAccountSwitchIfPending()"), "reopening the panel must ask again, not sync");
+  for (const action of ["auth-keep-data", "auth-clear-data"]) {
+    assert.ok(panel.includes('case "' + action + '"'), "panel must route " + action);
+  }
+  const you = readSrc("../src/ui/views/you.js");
+  assert.ok(you.includes("${esc(email"), "the account email is interpolated, so it must be escaped");
 });
 
 console.log(`\n${passed} tests passed`);

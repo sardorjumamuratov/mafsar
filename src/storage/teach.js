@@ -44,6 +44,16 @@ export const PERSONAS = {
   patient:  { emoji: "🧑‍⚕️", short: "patient",     long: "a worried patient",     option: "A worried patient" },
 };
 
+/** Who a set can be taught to. The worried patient only belongs in Medicine. */
+export function personaOptions(isMedicine) {
+  return isMedicine ? ["child", "beginner", "patient"] : ["child", "beginner"];
+}
+
+/** A persona the set doesn't offer (or none at all) falls back to the child. */
+export function pickPersona(id, isMedicine) {
+  return personaOptions(isMedicine).includes(id) ? id : "child";
+}
+
 /** Unknown values fall back to child, matching setTeachPersona. */
 export function personaInfo(id) {
   if (id === "beginner") return PERSONAS.beginner;

@@ -4,6 +4,27 @@
 import { API_BASE } from "../config.js";
 
 const KEY = "auth";
+const LAST_USER_KEY = "lastUserId";
+const SWITCH_KEY = "accountSwitchPending";
+
+/** No request may block the panel forever; a stalled one has to become an error. */
+export const REQUEST_TIMEOUT_MS = 30_000;
+const POLL_TIMEOUT_MS = 10_000;
+export const TIMEOUT_MESSAGE = "The server didn't answer. Check your connection and try again.";
+
+/** fetch that gives up instead of hanging. Callers may pass their own signal. */
+async function timedFetch(url, opts = {}, ms = REQUEST_TIMEOUT_MS) {
+  const timeout = AbortSignal.timeout(ms);
+  const signal = opts.signal && AbortSignal.any ? AbortSignal.any([opts.signal, timeout]) : opts.signal || timeout;
+  try {
+    return await fetch(url, { ...opts, signal });
+  } catch (e) {
+    // The caller's own abort (Cancel) must stay distinguishable from a timeout.
+    if (opts.signal?.aborted) throw e;
+    if (e?.name === "TimeoutError" || e?.name === "AbortError") throw new Error(TIMEOUT_MESSAGE);
+    throw e;
+  }
+}
 
 /** Sent on every request so the server can refuse a version it no longer supports. */
 function versionHeader() {
@@ -47,13 +68,44 @@ export function setAuth(patch) {
   });
 }
 
+/** Whose study data is on this device, from the last resolved sign-in. */
+export function getLastUserId() {
+  return new Promise((resolve) => chrome.storage.local.get(LAST_USER_KEY, (obj) => resolve(obj[LAST_USER_KEY] || null)));
+}
+
+/** This device now belongs to `userId`, and may sync again. */
+export function rememberAccount(userId) {
+  return new Promise((resolve) =>
+    chrome.storage.local.set({ [LAST_USER_KEY]: userId || null, [SWITCH_KEY]: false }, () => resolve())
+  );
+}
+
+/**
+ * Record who just signed in. "switched" means the sets on this device belong to
+ * someone else: until the learner says what to do with them, syncing would
+ * upload one account's library into another, so it is blocked.
+ */
+export async function noteSignedInUser(userId) {
+  const last = await getLastUserId();
+  if (last && userId && last !== userId) {
+    await new Promise((resolve) => chrome.storage.local.set({ [SWITCH_KEY]: true }, () => resolve()));
+    return "switched";
+  }
+  await rememberAccount(userId);
+  return last ? "same" : "first";
+}
+
+export function accountSwitchPending() {
+  return new Promise((resolve) => chrome.storage.local.get(SWITCH_KEY, (obj) => resolve(!!obj[SWITCH_KEY])));
+}
+
 /** Drop tokens (local study data is kept — logging out never deletes it). */
 export async function logout() {
   await new Promise((resolve) => chrome.storage.local.remove(KEY, () => resolve()));
 }
 
 async function postJson(path, body) {
-  const res = await fetch(API_BASE + path, {
+  const res = await timedFetch(API_BASE + path, {
     method: "POST",
     headers: { "content-type": "application/json", ...versionHeader() },
     body: JSON.stringify(body),
@@ -79,7 +131,7 @@ export async function login(email, password) {
 async function refreshAccessToken() {
   const auth = await getAuth();
   if (!auth?.refreshToken) throw new Error("signed out");
-  const res = await fetch(API_BASE + "/v1/auth/refresh", {
+  const res = await timedFetch(API_BASE + "/v1/auth/refresh", {
     method: "POST",
     headers: { "content-type": "application/json", ...versionHeader() },
     body: JSON.stringify({ refreshToken: auth.refreshToken }),
@@ -98,7 +150,7 @@ export async function authedFetch(path, opts = {}) {
   const auth = await getAuth();
   if (!auth?.accessToken) throw new Error("not signed in");
   const doFetch = (token) =>
-    fetch(API_BASE + path, {
+    timedFetch(API_BASE + path, {
       ...opts,
       headers: {
         ...(opts.headers || {}),
@@ -117,7 +169,7 @@ export async function authedFetch(path, opts = {}) {
 }
 
 export async function googleSignIn({ onTab, cancelSignal }) {
-  const res = await fetch(API_BASE + '/v1/auth/google/start', {
+  const res = await timedFetch(API_BASE + '/v1/auth/google/start', {
     method: 'POST',
     headers: versionHeader()
   });
@@ -139,11 +191,11 @@ export async function googleSignIn({ onTab, cancelSignal }) {
     attempts++;
     let pollRes;
     try {
-      pollRes = await fetch(API_BASE + '/v1/auth/google/poll', {
+      pollRes = await timedFetch(API_BASE + '/v1/auth/google/poll', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', ...versionHeader() },
         body: JSON.stringify({ pollId, pollToken })
-      });
+      }, POLL_TIMEOUT_MS);
     } catch (e) {
       continue;
     }

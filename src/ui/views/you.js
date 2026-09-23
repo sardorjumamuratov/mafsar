@@ -1,7 +1,7 @@
 import { activeTab, setNav, showChrome } from "../nav.js";
 import { FLAME, GOOGLE_G, app, bundle, esc, send, setFor, setHTML, summarize, toast, topOfView } from "../core.js";
 import { computeStreak, dayKey, exportAll, importAll } from "../../storage/store.js";
-import { getAuth, googleSignIn, login, register } from "../../sync/auth.js";
+import { accountSwitchPending, getAuth, googleSignIn, login, noteSignedInUser, register, rememberAccount } from "../../sync/auth.js";
 import { renderHome } from "../views/home.js";
 import { syncNow } from "../../sync/sync.js";
 import { renderSetDetail } from "../views/set-detail.js";
@@ -263,53 +263,60 @@ export async function authGoogle(btn) {
 
 export async function afterSignIn(wasSignedIn) {
   const auth = await getAuth();
-  const lastUserId = await new Promise(r => chrome.storage.local.get("lastUserId", obj => r(obj.lastUserId)));
-  
-  if (lastUserId && auth.user && auth.user.id !== lastUserId) {
-    // We switched accounts
-    setHTML(app, `
-      <div class="view" style="justify-content:center;min-height:100%">
-        <div style="text-align:center;margin-bottom:12px">
-          <div style="font-size:18px;font-weight:600;margin-bottom:8px">Account switched</div>
-          <div style="font-size:14px;line-height:1.4">You are now signed in as <b>${auth.user.email}</b>.<br><br>What would you like to do with the sets currently on this device?</div>
-        </div>
-        <div class="block" style="display:flex;flex-direction:column;gap:10px">
-          <button class="btn btn-primary btn-block" data-action="auth-keep-data">Keep sets (merge into new account)</button>
-          <button class="btn btn-ghost btn-block" data-action="auth-clear-data">Clear device (start fresh)</button>
-        </div>
-      </div>
-    `);
-    return;
-  }
-  
-  await finalizeSignIn(wasSignedIn, auth.user?.id);
+  if ((await noteSignedInUser(auth?.user?.id)) === "switched") return paintAccountSwitch(auth?.user?.email);
+  finishSignIn(wasSignedIn);
 }
 
-export async function finalizeSignIn(wasSignedIn, userId) {
-  if (userId) {
-    await new Promise(r => chrome.storage.local.set({ lastUserId: userId }, () => r()));
-  }
-  
+/**
+ * Signing out keeps the sets on the device, so signing in as someone else finds
+ * another learner's library here. Ask before either uploading or deleting it;
+ * sync stays blocked until this is answered (see accountSwitchPending).
+ */
+export function paintAccountSwitch(email) {
+  showChrome(false);
+  setHTML(app, `<div class="view">
+      <div class="t-label">Sets from another account</div>
+      <p class="del-lead">You're signed in as <b>${esc(email || "a different account")}</b>. The sets on this device belong to the account you used before, so nothing syncs until you choose what happens to them.</p>
+      <button type="button" class="btn btn-primary btn-block" data-action="auth-keep-data">Move them to this account</button>
+      <button type="button" class="btn btn-ghost btn-block" data-action="auth-clear-data">Remove them from this device</button>
+      <p class="help">Removing clears this device only. The other account keeps everything it has already synced.</p>
+    </div>`);
+  topOfView();
+}
+
+/** Take the sets with you: the next sync uploads them to the new account. */
+export async function keepLocalDataAndFinalize() {
+  const auth = await getAuth();
+  await rememberAccount(auth?.user?.id);
+  finishSignIn(false);
+}
+
+/** Start clean: drop this device's copy, then pull the new account's own sets. */
+export async function clearLocalDataAndFinalize() {
+  await new Promise((resolve) => chrome.storage.local.remove(["sessions", "studySets", "activity", "reviewLog"], () => resolve()));
+  const auth = await getAuth();
+  await rememberAccount(auth?.user?.id);
+  finishSignIn(false);
+}
+
+/**
+ * Being signed in doesn't wait on the network. The first sync after a sign-in
+ * can be slow or fail; that's a sync problem to report, not a sign-in that
+ * never finishes.
+ */
+export function finishSignIn(wasSignedIn) {
   if (!wasSignedIn) toast("Signed in");
-  
-  // Try sync, but don't block UI state on it
-  syncNow().catch(e => {
-    toast("Couldn't sync yet");
-  });
-  
+  syncNow().catch(() => toast("Signed in, but couldn't sync yet."));
   if (!wasSignedIn && activeTab !== "you") renderHome();
   else renderYou();
 }
 
-export async function clearLocalDataAndFinalize() {
-  await new Promise(r => chrome.storage.local.remove(["sessions", "studySets", "activity", "reviewLog"], () => r()));
+/** True when the panel painted the choice instead of the caller's view. */
+export async function showAccountSwitchIfPending() {
+  if (!(await accountSwitchPending())) return false;
   const auth = await getAuth();
-  await finalizeSignIn(false, auth.user?.id);
-}
-
-export async function keepLocalDataAndFinalize() {
-  const auth = await getAuth();
-  await finalizeSignIn(false, auth.user?.id);
+  paintAccountSwitch(auth?.user?.email);
+  return true;
 }
 
 export async function authSubmit(kind, btn) {

@@ -9,6 +9,7 @@ import { setTeachState } from "./teach.js";
 import { setDesignState } from "./design.js";
 import { setEstimationState } from "./estimation.js";
 import { setBottleneckState } from "./bottleneck.js";
+import { setCompareState } from "./compare.js";
 import { renderSetDetail } from "../views/set-detail.js";
 import { renderHome } from "../views/home.js";
 
@@ -129,6 +130,7 @@ export function goReturn() {
   setDesignState(null);
   setEstimationState(null);
   setBottleneckState(null);
+  setCompareState(null);
   const ret = focusReturn;
   if (typeof ret === "string" && ret.startsWith("set:")) renderSetDetail(ret.slice(4));
   else renderHome();

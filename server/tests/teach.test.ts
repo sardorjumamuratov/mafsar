@@ -51,6 +51,12 @@ describe("buildTurnPrompt", () => {
     expect(buildTurnPrompt(input([L("x")], { persona: "beginner" })).system).toContain("complete beginner");
   });
 
+  it("plays the worried patient, who asks what patients ask", () => {
+    const { system } = buildTurnPrompt(input([L("x")], { persona: "patient" }));
+    expect(system).toContain("worried patient");
+    expect(system).toMatch(/side effects/i);
+  });
+
   it("'I'm stuck' asks for a hint at the level the server computed", () => {
     const messages = [L("It makes food."), S("hint", "c1"), L("I don't know")];
     const { system, user } = buildTurnPrompt(input(messages, { wantHint: true }));
@@ -136,6 +142,19 @@ describe("normalizeEvaluation", () => {
       evalInput([L("a"), L("b")])
     );
     expect(e.scores.completeness).toBe(50);
+  });
+
+  it("reassurance is scored for the patient and left off everyone else", () => {
+    const patient = normalizeEvaluation(
+      { scores: { reassurance: 80 }, ideas: [{ cardId: "c1", status: "taught" }] },
+      { ...evalInput([L("a"), L("b")]), persona: "patient" as const }
+    );
+    expect(patient.scores.reassurance).toBe(80);
+    const child = normalizeEvaluation(
+      { scores: { reassurance: 80 }, ideas: [{ cardId: "c1", status: "taught" }] },
+      evalInput([L("a"), L("b")])
+    );
+    expect(child.scores.reassurance).toBeUndefined();
   });
 
   it("clamps scores and caps jargon at five", () => {

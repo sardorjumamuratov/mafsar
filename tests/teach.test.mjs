@@ -1,8 +1,8 @@
 // Teach-it-back client rules. Run: node tests/teach.test.mjs
 import assert from "node:assert/strict";
 import {
-  MAX_TEACH_CARDS, STUCK_TEXT, canFinish, coverageCount, mergeCoverage, reviewGradeFor, selectTeachCards,
-  PERSONAS, personaInfo,
+  MAX_TEACH_CARDS, STUCK_TEXT, canFinish, coverageCount, mergeCoverage, personaOptions, pickPersona, reviewGradeFor,
+  selectTeachCards, PERSONAS, personaInfo,
 } from "../src/storage/teach.js";
 
 let passed = 0;
@@ -57,7 +57,20 @@ test("the stuck message is fixed text", () => {
 });
 
 
-test("personaInfo handles patient", () => {
+test("the worried patient is offered in Medicine sets only", () => {
+  assert.deepEqual(personaOptions(false), ["child", "beginner"]);
+  assert.deepEqual(personaOptions(true), ["child", "beginner", "patient"]);
+});
+
+test("a persona the set doesn't offer falls back to the child", () => {
+  assert.equal(pickPersona("patient", false), "child");
+  assert.equal(pickPersona("patient", true), "patient");
+  assert.equal(pickPersona("beginner", false), "beginner");
+  assert.equal(pickPersona("nonsense", true), "child");
+  assert.equal(pickPersona(undefined, true), "child");
+});
+
+test("personaInfo knows the patient", () => {
   assert.equal(personaInfo("patient").short, "patient");
 });
 

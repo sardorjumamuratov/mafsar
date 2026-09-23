@@ -1892,6 +1892,17 @@ button.insight-row:focus-visible { outline: 2px solid var(--primary); outline-of
   white-space: pre; overflow-x: auto;
 }
 
+/* --- Medicine: comparing two chains ---------------------------------------- */
+.cmp-pair { flex-direction: column; align-items: flex-start; gap: 2px; text-align: left; }
+.cmp-pair-title { font-weight: 600; overflow-wrap: anywhere; }
+.cmp-pair .help { margin: 0; }
+.cmp-row { padding: 10px 14px; margin-bottom: 8px; border-left: 3px solid var(--primary); }
+/* Steps that read the same in both conditions step back, so the forks stand out. */
+.cmp-row.same { border-left-color: transparent; opacity: .55; }
+.cmp-head { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; margin-bottom: 6px; }
+.cmp-side { font-size: 13.5px; line-height: 1.45; color: var(--ink); overflow-wrap: anywhere; padding: 3px 0; }
+.cmp-gap { font-size: 13px; color: var(--faint); font-style: italic; padding: 3px 0; }
+
 /* --- Medicine: mechanism chains ------------------------------------------- */
 .chain { padding: 12px 14px; }
 .chain-head { display: flex; justify-content: space-between; align-items: center; gap: 10px; margin-bottom: 10px; }

@@ -3,7 +3,7 @@
 // source of truth and never blocked on the network.
 
 import { readRaw, uid } from "../storage/store.js";
-import { getAuth, setAuth, authedFetch } from "./auth.js";
+import { accountSwitchPending, getAuth, setAuth, authedFetch } from "./auth.js";
 import { toServer, applyServer } from "../../shared/sync-map.js";
 
 const KEYS = ["sessions", "studySets", "activity", "reviewLog"];
@@ -31,6 +31,10 @@ export async function syncNow() {
   if (syncing) return { skipped: "in-progress" };
   const auth = await getAuth();
   if (!auth?.accessToken) return { skipped: "signed-out" };
+  // Someone signed in as a different account and hasn't said what to do with
+  // the sets already on this device. Uploading them now would move one
+  // learner's library into another's account.
+  if (await accountSwitchPending()) return { skipped: "account-switch" };
 
   syncing = true;
   try {
