@@ -70,7 +70,7 @@ await test("regenerate pattern keeps examDate/mode/summary", async () => {
   const after = await store.getStudySetForSession(session.id);
   assert.equal(after.examDate, 1756999999999, "examDate survived regeneration");
   assert.equal(after.mode, "law", "mode survived regeneration");
-  assert.equal(after.flashcards.length, 1);
+  console.log("FLASHCARDS:", after.flashcards); assert.equal(after.flashcards.length, 1);
   assert.equal(after.flashcards[0].front, "New");
 });
 

@@ -1,5 +1,5 @@
 // Sync orchestrator: push local changes, pull server changes, both
-// last-write-wins. No-ops when signed out or offline â€” local data is the
+// last-write-wins. No-ops when signed out or offline — local data is the
 // source of truth and never blocked on the network.
 
 import { readRaw, saveRaw, uid, getLastSync, setLastSync, KEYS } from "../storage/store.js";
@@ -15,6 +15,12 @@ function writeAll(state) {
     activity: state.activity,
     reviewLog: state.reviewLog,
   });
+}
+
+function chunk(arr, size) {
+  const res = [];
+  for (let i = 0; i < arr.length; i += size) res.push(arr.slice(i, i + size));
+  return res;
 }
 
 /**
@@ -38,21 +44,55 @@ export async function syncNow() {
       reviewLog: raw.reviewLog || [],
     };
     const payload = toServer(local, lastSync);
-    const res = await authedFetch("/v1/sync", {
-      method: "POST",
-      body: JSON.stringify({ since: lastSync || undefined, ...payload }),
-    });
-    if (!res.ok) throw new Error(`sync failed (${res.status})`);
-    const resp = await res.json();
+    
+    // Chunk payload arrays
+    const CHUNK_SIZE = 500;
+    const chunkedSets = chunk(payload.sets, CHUNK_SIZE) || [[]];
+    const chunkedCards = chunk(payload.cards, CHUNK_SIZE) || [[]];
+    const chunkedQuiz = chunk(payload.quiz, CHUNK_SIZE) || [[]];
+    const chunkedReviews = chunk(payload.reviews, CHUNK_SIZE) || [[]];
+    const chunkedActivity = chunk(payload.activity, CHUNK_SIZE) || [[]];
+    const chunkedChains = chunk(payload.chains, CHUNK_SIZE) || [[]];
+    const chunkedChainSteps = chunk(payload.chainSteps, CHUNK_SIZE) || [[]];
+    
+    const maxChunks = Math.max(1, chunkedSets.length, chunkedCards.length, chunkedQuiz.length, chunkedReviews.length, chunkedActivity.length, chunkedChains.length, chunkedChainSteps.length);
+    
+    let totalPushed = 0;
+    let totalPulled = 0;
+    let currentSince = lastSync || undefined;
+    let finalServerTime = null;
 
-    const merged = applyServer(resp, local, uid);
-    await writeAll(merged);
-    await setLastSync(resp.serverTime);
+    for (let i = 0; i < maxChunks; i++) {
+      const cSets = chunkedSets[i] || [];
+      const cCards = chunkedCards[i] || [];
+      const cQuiz = chunkedQuiz[i] || [];
+      const cReviews = chunkedReviews[i] || [];
+      const cActivity = chunkedActivity[i] || [];
+      const cChains = chunkedChains[i] || [];
+      const cChainSteps = chunkedChainSteps[i] || [];
+      
+      const res = await authedFetch("/v1/sync", {
+        method: "POST",
+        body: JSON.stringify({ since: currentSince, sets: cSets, cards: cCards, quiz: cQuiz, reviews: cReviews, activity: cActivity, chains: cChains, chainSteps: cChainSteps }),
+      });
+      if (!res.ok) throw new Error("sync failed (${res.status})");
+      const resp = await res.json();
+
+      local = applyServer(resp, local, uid);
+      finalServerTime = resp.serverTime;
+      currentSince = resp.serverTime;
+      
+      totalPushed += cSets.length + cCards.length + cQuiz.length + cReviews.length + cActivity.length + cChains.length + cChainSteps.length;
+      totalPulled += resp.sets.length + resp.cards.length + resp.quiz.length + resp.reviews.length + resp.chains.length + resp.chainSteps.length;
+    }
+
+    await writeAll(local);
+    await setLastSync(finalServerTime);
 
     return {
-      pushed: payload.sets.length + payload.cards.length + payload.quiz.length + payload.reviews.length,
-      pulled: resp.sets.length + resp.cards.length + resp.quiz.length + resp.reviews.length,
-      serverTime: resp.serverTime,
+      pushed: totalPushed,
+      pulled: totalPulled,
+      serverTime: finalServerTime,
     };
   } finally {
     syncing = false;

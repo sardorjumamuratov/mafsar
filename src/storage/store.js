@@ -132,7 +132,7 @@ function get(key, fallback) {
 
 
 export async function evictToFreeSpace() {
-  const bytes = await new Promise(r => chrome.storage.local.getBytesInUse(null, r));
+  const bytes = await new Promise(r => chrome.storage.local.getBytesInUse(null, (bytes) => r(bytes)));
   if (bytes < 4_500_000) return false;
 
   const all = await new Promise(r => chrome.storage.local.get(null, r));
@@ -158,10 +158,10 @@ export async function evictToFreeSpace() {
     if (unsyncedReviews) continue;
     
     const drop = Object.values(KEYS).map(k => `${acc}_${k}`);
-    await new Promise(r => chrome.storage.local.remove(drop, r));
+    await new Promise(r => chrome.storage.local.remove(drop, () => r()));
     freedSomething = true;
     
-    const newBytes = await new Promise(r => chrome.storage.local.getBytesInUse(null, r));
+    const newBytes = await new Promise(r => chrome.storage.local.getBytesInUse(null, (bytes) => r(bytes)));
     if (newBytes < 4_500_000) return true;
   }
   return freedSomething;
@@ -291,11 +291,7 @@ export const BUNDLE_KEYS = [
   KEYS.REVIEW_LOG,
 ];
 
-export async function getStudySetForSession(sessionId) {
-  const sets = await get(KEYS.STUDY_SETS, []);
-  const found = sets.find((s) => s.sessionId === sessionId);
-  return found && !found.deleted ? found : null;
-}
+export async function getStudySetForSession(sessionId) { const sets = await get(KEYS.STUDY_SETS, []); const found = sets.find((s) => s.sessionId === sessionId); if (!found || found.deleted) return null; return { ...found, flashcards: (found.flashcards || []).filter(c => !c.deleted), quiz: (found.quiz || []).filter(q => !q.deleted) }; }
 
 
 
@@ -314,15 +310,23 @@ export async function saveStudySet(studySet) {
   const record = { ...existing, ...studySet, id: studySet.id || existing.id || uid(), updatedAt: nowISO() };
   
   const mergeArrays = (oldArr = [], newArr = []) => {
-    const byId = new Map(oldArr.map((x) => [x.id, x]));
-    for (const item of newArr) {
-      const ex = byId.get(item.id);
-      if (!ex || (item.updatedAt || "") >= (ex.updatedAt || "")) {
-        byId.set(item.id, item);
+      const byId = new Map(oldArr.map((x) => [x.id, x]));
+      const newIds = new Set(newArr.map((x) => x.id));
+      for (const item of newArr) {
+        const ex = byId.get(item.id);
+        if (!ex || (item.updatedAt || "") >= (ex.updatedAt || "")) {
+          byId.set(item.id, item);
+        }
       }
-    }
-    return Array.from(byId.values());
-  };
+      for (const [id, ex] of byId.entries()) {
+        if (!newIds.has(id)) {
+          if (!ex.deleted) {
+            byId.set(id, { ...ex, deleted: true, updatedAt: new Date().toISOString() });
+          }
+        }
+      }
+      return Array.from(byId.values());
+    };
 
   record.flashcards = mergeArrays(existing.flashcards, record.flashcards);
   record.quiz = mergeArrays(existing.quiz, record.quiz);
@@ -491,3 +495,6 @@ export async function updateStudySet(sessionId, patch) {
   await set(KEYS.STUDY_SETS, sets);
   return record;
 }
+
+
+
