@@ -29,8 +29,15 @@ export async function run(db: DB, sql: string, args: unknown[] = []): Promise<nu
 
 // --- migrations ---------------------------------------------------------------
 // Ordered list of DDL batches; the `migrations` table tracks applied ones.
+//
+// A migration is identified by its POSITION here (`00${i + 1}`), so this list is
+// append-only in the strictest sense: inserting one in the middle renames every
+// entry after it, which makes an applied migration look unapplied and re-runs it
+// against a database that already has it. Add new ones at the END, never
+// anywhere else, and never edit or reorder an existing entry.
+// server/tests/migrations.test.ts fails the build if you do.
 // Each batch is split on ';' because libSQL executes one statement at a time.
-const MIGRATIONS: string[] = [
+export const MIGRATIONS: string[] = [
   `
   CREATE TABLE users (
     id TEXT PRIMARY KEY,
@@ -161,9 +168,6 @@ const MIGRATIONS: string[] = [
   );
   CREATE INDEX idx_generation_events_user_time ON generation_events(user_id, created_at);
   `,
-  `
-  ALTER TABLE sets ADD COLUMN chain_overrides TEXT;
-    `,
     `
     ALTER TABLE generation_events ADD COLUMN category TEXT NOT NULL DEFAULT 'set';
     CREATE INDEX idx_generation_events_user_cat_time ON generation_events(user_id, category, created_at);
@@ -230,6 +234,9 @@ const MIGRATIONS: string[] = [
     deleted INTEGER NOT NULL DEFAULT 0
   );
   CREATE INDEX idx_chain_steps_user_server_updated ON chain_steps(user_id, server_updated_at);
+  `,
+  `
+  ALTER TABLE sets ADD COLUMN chain_overrides TEXT;
   `
 ];
 
