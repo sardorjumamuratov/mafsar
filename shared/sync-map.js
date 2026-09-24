@@ -36,6 +36,7 @@ export function toServer({ sessions, studySets, activity, reviewLog }, lastSync)
         source: se.source ?? null,
         sourceLabel: se.sourceLabel ?? null,
         mode: st.mode ?? "general",
+        ...(st.chainOverrides ? { chainOverrides: st.chainOverrides } : {}),
         examDate: st.examDate ? iso(st.examDate) : null,
         createdAt: iso(st.createdAt ?? se.capturedAt ?? Date.now()),
         updatedAt: st.updatedAt,
@@ -160,6 +161,7 @@ export function applyServer(resp, local, uid = () => Math.random().toString(36).
     const st = ensureSet(state, set.id);
     st.title = set.title ?? st.title;
     st.mode = set.mode ?? st.mode;
+    if (set.chainOverrides !== undefined) st.chainOverrides = set.chainOverrides;
     st.examDate = set.examDate ? ms(set.examDate) : null;
     st.createdAt = ms(set.createdAt) || st.createdAt;
     st.updatedAt = set.updatedAt;

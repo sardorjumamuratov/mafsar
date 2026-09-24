@@ -160,6 +160,9 @@ const MIGRATIONS: string[] = [
     created_at TEXT NOT NULL
   );
   CREATE INDEX idx_generation_events_user_time ON generation_events(user_id, created_at);
+  `,
+  `
+  ALTER TABLE sets ADD COLUMN chain_overrides TEXT;
     `,
     `
     ALTER TABLE generation_events ADD COLUMN category TEXT NOT NULL DEFAULT 'set';
