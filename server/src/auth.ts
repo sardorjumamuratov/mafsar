@@ -9,10 +9,12 @@ const REFRESH_TTL = "30d";
 
 export function secretKey(): Uint8Array {
   const s = process.env.JWT_SECRET;
-  if (process.env.NODE_ENV === "production" && (!s || s === "change-me")) {
+  if (!s || s === "change-me") {
+    if (process.env.NODE_ENV === "test" || process.env.USE_DEV_SECRET === "true") {
+      return new TextEncoder().encode("mafsar-dev-secret");
+    }
     throw new Error("JWT_SECRET must be set to a real secret in production");
   }
-  if (!s || s === "change-me") return new TextEncoder().encode("mafsar-dev-secret");
   return new TextEncoder().encode(s);
 }
 

@@ -36,9 +36,12 @@ export function createApp(db: DB) {
 
   // Abuse limits: see src/ratelimit.ts. Created here so each app instance, and so
   // each test, starts with clean counters.
+  // xff-last (default): safe behind a single proxy layer (e.g. Railway edge).
+  // xff-first: use only if the outermost proxy guarantees appending a verified IP.
+  // x-real-ip: for Nginx or similar proxies that pass it explicitly.
   const ipSource = (): IpSource => {
     const v = process.env.CLIENT_IP_SOURCE;
-    return v === "xff-last" || v === "x-real-ip" ? v : "xff-first";
+    return v === "xff-first" || v === "x-real-ip" ? v : "xff-last";
   };
   const requestIp = (c: any): string | null =>
     clientIp(c.req.raw.headers, c.env?.incoming?.socket?.remoteAddress, ipSource());
@@ -310,7 +313,7 @@ export function createApp(db: DB) {
     return c.json({ ok: true });
   });
 
-  app.post("/v1/sync", async (c) => {
+  app.post("/v1/sync", bodyLimit({ maxSize: 1024 * 1024 * 3, onError: (c) => c.json({ error: "too_large", message: "Sync payload too large. The limit is 3 MB." }, 413) }), async (c) => {
     const userId = c.get("userId") as string;
     const body = syncSchema.parse(await c.req.json().catch(() => ({})));
     await applySync(db, userId, body);
@@ -422,7 +425,7 @@ export function createApp(db: DB) {
       return c.json({ text: result.text, pages: result.pages, pagesRead: result.pagesRead });
     }
   );
-  app.post("/v1/generate", requireQuota(db, "set"), async (c) => {
+  app.post("/v1/generate", bodyLimit({ maxSize: 1024 * 1024 * 1, onError: (c) => c.json({ error: "too_large", message: "Generate payload too large. The limit is 1 MB." }, 413) }), requireQuota(db, "set"), async (c) => {
     const body = generateSchema.parse(await c.req.json());
     const generated = await generateStudySet(body.messages, body.mode);
     return c.json(generated);

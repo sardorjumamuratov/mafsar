@@ -103,15 +103,15 @@ export const chainStepSchema = z.object({
 });
 
 export const syncSchema = z.object({
-  since: z.string().optional(),
-  sets: z.array(setSchema).default([]),
-  cards: z.array(cardSchema).default([]),
-  quiz: z.array(quizSchema).default([]),
-  activity: z.array(activitySchema).default([]),
-  reviews: z.array(reviewSchema).default([]),
+  since: z.string().max(50).optional(),
+  sets: z.array(setSchema).max(50, "At most 50 sets per sync batch").default([]),
+  cards: z.array(cardSchema).max(500, "At most 500 cards per sync batch").default([]),
+  quiz: z.array(quizSchema).max(500, "At most 500 quiz items per sync batch").default([]),
+  activity: z.array(activitySchema).max(500, "At most 500 activity days per sync batch").default([]),
+  reviews: z.array(reviewSchema).max(1000, "At most 1000 reviews per sync batch").default([]),
   // Clients older than Medicine mode send neither; both default to empty.
-  chains: z.array(chainSchema).default([]),
-  chainSteps: z.array(chainStepSchema).default([]),
+  chains: z.array(chainSchema).max(50, "At most 50 chains per sync batch").default([]),
+  chainSteps: z.array(chainStepSchema).max(500, "At most 500 chain steps per sync batch").default([]),
 });
 export type SyncBody = z.infer<typeof syncSchema>;
 
@@ -119,12 +119,12 @@ export type SyncBody = z.infer<typeof syncSchema>;
 
 export const messageSchema = z.object({
   role: z.enum(["user", "assistant"]),
-  text: z.string().min(1),
+  text: z.string().min(1).max(30000, "Message text capped at 30k chars"),
 });
 
 export const generateSchema = z.object({
-  messages: z.array(messageSchema).min(1),
-  title: z.string().optional(),
+  messages: z.array(messageSchema).min(1).max(100, "At most 100 messages in conversation history"),
+  title: z.string().max(200, "Title capped at 200 chars").optional(),
   // Set mode; unknown values are treated as general (see llm.ts studyMode).
   mode: z.string().max(20).optional(),
 });
