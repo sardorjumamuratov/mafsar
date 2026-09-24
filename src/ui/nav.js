@@ -2,8 +2,21 @@ import { nav } from "./core.js";
 import { detail } from "./views/set-detail.js";
 
 export let activeTab = "home";
+let focusView = false;
+
+/**
+ * Hide the bottom nav for a focus view (review, a drill, teach it back). Also
+ * the one record of "the learner is in the middle of something", which a
+ * background repaint has to respect — see inFocusView.
+ */
 export function showChrome(visible) {
   nav.classList.toggle("hidden", !visible);
+  focusView = !visible;
+}
+
+/** True while a focus view is open. A sync must not repaint over one. */
+export function inFocusView() {
+  return focusView;
 }
 export function setNav(tab) {
   activeTab = tab;

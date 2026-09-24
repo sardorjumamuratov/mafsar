@@ -8,6 +8,9 @@ import { SYNC_LIMITS, toServer, applyServer } from "../../shared/sync-map.js";
 
 let syncing = false;
 
+/** Fired on `window` after a sync that actually brought something down. */
+export const SYNC_PULLED_EVENT = "mafsar:sync-pulled";
+
 function writeAll(state) {
   return saveRaw({
     sessions: state.sessions,
@@ -93,6 +96,11 @@ export async function syncNow() {
     await writeAll(local);
     await setLastSync(finalServerTime);
 
+    // The panel listens for this to repaint. Guarded because a service worker
+    // has no window, and a sync that throws here would lose the whole round.
+    if (totalPulled > 0 && typeof window !== "undefined") {
+      window.dispatchEvent(new CustomEvent(SYNC_PULLED_EVENT));
+    }
     return {
       pushed: totalPushed,
       pulled: totalPulled,
@@ -102,3 +110,4 @@ export async function syncNow() {
     syncing = false;
   }
 }
+

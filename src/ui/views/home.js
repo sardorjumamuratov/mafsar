@@ -1,6 +1,6 @@
 import { setNav, showChrome } from "../nav.js";
 import { FLAME, app, bundle, dateInputValue, esc, examDaysLeft, greeting, nav, send, setFor, setHTML, summarize, toast, topOfView } from "../core.js";
-import { computeStreak, dayKey, setExamDate, weekActivity } from "../../storage/store.js";
+import { computeStreak, dayKey, getLastSync, setExamDate, weekActivity } from "../../storage/store.js";
 import { examReadiness, weakTopics } from "../../../shared/readiness.js";
 import { review } from "../../../shared/srs.js";
 import { setRow } from "../views/sets.js";
@@ -108,7 +108,10 @@ export async function renderHome() {
        </div>`
     : "";
 
-  const heroHtml = due
+  // Nothing stored and nothing ever synced: the first sync is still in flight,
+  // so show that rather than telling a new learner they have no cards.
+  const isInitialSync = studySets.length === 0 && !(await getLastSync());
+  const heroHtml = isInitialSync ? homeSkeleton() : due
     ? `<div class="due-hero">
          <div><div class="t-label">Due today</div><div class="n tnum">${due}</div>
          <div class="sub">across ${withSets.length} set${withSets.length === 1 ? "" : "s"} · ~${est} min</div></div>
@@ -266,3 +269,14 @@ export let shareOpenFor = null; // sessionId whose share block is revealed (surv
 
 export function setExamDraft(v) { examDraft = v; }
 export function setShareOpenFor(v) { shareOpenFor = v; }
+
+/** Stands in for the hero while the first sync is still fetching this account's sets. */
+function homeSkeleton() {
+  return `<div class="skel" role="status" aria-label="Loading your sets">
+    <div class="sk-row" aria-hidden="true" style="height:90px">
+      <div class="sk" style="height:15px;width:40%;margin:10px auto"></div>
+      <div class="sk" style="height:12px;width:60%;margin:10px auto"></div>
+    </div>
+  </div>`;
+}
+

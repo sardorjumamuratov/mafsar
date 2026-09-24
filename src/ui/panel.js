@@ -7,7 +7,7 @@ import { cancelChainEdit, dismissMedicineSuggestion, openChainStepEdit, removeCh
 import { confirmDeleteAccount, renderDeleteAccount } from "./views/delete-account.js";
 import { doImport, previewImport, renderImport } from "./views/import.js";
 import { app, bundle, nav, send, setFor, toast } from "./core.js";
-import { goToActiveTab, registerTabs } from "./nav.js";
+import { goToActiveTab, inFocusView, registerTabs } from "./nav.js";
 import { importSharedSet, lookupShare, renderSets, refreshCaptureAnswerButton, refreshCaptureCurrentButton } from "./views/sets.js";
 import { onActiveTabChange } from "./tab-watch.js";
 import { currentDetail, makeSet, openDetailTab, paintDetail, promptAddCard, renderSetDetail, saveCardEdit, saveNewCard, setEditingCardId, startQuizForCurrentSet, toggleSetMenu } from "./views/set-detail.js";
@@ -28,7 +28,7 @@ import { checkTyped, startTypedPractice, typedNext } from "./flows/typed.js";
 import { getAuth, login, logout, register } from "../sync/auth.js";
 import { examDraft, openExamPicker, renderHome, saveExamSelection, setExamDraft } from "./views/home.js";
 import { answerQuiz, quickQuizLen, quizNext, startQuiz } from "./flows/quiz.js";
-import { syncNow } from "../sync/sync.js";
+import { SYNC_PULLED_EVENT, syncNow } from "../sync/sync.js";
 
 // ================================================================ action router
 document.addEventListener("click", (e) => {
@@ -316,6 +316,19 @@ nav.addEventListener("click", (e) => {
 });
 
 // --- first-launch auth gate: an account is required (backend-first) ---------
+// A sync that pulled rows repaints the tab on screen, so a fresh sign-in fills
+// in by itself. Never while the learner is mid-something: a focus view hides the
+// nav, and a repaint would throw away a half-written answer.
+window.addEventListener(SYNC_PULLED_EVENT, () => {
+  if (inFocusView()) return;
+  const sheet = document.getElementById('sheet');
+  if (sheet && !sheet.classList.contains('hidden')) return;
+  if (document.querySelector('.menu:not(.hidden)')) return;
+  const activeTag = document.activeElement?.tagName;
+  if (activeTag === 'INPUT' || activeTag === 'TEXTAREA') return;
+  goToActiveTab();
+});
+
 (async function init() {
   registerTabs({ home: renderHome, sets: renderSets, teams: renderTeams, you: renderYou });
   onActiveTabChange(() => {
@@ -367,3 +380,4 @@ async function openWeakCard(sessionId, cardId) {
   row.classList.add("flash-highlight");
   setTimeout(() => row.classList.remove("flash-highlight"), 1500);
 }
+

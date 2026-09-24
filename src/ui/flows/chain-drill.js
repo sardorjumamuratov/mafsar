@@ -2,6 +2,7 @@
 import { XBTN, app, bundle, esc, setHTML, setFor, send, toast } from "../core.js";
 import { appendReviewLog, bumpActivity, updateCard } from "../../storage/store.js";
 import { orderedSteps } from "../../storage/chains.js";
+import { showChrome } from "../nav.js";
 import { linkId } from "../../storage/chain-links.js";
 import { failedLinkIds, pickDrillChain, roundScore, shuffledOrder, EXERCISES } from "../../storage/chain-drill.js";
 import { drillLogEntry } from "../../storage/drill-log.js";
@@ -25,6 +26,7 @@ export async function startChainDrill(sessionId) {
 
   cSetId = sessionId;
   cChain = chain;
+  showChrome(false); // a drill is a focus view, like every other drill
   const ex = EXERCISES[Math.floor(Math.random() * EXERCISES.length)];
   
   cSteps = orderedSteps(cChain).filter(s => s.step && s.step.statement);
