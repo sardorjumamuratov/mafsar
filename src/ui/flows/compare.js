@@ -3,7 +3,7 @@ import { setFocusReturn } from "./review.js";
 import { showChrome } from "../nav.js";
 import { liveChains, templateSteps } from "../../storage/chains.js";
 import { buildForkCards, isSame, overrideKey, suggestPairs } from "../../storage/compare.js";
-import { saveStudySet } from "../../storage/store.js";
+import { updateStudySet } from "../../storage/store.js";
 
 // Compare two conditions step by step (Medicine mode). Shared steps are muted,
 // the forks are what's left. { sessionId, set, chains, c1, c2 }; goReturn() nulls it.
@@ -88,7 +88,7 @@ export async function toggleCompareSame(key) {
   if (!s?.c1 || !s?.c2) return;
   const wasSame = isSame(s.c1, s.c2, key, s.set);
   s.set.chainOverrides = { ...(s.set.chainOverrides || {}), [overrideKey(s.c1.id, s.c2.id, key)]: wasSame ? "diff" : "same" };
-  await saveStudySet(s.set);
+  await updateStudySet(s.set.sessionId, { chainOverrides: s.set.chainOverrides, flashcards: s.set.flashcards });
   paintCompareView();
 }
 
@@ -97,6 +97,6 @@ export async function createForkCards() {
   if (!s?.c1 || !s?.c2) return;
   const added = buildForkCards(s.c1, s.c2, s.set, templateSteps(s.c1.template));
   if (!added) return toast("No new differences to make cards from.");
-  await saveStudySet(s.set);
+  await updateStudySet(s.set.sessionId, { chainOverrides: s.set.chainOverrides, flashcards: s.set.flashcards });
   toast(added === 1 ? "1 card added to your review." : `${added} cards added to your review.`);
 }

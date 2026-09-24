@@ -304,16 +304,36 @@ export async function saveStudySet(studySet) {
   studySet.flashcards = syncLinkCards(studySet);
   const sets = await get(KEYS.STUDY_SETS, []);
   const idx = sets.findIndex((s) => s.sessionId === studySet.sessionId);
+
+  const existing = idx >= 0 ? sets[idx] : {};
+
   // Spread first, then force id + a fresh updatedAt LAST: re-saving a record
   // that already carries an updatedAt (e.g. the SUMMARIZE/blurb handlers pass
   // the stored set straight back) must still bump the stamp, or last-write-wins
   // sync can't tell the row changed.
-  const record = { ...studySet, id: studySet.id || uid(), updatedAt: nowISO() };
+  const record = { ...existing, ...studySet, id: studySet.id || existing.id || uid(), updatedAt: nowISO() };
+  
+  const mergeArrays = (oldArr = [], newArr = []) => {
+    const byId = new Map(oldArr.map((x) => [x.id, x]));
+    for (const item of newArr) {
+      const ex = byId.get(item.id);
+      if (!ex || (item.updatedAt || "") >= (ex.updatedAt || "")) {
+        byId.set(item.id, item);
+      }
+    }
+    return Array.from(byId.values());
+  };
+
+  record.flashcards = mergeArrays(existing.flashcards, record.flashcards);
+  record.quiz = mergeArrays(existing.quiz, record.quiz);
+  record.chains = mergeArrays(existing.chains, record.chains);
+
   // Stamp any unsynced children so LWW comparisons always have a timestamp.
   for (const c of record.flashcards || []) c.updatedAt ||= record.updatedAt;
   for (const q of record.quiz || []) q.updatedAt ||= record.updatedAt;
   for (const ch of record.chains || []) {
     ch.updatedAt ||= record.updatedAt;
+    ch.steps = mergeArrays((existing.chains || []).find(x => x.id === ch.id)?.steps, ch.steps);
     for (const st of ch.steps || []) st.updatedAt ||= record.updatedAt;
   }
   if (idx >= 0) sets[idx] = record;
@@ -460,3 +480,14 @@ export async function bumpActivity(n = 1) {
 }
 
 export { uid };
+
+export async function updateStudySet(sessionId, patch) {
+  const sets = await get(KEYS.STUDY_SETS, []);
+  const idx = sets.findIndex((s) => s.sessionId === sessionId);
+  if (idx < 0) return null;
+  const existing = sets[idx];
+  const record = { ...existing, ...patch, updatedAt: nowISO() };
+  sets[idx] = record;
+  await set(KEYS.STUDY_SETS, sets);
+  return record;
+}

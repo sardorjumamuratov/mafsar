@@ -2,7 +2,7 @@ import { COPY_SVG, bundle, esc, send, setFor, setHTML, toast } from "./core.js";
 import { detail, paintDetail } from "./views/set-detail.js";
 import { shareLinkFor } from "./share-link.js";
 import { LANDING_BASE } from "../config.js";
-import { saveStudySet } from "../storage/store.js";
+import { updateStudySet } from "../storage/store.js";
 import { setShareOpenFor, shareOpenFor } from "./views/home.js";
 import { confirmSheet } from "./confirm.js";
 
@@ -45,8 +45,8 @@ export async function ensureShareFor(sessionId) {
   toast("Creating link…");
   try {
     const r = await send({ type: "SHARE_CREATE", setId: sessionId });
-    set.shareCode = r.code;
-    await saveStudySet(set);
+    await updateStudySet(sessionId, { shareCode: r.code });
+      set.shareCode = r.code;
     return set;
   } catch (e) {
     toast(e.message || "Couldn't create a share link.");
@@ -97,8 +97,8 @@ export async function revokeShareFor(sessionId) {
   if (!ok) return;
   try {
     await send({ type: "SHARE_REVOKE", code: set.shareCode });
-    delete set.shareCode;
-    await saveStudySet(set);
+    await updateStudySet(sessionId, { shareCode: undefined });
+      delete set.shareCode;
     setShareOpenFor(null);
     paintDetail();
     toast("Sharing stopped");
