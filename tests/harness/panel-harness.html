@@ -26,6 +26,7 @@
           { id: "sess2", source: "quizlet", sourceLabel: "Imported", title: "Bio ch3", url: "", capturedAt: NOW - 172800000, messages: [], importedCount: 2 },
           { id: "sess3", source: "claude", sourceLabel: "Claude", title: "Pharmacology (big set)", url: "", capturedAt: NOW - 259200000, messages: [{ role: "user", text: "beta blockers?" }] },
           { id: "sess4", source: "chatgpt", sourceLabel: "ChatGPT", title: "Java OOP", url: "", capturedAt: NOW - 3600000, messages: [{ role: "user", text: "encapsulation?" }] },
+          { id: "sess5", source: "chatgpt", sourceLabel: "ChatGPT", title: "Obstructive airway disease", url: "", capturedAt: NOW - 7200000, messages: [{ role: "user", text: "asthma vs copd?" }] },
         ],
         studySets: [
           {
@@ -69,6 +70,44 @@
             ],
             quiz: [],
           },
+          {
+            id: "set5", sessionId: "sess5", title: "Obstructive airway disease", mode: "medicine",
+            createdAt: NOW - 7200000, updatedAt: "2026-09-01T09:00:00.000Z", deleted: false,
+            chains: [
+            {
+              id: "ch-asthma", template: "medicine-condition", title: "Asthma",
+              updatedAt: "2026-09-01T09:00:00.000Z",
+              steps: [
+              { id: "st-ch-asthma-cause", key: "cause", statement: "An allergen or cold air triggers a sensitised airway.", why: "The airway is already primed by type 2 inflammation.", updatedAt: "2026-09-01T09:00:00.000Z" },
+              { id: "st-ch-asthma-mechanism", key: "mechanism", statement: "Mast cells degranulate and smooth muscle constricts.", why: "Histamine and leukotrienes act within minutes.", updatedAt: "2026-09-01T09:00:00.000Z" },
+              { id: "st-ch-asthma-physiological", key: "physiological", statement: "Airflow limitation that reverses with a bronchodilator.", why: "The obstruction is muscular, so relaxing it opens the airway.", updatedAt: "2026-09-01T09:00:00.000Z" },
+              { id: "st-ch-asthma-symptoms", key: "symptoms", statement: "Episodic wheeze, cough and chest tightness, worse at night.", why: "", updatedAt: "2026-09-01T09:00:00.000Z" },
+              { id: "st-ch-asthma-signs", key: "signs", statement: "Expiratory wheeze; prolonged expiratory phase.", why: "", updatedAt: "2026-09-01T09:00:00.000Z" },
+              { id: "st-ch-asthma-tests", key: "tests", statement: "Spirometry shows obstruction that reverses after salbutamol.", why: "Reversibility is the fork away from COPD.", updatedAt: "2026-09-01T09:00:00.000Z" },
+              { id: "st-ch-asthma-diagnosis", key: "diagnosis", statement: "Asthma.", why: "", updatedAt: "2026-09-01T09:00:00.000Z" },
+              { id: "st-ch-asthma-treatment", key: "treatment", statement: "Inhaled corticosteroid, with a reliever as needed.", why: "", updatedAt: "2026-09-01T09:00:00.000Z" },
+              ],
+            },
+            {
+              id: "ch-copd", template: "medicine-condition", title: "COPD",
+              updatedAt: "2026-09-01T09:00:00.000Z",
+              steps: [
+              { id: "st-ch-copd-cause", key: "cause", statement: "Years of smoke exposure damage the airway and alveoli.", why: "The insult is cumulative, not episodic.", updatedAt: "2026-09-01T09:00:00.000Z" },
+              { id: "st-ch-copd-mechanism", key: "mechanism", statement: "Neutrophilic inflammation with loss of elastic recoil.", why: "Destroyed tissue does not spring back.", updatedAt: "2026-09-01T09:00:00.000Z" },
+              { id: "st-ch-copd-physiological", key: "physiological", statement: "Airflow limitation that is largely fixed.", why: "The obstruction is structural, so a bronchodilator barely moves it.", updatedAt: "2026-09-01T09:00:00.000Z" },
+              { id: "st-ch-copd-symptoms", key: "symptoms", statement: "Daily productive cough and progressive breathlessness.", why: "", updatedAt: "2026-09-01T09:00:00.000Z" },
+              { id: "st-ch-copd-signs", key: "signs", statement: "Barrel chest; quiet breath sounds.", why: "", updatedAt: "2026-09-01T09:00:00.000Z" },
+              { id: "st-ch-copd-tests", key: "tests", statement: "Post-bronchodilator FEV1/FVC stays below 0.7.", why: "No meaningful reversibility.", updatedAt: "2026-09-01T09:00:00.000Z" },
+              { id: "st-ch-copd-diagnosis", key: "diagnosis", statement: "COPD.", why: "", updatedAt: "2026-09-01T09:00:00.000Z" },
+              { id: "st-ch-copd-treatment", key: "treatment", statement: "Long-acting bronchodilator; stop smoking.", why: "", updatedAt: "2026-09-01T09:00:00.000Z" },
+              ],
+            },
+            ],
+            flashcards: [
+              { id: "mc1", front: "What reverses in asthma but not COPD?", back: "Airflow obstruction, after a bronchodilator.", easiness: 2.5, interval: 0, repetitions: 0, dueDate: NOW, updatedAt: "2026-09-01T09:00:00.000Z", deleted: false },
+            ],
+            quiz: [],
+          },
         ],
         activity: {},
         reviewLog: [
@@ -90,18 +129,29 @@
 
       window.chrome = {
         storage: {
+          onChanged: { addListener() {} },
           local: {
             get(arg, cb) {
-              const keys = Array.isArray(arg) ? arg : [arg];
+              if (arg === null || arg === undefined) {
+                setTimeout(() => cb(clone(DATA)), 0);
+                return;
+              }
+              const keys = Array.isArray(arg) ? arg : typeof arg === "object" ? Object.keys(arg) : [arg];
               const out = {};
               for (const k of keys) if (DATA[k] !== undefined) out[k] = clone(DATA[k]);
               setTimeout(() => cb(out), 0);
+            },
+            getBytesInUse(_keys, cb) {
+              setTimeout(() => cb(JSON.stringify(DATA).length), 0);
             },
             set(obj, cb) {
               for (const [k, v] of Object.entries(obj)) DATA[k] = clone(v);
               setTimeout(() => cb && cb(), 0);
             },
-            remove(key, cb) { delete DATA[key]; setTimeout(() => cb && cb(), 0); },
+            remove(key, cb) {
+              for (const k of Array.isArray(key) ? key : [key]) delete DATA[k];
+              setTimeout(() => cb && cb(), 0);
+            },
           },
         },
         runtime: {
