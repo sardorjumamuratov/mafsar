@@ -33,14 +33,20 @@ test("an unsynced row surviving the cap and a synced row being trimmed", async (
 
   const raw = await new Promise(r => global.chrome.storage.local.get(null, r));
   const log = raw["acc1_reviewLog"];
-  
-  // Cap is 2000. It should keep all 5 unsynced, and cap the synced to 2000. So 2005!
-  assert.strictEqual(log.length, 2005);
-  
-  // If we add another synced, the synced array becomes 2001, so it trims 1 synced. Total remains 2005.
+
+  // The cap bounds the whole log at 2000, and only synced rows may be dropped
+  // to meet it — so all 5 unsynced are still here and 5 old synced ones went.
+  assert.strictEqual(log.length, 2000);
+  const kept = new Set(log.map((r) => r.id));
+  for (let i = 2000; i < 2005; i++) assert.ok(kept.has(`r${i}`), `unsynced r${i} must survive`);
+
+  // Another synced row trims one more synced row, never an unsynced one.
   await appendReviewLog({ id: "rx", reviewedAt: "2022-01-01T10:00:00.000Z" });
   const raw2 = await new Promise(r => global.chrome.storage.local.get(null, r));
-  assert.strictEqual(raw2["acc1_reviewLog"].length, 2005);
+  const log2 = raw2["acc1_reviewLog"];
+  assert.strictEqual(log2.length, 2000);
+  const kept2 = new Set(log2.map((r) => r.id));
+  for (let i = 2000; i < 2005; i++) assert.ok(kept2.has(`r${i}`), `unsynced r${i} must still survive`);
 });
 
 test("the eviction policy refuses to evict unsynced data and drops synced inactive accounts", async () => {

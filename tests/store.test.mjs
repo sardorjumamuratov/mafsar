@@ -70,17 +70,22 @@ await test("regenerate pattern keeps examDate/mode/summary", async () => {
   const after = await store.getStudySetForSession(session.id);
   assert.equal(after.examDate, 1756999999999, "examDate survived regeneration");
   assert.equal(after.mode, "law", "mode survived regeneration");
-  console.log("FLASHCARDS:", after.flashcards); assert.equal(after.flashcards.length, 1);
+  assert.equal(after.flashcards.length, 1);
   assert.equal(after.flashcards[0].front, "New");
 });
 
-await test("a naive replace DOES wipe examDate (documents the old bug)", async () => {
+await test("a save that omits a field no longer wipes it", async () => {
+  // This used to be the documented bug: saveStudySet replaced the record, so a
+  // caller that didn't repeat examDate lost it. It now merges over what's
+  // stored, which is also what keeps tombstones alive (see the tombstone tests).
   const session = await store.addSession({ source: "chatgpt", title: "T", messages: [] });
   await store.saveStudySet({ sessionId: session.id, title: "T", examDate: 123, flashcards: [], quiz: [] });
-  // What the old service worker did — no preserved fields:
   await store.saveStudySet({ sessionId: session.id, title: "T", createdAt: Date.now(), flashcards: [], quiz: [] });
   const after = await store.getStudySetForSession(session.id);
-  assert.ok(after.examDate == null, "naive replace loses examDate — SW must use the merged pattern");
+  assert.equal(after.examDate, 123, "a field the caller didn't mention survives");
+  // Clearing is explicit, through the function that owns it.
+  await store.setExamDate(session.id, null);
+  assert.equal((await store.getStudySetForSession(session.id)).examDate, null);
 });
 
 console.log("tombstones + filtered getters");
@@ -196,14 +201,25 @@ await test("a deleted quiz question is hidden from the UI getter but kept raw", 
 
 console.log("settings defaults + merge");
 
-await test("getSettings returns provider defaults; saveSettings merges", async () => {
+await test("getSettings merges over the defaults", async () => {
   const def = await store.getSettings();
-  assert.equal(def.provider, "gemini");
-  assert.equal(def.apiKey, "");
-  await store.saveSettings({ apiKey: "secret" });
+  assert.equal(def.openInTab, false);
+  await store.saveSettings({ openInTab: true });
   const merged = await store.getSettings();
-  assert.equal(merged.apiKey, "secret");
-  assert.equal(merged.provider, "gemini", "unspecified fields keep their defaults");
+  assert.equal(merged.openInTab, true);
+});
+
+await test("a personal LLM key left by an old build is scrubbed on read", async () => {
+  // The extension called the model directly before the backend existed, so an
+  // early user still has their own key sitting in local storage, unused.
+  await store.saveRaw({ settings: { provider: "gemini", apiKey: "sk-live-secret", model: "x", openInTab: true } });
+  const settings = await store.getSettings();
+  assert.equal(settings.apiKey, undefined, "the key is gone from what callers see");
+  assert.equal(settings.openInTab, true, "real settings survive the scrub");
+  const stored = await store.readRaw(["settings"]);
+  assert.equal(stored.settings.apiKey, undefined, "and gone from disk, not just hidden");
+  assert.equal(stored.settings.provider, undefined);
+  assert.equal(stored.settings.model, undefined);
 });
 
 console.log("activity, streaks, and the 7-day view");
@@ -244,14 +260,27 @@ await test("weekActivity returns 7 oldest-first days ending today", () => {
 
 console.log("review log cap");
 
-await test("appendReviewLog keeps only the newest 2000 entries", async () => {
+await test("appendReviewLog caps the log by dropping rows the server already has", async () => {
   const seed = Array.from({ length: 2000 }, (_, i) => ({ id: "r" + i, cardId: "c", grade: 3, reviewedAt: "2026-01-01T00:00:00.000Z" }));
-  await store.saveRaw({ reviewLog: seed });
+  await store.saveRaw({ reviewLog: seed, lastSync: "2026-01-15T00:00:00.000Z" });
   await store.appendReviewLog({ id: "newest", cardId: "c", grade: 5, reviewedAt: "2026-02-01T00:00:00.000Z" });
   const log = await store.getReviewLog();
   assert.equal(log.length, 2000, "capped at 2000");
   assert.equal(log[log.length - 1].id, "newest", "newest retained");
   assert.equal(log[0].id, "r1", "oldest (r0) dropped");
+});
+
+await test("an unsynced row is never dropped to meet the cap", async () => {
+  // A long stretch offline must not cost reviews: they are the only copy.
+  const seed = Array.from({ length: 2000 }, (_, i) => ({ id: "s" + i, cardId: "c", grade: 3, reviewedAt: "2026-01-01T00:00:00.000Z" }));
+  const offline = Array.from({ length: 50 }, (_, i) => ({ id: "u" + i, cardId: "c", grade: 4, reviewedAt: "2026-03-01T00:00:00.000Z" }));
+  await store.saveRaw({ reviewLog: [...seed, ...offline], lastSync: "2026-01-15T00:00:00.000Z" });
+  await store.appendReviewLog({ id: "newest", cardId: "c", grade: 5, reviewedAt: "2026-03-02T00:00:00.000Z" });
+  const log = await store.getReviewLog();
+  assert.equal(log.length, 2000, "still bounded");
+  const kept = new Set(log.map((r) => r.id));
+  for (const r of offline) assert.ok(kept.has(r.id), r.id + " was unsynced and must survive");
+  assert.ok(kept.has("newest"));
 });
 
 console.log("addCard");

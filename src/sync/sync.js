@@ -1,10 +1,10 @@
 // Sync orchestrator: push local changes, pull server changes, both
-// last-write-wins. No-ops when signed out or offline � local data is the
+// last-write-wins. No-ops when signed out or offline — local data is the
 // source of truth and never blocked on the network.
 
 import { readRaw, saveRaw, uid, getLastSync, setLastSync, KEYS } from "../storage/store.js";
 import { getAuth, setAuth, authedFetch } from "./auth.js";
-import { toServer, applyServer } from "../../shared/sync-map.js";
+import { SYNC_LIMITS, toServer, applyServer } from "../../shared/sync-map.js";
 
 let syncing = false;
 
@@ -19,7 +19,7 @@ function writeAll(state) {
 
 function chunk(arr, size) {
   const res = [];
-  for (let i = 0; i < arr.length; i += size) res.push(arr.slice(i, i + size));
+  for (let i = 0; i < (arr || []).length; i += size) res.push(arr.slice(i, i + size));
   return res;
 }
 
@@ -45,17 +45,19 @@ export async function syncNow() {
     };
     const payload = toServer(local, lastSync);
     
-    // Chunk payload arrays
-    const CHUNK_SIZE = 500;
-    const chunkedSets = chunk(payload.sets, CHUNK_SIZE) || [[]];
-    const chunkedCards = chunk(payload.cards, CHUNK_SIZE) || [[]];
-    const chunkedQuiz = chunk(payload.quiz, CHUNK_SIZE) || [[]];
-    const chunkedReviews = chunk(payload.reviews, CHUNK_SIZE) || [[]];
-    const chunkedActivity = chunk(payload.activity, CHUNK_SIZE) || [[]];
-    const chunkedChains = chunk(payload.chains, CHUNK_SIZE) || [[]];
-    const chunkedChainSteps = chunk(payload.chainSteps, CHUNK_SIZE) || [[]];
-    
-    const maxChunks = Math.max(1, chunkedSets.length, chunkedCards.length, chunkedQuiz.length, chunkedReviews.length, chunkedActivity.length, chunkedChains.length, chunkedChainSteps.length);
+    // Split the push to what the server will accept. Each array has its own
+    // cap, so one size for all of them would send 60 sets against a limit of
+    // 50 and fail the whole batch — forever, for anyone with a big library.
+    const chunked = {
+      sets: chunk(payload.sets, SYNC_LIMITS.sets),
+      cards: chunk(payload.cards, SYNC_LIMITS.cards),
+      quiz: chunk(payload.quiz, SYNC_LIMITS.quiz),
+      reviews: chunk(payload.reviews, SYNC_LIMITS.reviews),
+      activity: chunk(payload.activity, SYNC_LIMITS.activity),
+      chains: chunk(payload.chains, SYNC_LIMITS.chains),
+      chainSteps: chunk(payload.chainSteps, SYNC_LIMITS.chainSteps),
+    };
+    const maxChunks = Math.max(1, ...Object.values(chunked).map((c) => c.length));
     
     let totalPushed = 0;
     let totalPulled = 0;
@@ -63,19 +65,19 @@ export async function syncNow() {
     let finalServerTime = null;
 
     for (let i = 0; i < maxChunks; i++) {
-      const cSets = chunkedSets[i] || [];
-      const cCards = chunkedCards[i] || [];
-      const cQuiz = chunkedQuiz[i] || [];
-      const cReviews = chunkedReviews[i] || [];
-      const cActivity = chunkedActivity[i] || [];
-      const cChains = chunkedChains[i] || [];
-      const cChainSteps = chunkedChainSteps[i] || [];
+      const cSets = chunked.sets[i] || [];
+      const cCards = chunked.cards[i] || [];
+      const cQuiz = chunked.quiz[i] || [];
+      const cReviews = chunked.reviews[i] || [];
+      const cActivity = chunked.activity[i] || [];
+      const cChains = chunked.chains[i] || [];
+      const cChainSteps = chunked.chainSteps[i] || [];
       
       const res = await authedFetch("/v1/sync", {
         method: "POST",
         body: JSON.stringify({ since: currentSince, sets: cSets, cards: cCards, quiz: cQuiz, reviews: cReviews, activity: cActivity, chains: cChains, chainSteps: cChainSteps }),
       });
-      if (!res.ok) throw new Error("sync failed (${res.status})");
+      if (!res.ok) throw new Error(`sync failed (${res.status})`);
       const resp = await res.json();
 
       local = applyServer(resp, local, uid);
@@ -83,7 +85,9 @@ export async function syncNow() {
       currentSince = resp.serverTime;
       
       totalPushed += cSets.length + cCards.length + cQuiz.length + cReviews.length + cActivity.length + cChains.length + cChainSteps.length;
-      totalPulled += resp.sets.length + resp.cards.length + resp.quiz.length + resp.reviews.length + resp.chains.length + resp.chainSteps.length;
+      // An older server answers without the chain arrays; don't throw on it.
+      totalPulled += (resp.sets?.length || 0) + (resp.cards?.length || 0) + (resp.quiz?.length || 0) +
+        (resp.reviews?.length || 0) + (resp.chains?.length || 0) + (resp.chainSteps?.length || 0);
     }
 
     await writeAll(local);

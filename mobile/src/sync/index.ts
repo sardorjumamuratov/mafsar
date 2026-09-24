@@ -1,4 +1,5 @@
 import { getDB, getMeta, setMeta } from '../db';
+import { SYNC_LIMITS } from '../../../shared/sync-map.js';
 import { authedFetch, isSignedIn } from '../auth';
 import { cardFromWire, cardToWire, isNewer, reviewToWire, setFromWire, setToWire } from './map';
 
@@ -28,6 +29,14 @@ export async function syncQuietly(): Promise<void> {
   }
 }
 
+/** Split rows into batches the server will accept (see SYNC_LIMITS). */
+function batches<T>(rows: T[], size: number): T[][] {
+  if (rows.length <= size) return [rows];
+  const out: T[][] = [];
+  for (let i = 0; i < rows.length; i += size) out.push(rows.slice(i, i + size));
+  return out;
+}
+
 async function doSync(): Promise<SyncResult> {
   const db = await getDB();
   const lastSync = (await getMeta('lastSync')) || '';
@@ -38,34 +47,54 @@ async function doSync(): Promise<SyncResult> {
   // The server max-merges activity per day, so pushing all of it is idempotent.
   const allActivity = await db.getAllAsync<any>('SELECT day, count FROM activity');
 
-  const body = {
-    since: lastSync || undefined,
-    sets: dirtySets.map(setToWire),
-    cards: dirtyCards.map(cardToWire),
-    quiz: [],
-    activity: allActivity.map((a) => ({ day: a.day, count: a.count })),
-    reviews: dirtyReviews.map(reviewToWire),
-  };
+  // /v1/sync rejects a batch that exceeds any cap, so a phone with a big
+  // library has to send several. Everything else here is per-batch too: rows
+  // are only marked clean once the request carrying them came back.
+  const setBatches = batches(dirtySets, SYNC_LIMITS.sets);
+  const cardBatches = batches(dirtyCards, SYNC_LIMITS.cards);
+  const reviewBatches = batches(dirtyReviews, SYNC_LIMITS.reviews);
+  const activityBatches = batches(allActivity, SYNC_LIMITS.activity);
+  const rounds = Math.max(setBatches.length, cardBatches.length, reviewBatches.length, activityBatches.length);
 
-  const res = await authedFetch('/v1/sync', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(body),
-  });
-  if (!res.ok) throw new Error(`Sync failed (${res.status})`);
-  const data = await res.json();
   let pulled = 0;
+  let since = lastSync || undefined;
+  let serverTime: string | undefined;
+
+  for (let i = 0; i < rounds; i++) {
+    const roundSets = setBatches[i] || [];
+    const roundCards = cardBatches[i] || [];
+    const roundReviews = reviewBatches[i] || [];
+    const roundActivity = activityBatches[i] || [];
+
+    const body = {
+      since,
+      sets: roundSets.map(setToWire),
+      cards: roundCards.map(cardToWire),
+      quiz: [],
+      activity: roundActivity.map((a) => ({ day: a.day, count: a.count })),
+      reviews: roundReviews.map(reviewToWire),
+    };
+
+    const res = await authedFetch('/v1/sync', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    });
+    if (!res.ok) throw new Error(`Sync failed (${res.status})`);
+    const data = await res.json();
+    serverTime = data.serverTime;
+    since = data.serverTime;
 
   await db.withTransactionAsync(async () => {
     // Clear dirty only for rows unchanged since we read them: a review made
     // while the request was in flight has a newer updated_at and stays dirty.
-    for (const s of dirtySets) {
+    for (const s of roundSets) {
       await db.runAsync('UPDATE sets SET dirty = 0 WHERE id = ? AND updated_at = ?', [s.id, s.updated_at]);
     }
-    for (const c of dirtyCards) {
+    for (const c of roundCards) {
       await db.runAsync('UPDATE cards SET dirty = 0 WHERE id = ? AND updated_at = ?', [c.id, c.updated_at]);
     }
-    for (const r of dirtyReviews) {
+    for (const r of roundReviews) {
       await db.runAsync('UPDATE review_log SET dirty = 0 WHERE id = ?', [r.id]);
     }
 
@@ -125,9 +154,10 @@ async function doSync(): Promise<SyncResult> {
         [r.id, r.cardId, r.grade, r.prevInterval ?? 0, r.newInterval ?? 0, r.reviewedAt, r.kind ?? 'flashcard', r.stability ?? null, r.difficulty ?? null]
       );
     }
-  });
+    });
+  }
 
-  await setMeta('lastSync', data.serverTime);
+  if (serverTime) await setMeta('lastSync', serverTime);
   await setMeta('lastSyncAt', new Date().toISOString());
   return { pushed: dirtySets.length + dirtyCards.length + dirtyReviews.length, pulled };
 }

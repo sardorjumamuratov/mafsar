@@ -831,7 +831,10 @@ test("Compare conditions is wired end to end and offered only when there are two
   }
   const flow = readSrc("../src/ui/flows/compare.js");
   assert.ok(flow.includes("storage/compare.js"), "the judgement lives in the pure module");
-  assert.ok(flow.includes("await saveStudySet"), "an override that is not saved is not an override");
+  assert.ok(
+    /await (saveStudySet|updateStudySet)\(/.test(flow),
+    "an override that is not written through store.js is not an override"
+  );
 });
 
 test("fork cards are ordinary review cards: scheduled, stamped, and never duplicated", () => {

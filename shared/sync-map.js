@@ -6,6 +6,22 @@
 // setId of every card/quiz. Local timestamps are epoch ms + ISO updatedAt
 // strings; the server speaks ISO strings everywhere.
 
+/**
+ * The most rows /v1/sync accepts in one request, per array. The server enforces
+ * these in `syncSchema` (server/src/schema.ts) and rejects the whole batch when
+ * one is exceeded, so every client has to split its push to match. The two
+ * copies can't share a module — tests/sync-limits.test.mjs checks they agree.
+ */
+export const SYNC_LIMITS = {
+  sets: 50,
+  cards: 500,
+  quiz: 500,
+  activity: 500,
+  reviews: 1000,
+  chains: 50,
+  chainSteps: 500,
+};
+
 const iso = (ms) => (ms == null ? null : new Date(ms).toISOString());
 const ms = (val) => {
   if (val == null) return null;

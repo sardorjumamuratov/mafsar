@@ -21,6 +21,7 @@ export const KEYS = {
 
 const DEFAULT_SETTINGS = { openInTab: false };
 const REVIEW_LOG_CAP = 2000;
+const REVIEW_LOG_HARD_CAP = REVIEW_LOG_CAP * 10;
 
 // --- Per-account partitions --------------------------------------------------
 // Study data is stored under "<accountId>_<key>", so two accounts on one device
@@ -295,6 +296,26 @@ export async function getStudySetForSession(sessionId) { const sets = await get(
 
 
 
+/**
+ * Merge an incoming row list over what's stored. The UI reads through getters
+ * that hide tombstones, so a caller can only ever hand back the live rows: a
+ * plain replace would erase every delete and let the next pull resurrect them.
+ * A row the caller dropped is tombstoned rather than removed, so the delete
+ * still propagates.
+ */
+function mergeRows(oldRows = [], newRows = [], stamp = nowISO()) {
+  const byId = new Map((oldRows || []).map((x) => [x.id, x]));
+  const incoming = new Set((newRows || []).map((x) => x.id));
+  for (const row of newRows || []) {
+    const existing = byId.get(row.id);
+    if (!existing || (row.updatedAt || "") >= (existing.updatedAt || "")) byId.set(row.id, row);
+  }
+  for (const [id, row] of byId) {
+    if (!incoming.has(id) && !row.deleted) byId.set(id, { ...row, deleted: true, updatedAt: stamp });
+  }
+  return [...byId.values()];
+}
+
 export async function saveStudySet(studySet) {
   // Medicine sets: keep one review card per chain link in step with the chains.
   studySet.flashcards = syncLinkCards(studySet);
@@ -309,35 +330,16 @@ export async function saveStudySet(studySet) {
   // sync can't tell the row changed.
   const record = { ...existing, ...studySet, id: studySet.id || existing.id || uid(), updatedAt: nowISO() };
   
-  const mergeArrays = (oldArr = [], newArr = []) => {
-      const byId = new Map(oldArr.map((x) => [x.id, x]));
-      const newIds = new Set(newArr.map((x) => x.id));
-      for (const item of newArr) {
-        const ex = byId.get(item.id);
-        if (!ex || (item.updatedAt || "") >= (ex.updatedAt || "")) {
-          byId.set(item.id, item);
-        }
-      }
-      for (const [id, ex] of byId.entries()) {
-        if (!newIds.has(id)) {
-          if (!ex.deleted) {
-            byId.set(id, { ...ex, deleted: true, updatedAt: new Date().toISOString() });
-          }
-        }
-      }
-      return Array.from(byId.values());
-    };
-
-  record.flashcards = mergeArrays(existing.flashcards, record.flashcards);
-  record.quiz = mergeArrays(existing.quiz, record.quiz);
-  record.chains = mergeArrays(existing.chains, record.chains);
+  record.flashcards = mergeRows(existing.flashcards, record.flashcards, record.updatedAt);
+  record.quiz = mergeRows(existing.quiz, record.quiz, record.updatedAt);
+  record.chains = mergeRows(existing.chains, record.chains, record.updatedAt);
 
   // Stamp any unsynced children so LWW comparisons always have a timestamp.
   for (const c of record.flashcards || []) c.updatedAt ||= record.updatedAt;
   for (const q of record.quiz || []) q.updatedAt ||= record.updatedAt;
   for (const ch of record.chains || []) {
     ch.updatedAt ||= record.updatedAt;
-    ch.steps = mergeArrays((existing.chains || []).find(x => x.id === ch.id)?.steps, ch.steps);
+    ch.steps = mergeRows((existing.chains || []).find((x) => x.id === ch.id)?.steps, ch.steps, record.updatedAt);
     for (const st of ch.steps || []) st.updatedAt ||= record.updatedAt;
   }
   if (idx >= 0) sets[idx] = record;
@@ -405,13 +407,18 @@ export async function getReviewLog() {
 export async function appendReviewLog(entry) {
   const log = await getReviewLog();
   log.push(entry);
-  const lastSync = await getLastSync() || "";
-    // Keep all unsynced rows (they can't cost data), and cap only the synced ones.
-    const unsynced = log.filter(r => (r.reviewedAt || "") > lastSync);
-    const synced = log.filter(r => (r.reviewedAt || "") <= lastSync);
-    if (synced.length > REVIEW_LOG_CAP) synced.splice(0, synced.length - REVIEW_LOG_CAP);
-    log.length = 0;
-    log.push(...synced, ...unsynced);
+  const lastSync = (await getLastSync()) || "";
+  // The cap bounds the whole log, but only rows the server already has may be
+  // dropped to meet it: losing an unsynced row loses that review for good.
+  const unsynced = log.filter((r) => (r.reviewedAt || "") > lastSync);
+  const synced = log.filter((r) => (r.reviewedAt || "") <= lastSync);
+  const roomForSynced = Math.max(0, REVIEW_LOG_CAP - unsynced.length);
+  if (synced.length > roomForSynced) synced.splice(0, synced.length - roomForSynced);
+  log.length = 0;
+  log.push(...synced, ...unsynced);
+  // Someone who never signs in never syncs, so there has to be a point where
+  // unbounded growth beats the loss. At the hard ceiling the oldest go anyway.
+  if (log.length > REVIEW_LOG_HARD_CAP) log.splice(0, log.length - REVIEW_LOG_HARD_CAP);
   await set(KEYS.REVIEW_LOG, log);
   return log;
 }
@@ -485,12 +492,16 @@ export async function bumpActivity(n = 1) {
 
 export { uid };
 
+/** Patch one set. Row arrays in the patch go through the same merge as a full save. */
 export async function updateStudySet(sessionId, patch) {
   const sets = await get(KEYS.STUDY_SETS, []);
   const idx = sets.findIndex((s) => s.sessionId === sessionId);
   if (idx < 0) return null;
   const existing = sets[idx];
   const record = { ...existing, ...patch, updatedAt: nowISO() };
+  for (const key of ["flashcards", "quiz", "chains"]) {
+    if (patch[key]) record[key] = mergeRows(existing[key], patch[key], record.updatedAt);
+  }
   sets[idx] = record;
   await set(KEYS.STUDY_SETS, sets);
   return record;
