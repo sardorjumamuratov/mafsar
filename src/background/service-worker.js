@@ -214,10 +214,12 @@ async function saveGeneratedStudySet(session, generated) {
 // service worker start (not just onInstalled) so it survives worker restarts.
 // Must stay a direct synchronous call — routing it through an async import
 // silently loses the race with worker teardown and leaves the icon dead.
-const sp = chrome['sidePanel'];
-if (sp?.setPanelBehavior) {
-  sp.setPanelBehavior({ openPanelOnActionClick: true }).catch(() => {});
-}
+chrome.storage.local.get(["settings"], (raw) => {
+  const sp = chrome['sidePanel'];
+  if (sp?.setPanelBehavior) {
+    sp.setPanelBehavior({ openPanelOnActionClick: !(raw?.settings?.openInTab) }).catch(() => {});
+  }
+});
 
 // A store update has downloaded but only applies once the extension restarts.
 // Don't reload here: that would cut off a review in progress. The panel shows
@@ -236,7 +238,22 @@ chrome.runtime.onInstalled.addListener((details) => {
 // Toolbar click. Chrome only fires this when openPanelOnActionClick is off, so
 // it doubles as the fallback if the call above failed; Firefox always uses it.
 if (chrome.action?.onClicked) {
-  chrome.action.onClicked.addListener((tab) => {
+  chrome.action.onClicked.addListener(async (tab) => {
+    const raw = await chrome.storage.local.get(["settings"]);
+    if (raw?.settings?.openInTab) {
+      const url = chrome.runtime.getURL("src/ui/panel.html");
+      const tabs = await new Promise((resolve) => chrome.tabs.query({ url }, resolve));
+      if (tabs.length) {
+        chrome.tabs.update(tabs[0].id, { active: true });
+        if (tabs[0].windowId !== tab.windowId) {
+          chrome.windows.update(tabs[0].windowId, { focused: true });
+        }
+      } else {
+        chrome.tabs.create({ url });
+      }
+      return;
+    }
+
     if (/** @type {any} */ (globalThis.chrome)?.sidebarAction) {
       chrome["sidebarAction"].toggle();
     } else {
@@ -888,6 +905,13 @@ async function handle(msg) {
       return { success: true };
     }
 
+    case "SET_OPEN_IN_TAB": {
+      const sp = chrome['sidePanel'];
+      if (sp?.setPanelBehavior) {
+        sp.setPanelBehavior({ openPanelOnActionClick: !msg.value }).catch(() => {});
+      }
+      return {};
+    }
     default:
       throw new Error(`Unknown message type: ${msg?.type}`);
   }

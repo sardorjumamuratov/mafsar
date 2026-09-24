@@ -19,7 +19,7 @@ export const KEYS = {
   REVIEW_LOG: "reviewLog",
 };
 
-const DEFAULT_SETTINGS = {};
+const DEFAULT_SETTINGS = { openInTab: false };
 const REVIEW_LOG_CAP = 2000;
 
 // --- Per-account partitions --------------------------------------------------

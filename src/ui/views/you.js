@@ -66,6 +66,11 @@ export async function renderYou() {
         <div class="stat"><div class="v tnum">${studySets.length}</div><div class="k">Sets</div></div>
       </div>
       ${accountHtml}
+            <div class="listhd"><span class="t-label">Layout</span></div>
+      <label class="setting-row">
+        <span class="txt"><span class="main" style="display:block">Open Mafsar in a tab</span><span class="sub" style="display:block">Use a full page instead of the side panel</span></span>
+        <input type="checkbox" id="openInTabCheck" ${settings.openInTab ? "checked" : ""} />
+      </label>
       <div class="listhd"><span class="t-label">Backup</span></div>
       <div id="backupSlot"></div>
       <input type="file" id="backupFile" accept="application/json,.json" class="hidden" />
