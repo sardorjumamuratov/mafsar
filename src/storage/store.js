@@ -5,7 +5,7 @@ import { initSchedule } from "../../shared/srs.js";
 import { syncLinkCards } from "./chain-links.js";
 //
 // Shape:
-//   settings        -> { apiKey, model }
+//   settings        -> {}
 //   sessions        -> Session[]          (captured conversations)
 //   studySets       -> StudySet[]         (generated cards, keyed by sessionId)
 // A StudySet card carries its own SM-2 scheduling fields (see srs.js).
@@ -19,7 +19,7 @@ export const KEYS = {
   REVIEW_LOG: "reviewLog",
 };
 
-const DEFAULT_SETTINGS = { provider: "gemini", apiKey: "", model: "" };
+const DEFAULT_SETTINGS = {};
 const REVIEW_LOG_CAP = 2000;
 
 // --- Per-account partitions --------------------------------------------------
@@ -130,6 +130,43 @@ function get(key, fallback) {
   });
 }
 
+
+export async function evictToFreeSpace() {
+  const bytes = await new Promise(r => chrome.storage.local.getBytesInUse(null, r));
+  if (bytes < 4_500_000) return false;
+
+  const all = await new Promise(r => chrome.storage.local.get(null, r));
+  const activeId = await getActiveAccountId();
+  const accounts = new Set();
+  for (const k of Object.keys(all)) {
+    if (k.includes("_")) accounts.add(k.split("_")[0]);
+  }
+  
+  let freedSomething = false;
+  for (const acc of accounts) {
+    if (acc === activeId || acc === "local") continue;
+    
+    const lastSync = all[`${acc}_${KEYS.LAST_SYNC}`] || "";
+    if (!lastSync) continue; // Can't prove server has it
+    
+    const sets = all[`${acc}_${KEYS.STUDY_SETS}`] || [];
+    const unsyncedSets = sets.some(s => (s.updatedAt || "") > lastSync);
+    if (unsyncedSets) continue;
+    
+    const reviews = all[`${acc}_${KEYS.REVIEW_LOG}`] || [];
+    const unsyncedReviews = reviews.some(r => (r.reviewedAt || "") > lastSync);
+    if (unsyncedReviews) continue;
+    
+    const drop = Object.values(KEYS).map(k => `${acc}_${k}`);
+    await new Promise(r => chrome.storage.local.remove(drop, r));
+    freedSomething = true;
+    
+    const newBytes = await new Promise(r => chrome.storage.local.getBytesInUse(null, r));
+    if (newBytes < 4_500_000) return true;
+  }
+  return freedSomething;
+}
+
 function set(key, value) {
   return getActiveAccountId().then(id => {
     return new Promise((resolve) => {
@@ -150,6 +187,11 @@ function uid() {
 
 export async function getSettings() {
   const s = await get(KEYS.SETTINGS, {});
+  let changed = false;
+  if ("provider" in s) { delete s.provider; changed = true; }
+  if ("apiKey" in s) { delete s.apiKey; changed = true; }
+  if ("model" in s) { delete s.model; changed = true; }
+  if (changed) await set(KEYS.SETTINGS, s);
   return { ...DEFAULT_SETTINGS, ...s };
 }
 
@@ -339,7 +381,13 @@ export async function getReviewLog() {
 export async function appendReviewLog(entry) {
   const log = await getReviewLog();
   log.push(entry);
-  if (log.length > REVIEW_LOG_CAP) log.splice(0, log.length - REVIEW_LOG_CAP);
+  const lastSync = await getLastSync() || "";
+    // Keep all unsynced rows (they can't cost data), and cap only the synced ones.
+    const unsynced = log.filter(r => (r.reviewedAt || "") > lastSync);
+    const synced = log.filter(r => (r.reviewedAt || "") <= lastSync);
+    if (synced.length > REVIEW_LOG_CAP) synced.splice(0, synced.length - REVIEW_LOG_CAP);
+    log.length = 0;
+    log.push(...synced, ...unsynced);
   await set(KEYS.REVIEW_LOG, log);
   return log;
 }
