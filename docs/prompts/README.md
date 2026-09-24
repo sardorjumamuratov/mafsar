@@ -37,6 +37,7 @@ for example: *"Implement docs/prompts/02-abuse-protection.md. Follow AGENTS.md."
 | 28 | [Scraper resilience](28-scraper-resilience.md) | **07** | YouTube + AI Studio extractors, HTML fixtures |
 | 29 | [Split the big three](29-split-the-big-three.md) | — | `llm.ts`, `service-worker.js`, `app.ts` (run alone) |
 | 30 | [Usage counts](30-usage-counts.md) | — | `server/src/app.ts`, `privacy.ts` |
+| 31 | [Home is empty until you switch tabs](31-refresh-after-sync.md) | **20**, **21** | `src/ui/nav.js`, `panel.js`, `you.js` (live bug) |
 
 **24 to 30 in order:** 24 and 25 are the two that matter; 29 rewrites the
 files almost everything else touches, so run it on its own and merge it the same
