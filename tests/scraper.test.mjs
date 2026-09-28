@@ -45,7 +45,7 @@ class FakeDocument {
       const m = this.html.match(/<button[^>]*aria-label="Show transcript"[^>]*>([^<]*)<\/button>/);
       if (m) {
         const el = new FakeElement(m[0], m[1]);
-        el.click = () => { this._transcriptClicked = true; };
+        el.click = () => { this._transcriptClicked = true; this.onTranscriptClick?.(); };
         return el;
       }
     }
@@ -132,15 +132,14 @@ async function testYouTubeCollapsed() {
   const originalSetTimeout = global.setTimeout;
   global.setTimeout = (fn) => fn();
   
-  const resultPromise = extractFn();
-  
-  Promise.resolve().then(() => {
-    if (global.document._transcriptClicked) {
-      global.document.html += "<ytd-transcript-segment-renderer><div class='segment-timestamp'>0:00</div><div class='segment-text'>Loaded text</div></ytd-transcript-segment-renderer>";
-    }
-  });
-  
-  const result = await resultPromise;
+  // YouTube renders the segments because the button was clicked. Simulated on
+  // the click itself, not on a guessed microtask: the extractor may await more
+  // or less before it gets there, and that must not decide the test.
+  global.document.onTranscriptClick = () => {
+    global.document.html += "<ytd-transcript-segment-renderer><div class='segment-timestamp'>0:00</div><div class='segment-text'>Loaded text</div></ytd-transcript-segment-renderer>";
+  };
+
+  const result = await extractFn();
   global.setTimeout = originalSetTimeout;
   
   assert.strictEqual(result.ok, true);

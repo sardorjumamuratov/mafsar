@@ -73,6 +73,30 @@ export function transcriptToText(segments, paragraphSeconds = 45) {
   return paragraphs.join("\n\n");
 }
 
+/**
+ * The caption body YouTube's player loads (fmt=json3) → the same segments the
+ * transcript panel used to give. Start times are whole seconds as a string,
+ * which parseTimestamp reads. Anything unparseable gives [] rather than a throw.
+ * @param {string|null|undefined} body
+ * @returns {{start: string, text: string}[]}
+ */
+export function json3ToSegments(body) {
+  let data;
+  try {
+    data = JSON.parse(String(body ?? ""));
+  } catch {
+    return [];
+  }
+  const out = [];
+  for (const ev of Array.isArray(data?.events) ? data.events : []) {
+    if (!Array.isArray(ev?.segs)) continue; // window and pen definitions, not speech
+    const text = ev.segs.map((s) => String(s?.utf8 ?? "")).join("").replace(/\s+/g, " ").trim();
+    if (!text) continue;
+    out.push({ start: String(Math.floor((Number(ev.tStartMs) || 0) / 1000)), text });
+  }
+  return out;
+}
+
 /** Fit text to the generation budget, cutting at a sentence, then a word, then hard. */
 export function truncateForGeneration(text, max = MAX_CAPTURE_CHARS) {
   const s = String(text || "");

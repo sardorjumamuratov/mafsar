@@ -914,10 +914,16 @@ test("YouTube and PDF capture: permission first, and no dead caption endpoint", 
   const sw = read("../src/background/service-worker.js");
   assert.ok(sw.includes("function extractYouTubeTranscript"), "the transcript extractor must exist");
   assert.ok(sw.includes("classifyUrl("), "captureTabAndSave must route by URL kind");
-  assert.ok(
-    !/timedtext|captionTracks/.test(sw),
-    "YouTube's caption URLs return empty bodies without a proof-of-origin token: read the transcript panel instead"
-  );
+  // Caption URLs we build ourselves (captionTracks[].baseUrl) come back empty
+  // without the player's proof-of-origin token, and the transcript panel was
+  // found failing live (its get_transcript call is refused). The only caption
+  // source that works is the request the player makes, so the extractor may
+  // watch /api/timedtext but never fetch a caption URL of its own.
+  const swCode = sw.replace(/\/\*[\s\S]*?\*\//g, "").replace(/(^|[^:])\/\/[^\n]*/g, "$1");
+  assert.ok(!/captionTracks|baseUrl/.test(swCode), "never build a caption URL from captionTracks: it has no proof-of-origin token");
+  assert.ok(!/fetch\(\s*[`'"][^`'"]*timedtext/.test(swCode), "never fetch timedtext directly; watch the player's own request");
+  const yt = swCode.slice(swCode.indexOf("async function extractYouTubeTranscript"));
+  assert.ok(/includes\("\/api\/timedtext"\)/.test(yt), "the extractor recognises the player's caption request");
 
   const sets = read("../src/ui/views/sets.js");
   assert.ok(sets.includes('id="captureCurrentBtn"') && sets.includes("refreshCaptureCurrentButton"), "the capture button must carry kind/origin");

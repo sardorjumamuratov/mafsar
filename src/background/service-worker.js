@@ -43,7 +43,7 @@ import {
   backendExtractPdf,
 } from "../sync/api.js";
 import {
-  MAX_PDF_BYTES, captureNote, classifyUrl, pdfTitleFromUrl, transcriptToText, truncateForGeneration,
+  MAX_PDF_BYTES, captureNote, classifyUrl, json3ToSegments, pdfTitleFromUrl, transcriptToText, truncateForGeneration,
 } from "../storage/sources.js";
 import { resolveCaptureTab } from "./capture-target.js";
 
@@ -58,7 +58,8 @@ async function captureYouTube(tabId, source) {
   let result;
   try {
     const results = await new Promise((resolve, reject) => {
-      chrome.scripting.executeScript({ target: { tabId }, func: extractYouTubeTranscript }, (r) =>
+      // MAIN world: the extractor watches the player's own caption request.
+      chrome.scripting.executeScript({ target: { tabId }, world: "MAIN", func: extractYouTubeTranscript }, (r) =>
         chrome.runtime.lastError ? reject(new Error(chrome.runtime.lastError.message)) : resolve(r)
       );
     });
@@ -70,7 +71,8 @@ async function captureYouTube(tabId, source) {
       if (result?.reason === "scraper-failed") throw new Error("YouTube might have changed its layout. We couldn't read the transcript.");
       throw new Error("This video has no transcript to learn from.");
     }
-  const full = transcriptToText(result.segments);
+  const segments = result.json3 ? json3ToSegments(result.json3) : result.segments;
+  const full = transcriptToText(segments);
   if (full.length < 200) throw new Error("This video's transcript is too short to make cards from.");
   const { text, truncated, keptPercent } = truncateForGeneration(full);
   const r = await saveAndGenerate({
@@ -114,18 +116,78 @@ async function capturePdf(url, source) {
 }
 
 /**
- * Runs INSIDE a YouTube watch page (serialized by executeScript, so it must stay
- * self-contained). Reads the transcript panel YouTube itself renders.
+ * Runs INSIDE a YouTube watch page, in the page's MAIN world (serialized by
+ * executeScript, so it must stay self-contained).
  *
- * ⚠ UNVERIFIED: these selectors were not checked against the live site when this
- * was written. See docs/prompts/07-youtube-pdf-capture.md, "Live check".
+ * Verified live on 2026-09-28 against a 79-minute MIT OpenCourseWare lecture:
+ * the caption path returned the whole transcript; the transcript-panel path did
+ * not, because YouTube refused the panel's get_transcript call (400). The panel
+ * is kept only as a fallback. tests/youtube-captions.test.mjs covers both.
  *
- * Deliberately does NOT fetch cTracks[].baseUrl / tText: since 2025
- * those return an empty body without a proof-of-origin token from YouTube's player.
+ * Never fetches captionTracks[].baseUrl itself: without the player's
+ * proof-of-origin token those return an empty body. It only watches the request
+ * the player makes, which carries the token.
  */
 async function extractYouTubeTranscript() {
   const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
-  
+  const readTitle = () =>
+    (document.querySelector("h1.ytd-watch-metadata")?.textContent || document.title || "")
+      .replace(/\s*-\s*YouTube\s*$/, "")
+      .trim();
+
+  // 1. The captions the player loads itself. Checked live on 2026-09-28: the
+  // transcript panel below spins forever because YouTube answers its
+  // get_transcript call with a 400 unless it carries a proof-of-origin token.
+  // The player's own /api/timedtext request carries one and succeeds, so watch
+  // for that request and have the player make it. Needs the MAIN world: the
+  // isolated world has its own XMLHttpRequest and never sees the player's.
+  const captureCaptions = async () => {
+    const btn = /** @type {HTMLElement|null} */ (document.querySelector(".ytp-subtitles-button"));
+    // Not a visibility check: YouTube hides this button with an inline
+    // display:none even on videos that have captions switched on, and clicking
+    // it still works. A video with no captions simply never makes the request.
+    if (!btn || btn.getAttribute("aria-disabled") === "true") return null;
+    let body = null;
+    const XHR = window.XMLHttpRequest;
+    const origOpen = XHR.prototype.open;
+    const origFetch = window.fetch;
+    XHR.prototype.open = function (method, url) {
+      if (String(url).includes("/api/timedtext")) {
+        this.addEventListener("load", () => {
+          if (this.status === 200 && this.responseText) body = body || this.responseText;
+        });
+      }
+      return origOpen.apply(this, arguments);
+    };
+    window.fetch = function (input) {
+      // A string, a Request (.url) or a URL (whose string form is its href).
+      const url = typeof input === "string" ? input : /** @type {any} */ (input)?.url || String(input);
+      const pending = origFetch.apply(this, arguments);
+      if (url && String(url).includes("/api/timedtext")) {
+        pending.then((r) => (r.ok ? r.clone().text() : null)).then((t) => { if (t) body = body || t; }).catch(() => {});
+      }
+      return pending;
+    };
+    const wasOn = btn.getAttribute("aria-pressed") === "true";
+    try {
+      // Off and on again: already-showing captions were fetched before we listened.
+      if (wasOn) { btn.click(); await sleep(300); }
+      btn.click();
+      for (let i = 0; i < 30 && !body; i++) await sleep(200);
+    } finally {
+      XHR.prototype.open = origOpen;
+      window.fetch = origFetch;
+      // Leave the video the way the learner had it.
+      if (!wasOn && btn.getAttribute("aria-pressed") === "true") btn.click();
+    }
+    return body;
+  };
+
+  const json3 = await captureCaptions();
+  if (json3) return { ok: true, title: readTitle(), json3 };
+
+  // 2. Fallback: YouTube's transcript panel, which still loads in some sessions.
+
   const readSegments = () => {
     // Primary: ytd-transcript-segment-renderer
     // Fallback: ytd-transcript-segment-list-renderer > div
@@ -179,9 +241,7 @@ async function extractYouTubeTranscript() {
     return { ok: false, reason: clickedButton ? "scraper-failed" : "no-transcript" };
   }
   
-  const title = (document.querySelector("h1.ytd-watch-metadata")?.textContent || document.title || "")
-    .replace(/\s*-\s*YouTube\s*$/, "")
-    .trim();
+  const title = readTitle();
   return { ok: true, title, segments };
 }
 
