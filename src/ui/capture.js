@@ -28,7 +28,7 @@ export async function captureCurrent(btnElement) {
       r = await send({ type: "SAVE_AND_GENERATE", payload: resp.session });
     } else {
       // …otherwise fall back to universal page-text capture on any site.
-      r = await send({ type: "CAPTURE_UNIVERSAL" });
+      r = await send({ type: "CAPTURE_UNIVERSAL", tabId: tab.id });
     }
     // Repaint the view the user is already on, then report — so the message
     // stays up until the new set is actually visible.
@@ -66,7 +66,11 @@ export async function captureLastAnswer(btnElement) {
 
   toast("Capturing…", 0);
   try {
-    const r = await send({ type: "CAPTURE_LAST_ANSWER_SMART" });
+    // queryActiveTab skips Mafsar's own tab, so this is the page the learner
+    // means even when Mafsar is running in a tab rather than the sidebar.
+    const tab = await queryActiveTab();
+    if (!tab?.id) return toast("Open the page you want to capture first.");
+    const r = await send({ type: "CAPTURE_LAST_ANSWER_SMART", tabId: tab.id });
     const name = shortTitle(r.session?.title);
     await goToActiveTab();
     if (r.generated) toast(`Saved "${name}" · ${r.cards} cards`);

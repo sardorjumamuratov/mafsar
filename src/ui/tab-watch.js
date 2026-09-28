@@ -63,6 +63,21 @@ if (typeof chrome !== "undefined") {
   if (chrome.windows && chrome.windows.onFocusChanged) {
     chrome.windows.onFocusChanged.addListener(schedule);
   }
+
+  // Opened as a tab, the panel never saw the page the learner came from, so the
+  // first capture would have nothing to read until they switched tabs and back.
+  // Start from the most recently used ordinary tab in this window instead.
+  if (chrome.tabs && chrome.tabs.query) {
+    try {
+      chrome.tabs.query({ currentWindow: true }, (tabs) => {
+        if (lastContentTabId) return; // an event got there first, and it's fresher
+        const recent = (tabs || [])
+          .filter((t) => t && t.id != null && !isMafsarUrl(t.url))
+          .sort((a, b) => (b.lastAccessed || 0) - (a.lastAccessed || 0))[0];
+        if (recent) lastContentTabId = recent.id;
+      });
+    } catch {}
+  }
 }
 
 export function onActiveTabChange(fn) {

@@ -45,6 +45,14 @@ import {
 import {
   MAX_PDF_BYTES, captureNote, classifyUrl, pdfTitleFromUrl, transcriptToText, truncateForGeneration,
 } from "../storage/sources.js";
+import { resolveCaptureTab } from "./capture-target.js";
+
+/** chrome.tabs in the promise shape resolveCaptureTab takes. */
+const tabsApi = {
+  get: (id) => new Promise((resolve) => chrome.tabs.get(id, (t) => resolve(chrome.runtime.lastError ? null : t))),
+  query: (q) => new Promise((resolve) => chrome.tabs.query(q, (t) => resolve(t || []))),
+};
+const captureTab = (msg) => resolveCaptureTab(msg, tabsApi, chrome.runtime.getURL(""));
 
 async function captureYouTube(tabId, source) {
   let result;
@@ -565,19 +573,14 @@ async function handle(msg) {
     // Universal capture from the panel: no content script needed — the worker
     // extracts the active tab's text itself.
     case "CAPTURE_UNIVERSAL": {
-      const tabs = await new Promise((resolve) =>
-        chrome.tabs.query({ active: true, currentWindow: true }, (t) => resolve(t || []))
-      );
-      if (!tabs[0]?.id) throw new Error("No active tab.");
-      return await captureTabAndSave(tabs[0].id);
+      // The panel sends the tab it means: with Mafsar open in a tab of its own,
+      // the active tab is Mafsar, and capturing that fails.
+      const tab = await captureTab(msg);
+      return await captureTabAndSave(tab.id);
     }
 
     case "CAPTURE_LAST_ANSWER_SMART": {
-      const tabs = await new Promise((resolve) =>
-        chrome.tabs.query({ active: true, currentWindow: true }, (t) => resolve(t || []))
-      );
-      const tab = tabs[0];
-      if (!tab?.id) throw new Error("No active tab.");
+      const tab = await captureTab(msg);
 
       // Try pinging the adapter first. A short timeout here: a live script
       // answers instantly, and a slow one must not stall the whole capture.
