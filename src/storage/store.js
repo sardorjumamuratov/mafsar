@@ -15,6 +15,7 @@ export const KEYS = {
   SESSIONS: "sessions",
   STUDY_SETS: "studySets",
   LAST_SYNC: "lastSync",
+  LAST_PUSH: "lastPush",
   ACTIVITY: "activity",
   REVIEW_LOG: "reviewLog",
 };
@@ -31,7 +32,7 @@ const REVIEW_LOG_HARD_CAP = REVIEW_LOG_CAP * 10;
 // storage listener drops the cache when another context switches account —
 // without it the worker would keep filing captures under the previous account.
 
-const DATA_KEYS = ["sessions", "studySets", "activity", "reviewLog", "lastSync"];
+const DATA_KEYS = ["sessions", "studySets", "activity", "reviewLog", "lastSync", "lastPush"];
 /** Data captured before anyone signed in; the next sign-in adopts it. */
 const NO_ACCOUNT = "local";
 
@@ -96,9 +97,10 @@ async function adoptOrphanData(id) {
     if (found[scopedKey(id, k)] === undefined) moved[scopedKey(id, k)] = found[from];
   }
   if (!drop.length) return;
-  // A fresh account inherits the sets but not the old sync cursor, or the
+  // A fresh account inherits the sets but not the old sync cursors, or the
   // server would be told those rows were already pushed.
   delete moved[scopedKey(id, KEYS.LAST_SYNC)];
+  delete moved[scopedKey(id, KEYS.LAST_PUSH)];
   if (Object.keys(moved).length) await new Promise((resolve) => chrome.storage.local.set(moved, () => resolve()));
   await new Promise((resolve) => chrome.storage.local.remove(drop, () => resolve()));
 }
@@ -113,6 +115,21 @@ export async function getLastSync() {
 
 export async function setLastSync(time) {
   return set(KEYS.LAST_SYNC, time);
+}
+
+/**
+ * The push cursor, on THIS device's clock. Rows are stamped with the local
+ * clock, so deciding which ones still need pushing has to compare against a
+ * local time too. lastSync is the server's clock, and a row saved during a sync
+ * (a captured answer, typically) can be stamped earlier than the serverTime that
+ * sync returns — against lastSync it would never be pushed at all.
+ */
+export async function getLastPush() {
+  return get(KEYS.LAST_PUSH, null);
+}
+
+export async function setLastPush(time) {
+  return set(KEYS.LAST_PUSH, time);
 }
 
 /** Drop everything the signed-in account owns here. Other accounts are untouched. */
@@ -147,15 +164,18 @@ export async function evictToFreeSpace() {
   for (const acc of accounts) {
     if (acc === activeId || acc === "local") continue;
     
-    const lastSync = all[`${acc}_${KEYS.LAST_SYNC}`] || "";
-    if (!lastSync) continue; // Can't prove server has it
-    
+    // Proven on this device's clock, which is what the rows are stamped with.
+    // No push cursor means no proof: an account that hasn't synced since
+    // lastPush existed is kept, because deleting it is not recoverable.
+    const lastPush = all[`${acc}_${KEYS.LAST_PUSH}`] || "";
+    if (!lastPush) continue;
+
     const sets = all[`${acc}_${KEYS.STUDY_SETS}`] || [];
-    const unsyncedSets = sets.some(s => (s.updatedAt || "") > lastSync);
+    const unsyncedSets = sets.some(s => (s.updatedAt || "") > lastPush);
     if (unsyncedSets) continue;
-    
+
     const reviews = all[`${acc}_${KEYS.REVIEW_LOG}`] || [];
-    const unsyncedReviews = reviews.some(r => (r.reviewedAt || "") > lastSync);
+    const unsyncedReviews = reviews.some(r => (r.reviewedAt || "") > lastPush);
     if (unsyncedReviews) continue;
     
     const drop = Object.values(KEYS).map(k => `${acc}_${k}`);
@@ -407,7 +427,10 @@ export async function getReviewLog() {
 export async function appendReviewLog(entry) {
   const log = await getReviewLog();
   log.push(entry);
-  const lastSync = (await getLastSync()) || "";
+  // Reviews are stamped on this device's clock, so "already pushed" is decided
+  // against the push cursor. Older installs fall back to lastSync until their
+  // first sync on this version sets lastPush.
+  const lastSync = (await getLastPush()) || (await getLastSync()) || "";
   // The cap bounds the whole log, but only rows the server already has may be
   // dropped to meet it: losing an unsynced row loses that review for good.
   const unsynced = log.filter((r) => (r.reviewedAt || "") > lastSync);

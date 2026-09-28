@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert";
-import { appendReviewLog, evictToFreeSpace, getSettings, setLastSync, saveStudySet, getActiveAccountId, switchActiveAccount } from "../src/storage/store.js";
+import { appendReviewLog, evictToFreeSpace, getSettings, setLastSync, setLastPush, saveStudySet, getActiveAccountId, switchActiveAccount } from "../src/storage/store.js";
 
 function mockStorage() {
   let store = {};
@@ -52,16 +52,24 @@ test("an unsynced row surviving the cap and a synced row being trimmed", async (
 test("the eviction policy refuses to evict unsynced data and drops synced inactive accounts", async () => {
   global.chrome = { storage: { local: mockStorage(), onChanged: { addListener: () => {} } }, runtime: {} };
   
-  // Set up acc2 (fully synced)
+  // Set up acc2 (fully synced: a real sync sets both cursors)
   await switchActiveAccount("acc2");
   await setLastSync("2024-01-01T10:00:00.000Z");
+  await setLastPush("2024-01-01T10:00:00.000Z");
   await new Promise(r => global.chrome.storage.local.set({ "acc2_studySets": [{ sessionId: "s2", updatedAt: "2023-01-01T10:00:00.000Z", flashcards: [{ id: "c1", updatedAt: "2023-01-01T10:00:00.000Z" }] }] }, r));
 
   // Set up acc3 (unsynced set)
   await switchActiveAccount("acc3");
   await setLastSync("2024-01-01T10:00:00.000Z");
+  await setLastPush("2024-01-01T10:00:00.000Z");
   await saveStudySet({ sessionId: "s3", flashcards: [{ id: "c2", updatedAt: "2025-01-01T10:00:00.000Z" }] });
   
+  // Set up acc4 (only a server-clock cursor, as an install that hasn't synced
+  // since lastPush existed would have). Not proof enough to delete a library.
+  await switchActiveAccount("acc4");
+  await setLastSync("2024-01-01T10:00:00.000Z");
+  await new Promise(r => global.chrome.storage.local.set({ "acc4_studySets": [{ sessionId: "s4", updatedAt: "2023-01-01T10:00:00.000Z", flashcards: [] }] }, r));
+
   // Set up acc1 (active)
   await switchActiveAccount("acc1");
 
@@ -74,6 +82,7 @@ test("the eviction policy refuses to evict unsynced data and drops synced inacti
   
   assert.ok(!raw["acc2_studySets"], "Fully synced account acc2 should be evicted");
   assert.ok(raw["acc3_studySets"], "Unsynced account acc3 must NOT be evicted");
+  assert.ok(raw["acc4_studySets"], "Without a push cursor there is no proof, so acc4 must NOT be evicted");
   assert.ok(raw["acc1_studySets"] || true, "Active account acc1 must NOT be evicted");
 });
 

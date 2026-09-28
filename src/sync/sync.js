@@ -2,7 +2,7 @@
 // last-write-wins. No-ops when signed out or offline — local data is the
 // source of truth and never blocked on the network.
 
-import { readRaw, saveRaw, uid, getLastSync, setLastSync, KEYS } from "../storage/store.js";
+import { readRaw, saveRaw, uid, getLastPush, getLastSync, setLastPush, setLastSync, KEYS } from "../storage/store.js";
 import { getAuth, setAuth, authedFetch } from "./auth.js";
 import { SYNC_LIMITS, toServer, applyServer } from "../../shared/sync-map.js";
 
@@ -18,6 +18,16 @@ function writeAll(state) {
     activity: state.activity,
     reviewLog: state.reviewLog,
   });
+}
+
+async function readLocal() {
+  const raw = await readRaw([KEYS.SESSIONS, KEYS.STUDY_SETS, KEYS.ACTIVITY, KEYS.REVIEW_LOG]);
+  return {
+    sessions: raw.sessions || [],
+    studySets: raw.studySets || [],
+    activity: raw.activity || {},
+    reviewLog: raw.reviewLog || [],
+  };
 }
 
 function chunk(arr, size) {
@@ -37,16 +47,18 @@ export async function syncNow() {
   // Both the rows and the cursor come from this account's partition, so a
   // second account on the same device can't be pushed under these tokens.
   const lastSync = await getLastSync();
+  // Two cursors, each compared within one clock: pulls ask the server for rows
+  // after its own lastSync; pushes pick local rows stamped after this device's
+  // lastPush. Before lastPush existed, lastSync did both jobs.
+  const lastPush = (await getLastPush()) ?? lastSync;
   syncing = true;
   try {
-    const raw = await readRaw([KEYS.SESSIONS, KEYS.STUDY_SETS, KEYS.ACTIVITY, KEYS.REVIEW_LOG]);
-    let local = {
-      sessions: raw.sessions || [],
-      studySets: raw.studySets || [],
-      activity: raw.activity || {},
-      reviewLog: raw.reviewLog || [],
-    };
-    const payload = toServer(local, lastSync);
+    // Taken just before the read, so a row saved after the read is stamped
+    // later than this and goes out next time. A row inside the snapshot that
+    // shares the millisecond is simply pushed twice, which LWW makes harmless.
+    const snapshotAt = new Date(Date.now() - 1).toISOString();
+    const local = await readLocal();
+    const payload = toServer(local, lastPush);
     
     // Split the push to what the server will accept. Each array has its own
     // cap, so one size for all of them would send 60 sets against a limit of
@@ -66,6 +78,7 @@ export async function syncNow() {
     let totalPulled = 0;
     let currentSince = lastSync || undefined;
     let finalServerTime = null;
+    const responses = [];
 
     for (let i = 0; i < maxChunks; i++) {
       const cSets = chunked.sets[i] || [];
@@ -83,7 +96,7 @@ export async function syncNow() {
       if (!res.ok) throw new Error(`sync failed (${res.status})`);
       const resp = await res.json();
 
-      local = applyServer(resp, local, uid);
+      responses.push(resp);
       finalServerTime = resp.serverTime;
       currentSince = resp.serverTime;
       
@@ -93,8 +106,14 @@ export async function syncNow() {
         (resp.reviews?.length || 0) + (resp.chains?.length || 0) + (resp.chainSteps?.length || 0);
     }
 
-    await writeAll(local);
+    // The round trip takes seconds, and the service worker may have saved a
+    // captured answer meanwhile. Merge the server's answer into what storage
+    // holds NOW: writing back the snapshot we pushed from would erase it.
+    let merged = await readLocal();
+    for (const resp of responses) merged = applyServer(resp, merged, uid);
+    await writeAll(merged);
     await setLastSync(finalServerTime);
+    await setLastPush(snapshotAt);
 
     // The panel listens for this to repaint. Guarded because a service worker
     // has no window, and a sync that throws here would lose the whole round.
