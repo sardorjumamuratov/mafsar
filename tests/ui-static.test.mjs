@@ -938,10 +938,17 @@ test("open in tab rules", () => {
 
   const sw = read("../src/background/service-worker.js");
   assert.ok(sw.includes('case "SET_OPEN_IN_TAB":'), "service-worker must listen for SET_OPEN_IN_TAB to flip the panel behaviour");
-  assert.ok(sw.includes("openPanelOnActionClick: !msg.value"), "SET_OPEN_IN_TAB must flip openPanelOnActionClick");
+  assert.ok(sw.includes("rememberOpenInTab(msg.value)"), "SET_OPEN_IN_TAB must go through rememberOpenInTab");
+  assert.ok(sw.includes("openPanelOnActionClick: !openInTab"), "rememberOpenInTab must flip openPanelOnActionClick");
   assert.ok(sw.includes("chrome.tabs.update") && sw.includes("chrome.windows.update"), "onClicked must focus an existing tab, not open five");
   assert.ok(sw.includes("chrome.tabs.create"), "onClicked must create the tab if none exists");
-  assert.ok(sw.includes("chrome.storage.local.get([\"settings\"]"), "onClicked must read the persisted setting from local storage directly");
+  // The click handler must NOT read storage: after that await, Firefox refuses
+  // sidebarAction.toggle() and the icon does nothing. tests/toolbar-click.test.mjs
+  // fires the real listener; this just keeps the obvious regression out.
+  const click = sw.slice(sw.indexOf("chrome.action.onClicked.addListener"));
+  const handler = click.slice(0, click.indexOf("\n  });"));
+  assert.ok(!/async\s*\(tab\)/.test(handler), "the toolbar click handler must not be async");
+  assert.ok(!handler.includes("await"), "nothing may be awaited before the sidebar opens");
 
   const you = read("../src/ui/views/you.js");
   assert.ok(you.includes('id="openInTabCheck"'), "You view must have the checkbox");

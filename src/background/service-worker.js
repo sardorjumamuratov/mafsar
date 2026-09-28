@@ -258,46 +258,79 @@ chrome.runtime.onUpdateAvailable?.addListener((details) => {
   chrome.storage.local.set({ updateReady: details.version });
 });
 
-chrome.runtime.onInstalled.addListener(async (details) => {
+chrome.runtime.onInstalled.addListener((details) => {
   if (details.reason === "update") {
     chrome.storage.local.remove(["updateReady", "clientOutdated"]);
   }
-  
-  const raw = await chrome.storage.local.get(["settings"]);
-  const sp = chrome['sidePanel'];
-  if (sp?.setPanelBehavior) {
-    sp.setPanelBehavior({ openPanelOnActionClick: !(raw?.settings?.openInTab) }).catch(() => {});
-  }
-
   registerContextMenus();
 });
 
-// Toolbar click. Chrome only fires this when openPanelOnActionClick is off, so
-// it doubles as the fallback if the call above failed; Firefox always uses it.
+// --- Toolbar click --------------------------------------------------------------
+// Opening the sidebar (Firefox) or side panel (Chrome) is only allowed
+// synchronously inside the click. After an `await` the call no longer counts as
+// the user's, the browser refuses it, and the icon does nothing at all. So the
+// "open in a tab" preference has to be known before the click arrives.
+//
+// Firefox suspends this page after ~30s idle and the click is what wakes it, so
+// a storage read started at load is still pending when the click lands. The
+// page there has localStorage, which is synchronous, so the preference is
+// mirrored into it. Chrome's worker has no localStorage and doesn't need it:
+// setPanelBehavior makes Chrome open the panel itself, and onClicked only fires
+// in tab mode, where opening a tab needs no user gesture.
+const OPEN_IN_TAB_MIRROR = "mafsar.openInTab";
+
+function readOpenInTabMirror() {
+  try {
+    return globalThis.localStorage?.getItem(OPEN_IN_TAB_MIRROR) === "1";
+  } catch {
+    return false;
+  }
+}
+
+let openInTab = readOpenInTabMirror();
+
+function rememberOpenInTab(value) {
+  openInTab = !!value;
+  try {
+    globalThis.localStorage?.setItem(OPEN_IN_TAB_MIRROR, openInTab ? "1" : "0");
+  } catch {
+    /* no localStorage in Chrome's worker; it doesn't need the mirror */
+  }
+  // Re-asserted on every start, not only on install: without it the icon can go
+  // dead after a worker restart.
+  const sp = chrome["sidePanel"];
+  if (sp?.setPanelBehavior) sp.setPanelBehavior({ openPanelOnActionClick: !openInTab }).catch(() => {});
+}
+
+chrome.storage.local.get(["settings"], (obj) => rememberOpenInTab(obj?.settings?.openInTab));
+chrome.storage.onChanged?.addListener((changes, area) => {
+  if (area === "local" && changes.settings) rememberOpenInTab(changes.settings.newValue?.openInTab);
+});
+
+/** Focus the Mafsar tab if one is open, otherwise open one. */
+async function openMafsarTab(fromTab) {
+  const url = chrome.runtime.getURL("src/ui/panel.html");
+  const tabs = await new Promise((resolve) => chrome.tabs.query({ url }, (t) => resolve(t || [])));
+  if (tabs.length) {
+    chrome.tabs.update(tabs[0].id, { active: true });
+    if (tabs[0].windowId !== fromTab?.windowId) chrome.windows.update(tabs[0].windowId, { focused: true });
+  } else {
+    chrome.tabs.create({ url });
+  }
+}
+
 if (chrome.action?.onClicked) {
-  chrome.action.onClicked.addListener(async (tab) => {
-    const raw = await chrome.storage.local.get(["settings"]);
-    if (raw?.settings?.openInTab) {
-      const url = chrome.runtime.getURL("src/ui/panel.html");
-      const tabs = await new Promise((resolve) => chrome.tabs.query({ url }, resolve));
-      if (tabs.length) {
-        chrome.tabs.update(tabs[0].id, { active: true });
-        if (tabs[0].windowId !== tab.windowId) {
-          chrome.windows.update(tabs[0].windowId, { focused: true });
-        }
-      } else {
-        chrome.tabs.create({ url });
-      }
+  // Deliberately not async: see above.
+  chrome.action.onClicked.addListener((tab) => {
+    if (openInTab) {
+      openMafsarTab(tab).catch(() => {});
       return;
     }
-
     if (/** @type {any} */ (globalThis.chrome)?.sidebarAction) {
       chrome["sidebarAction"].toggle();
     } else {
-      const sp2 = chrome['sidePanel'];
-      if (sp2?.open && tab?.windowId != null) {
-        sp2.open({ windowId: tab.windowId }).catch(() => {});
-      }
+      const sp = chrome["sidePanel"];
+      if (sp?.open && tab?.windowId != null) sp.open({ windowId: tab.windowId }).catch(() => {});
     }
   });
 }
@@ -938,10 +971,9 @@ async function handle(msg) {
     }
 
     case "SET_OPEN_IN_TAB": {
-      const sp = chrome['sidePanel'];
-      if (sp?.setPanelBehavior) {
-        sp.setPanelBehavior({ openPanelOnActionClick: !msg.value }).catch(() => {});
-      }
+      // storage.onChanged would get here too; doing it now means the very next
+      // click already behaves.
+      rememberOpenInTab(msg.value);
       return {};
     }
     default:
