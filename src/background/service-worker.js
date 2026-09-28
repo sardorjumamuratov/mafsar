@@ -43,7 +43,8 @@ import {
   backendExtractPdf,
 } from "../sync/api.js";
 import {
-  MAX_PDF_BYTES, captureNote, classifyUrl, json3ToSegments, pdfTitleFromUrl, transcriptToText, truncateForGeneration,
+  MAX_PDF_BYTES, captureNote, classifyUrl, json3ToSegments, pdfTitleFromUrl, sampleForGeneration, transcriptToText,
+  truncateForGeneration,
 } from "../storage/sources.js";
 import { resolveCaptureTab } from "./capture-target.js";
 
@@ -74,7 +75,8 @@ async function captureYouTube(tabId, source) {
   const segments = result.json3 ? json3ToSegments(result.json3) : result.segments;
   const full = transcriptToText(segments);
   if (full.length < 200) throw new Error("This video's transcript is too short to make cards from.");
-  const { text, truncated, keptPercent } = truncateForGeneration(full);
+  // Excerpts from across the whole video, not its opening minutes only.
+  const { text, truncated, sampled, keptPercent } = sampleForGeneration(full);
   const r = await saveAndGenerate({
     source: "youtube",
     sourceLabel: "YouTube",
@@ -84,7 +86,7 @@ async function captureYouTube(tabId, source) {
     messages: [{ role: "user", text }],
   });
   if (!r.generated) throw new Error(r.reason || "generation-failed");
-  return { ...r, note: captureNote({ truncated, keptPercent }) };
+  return { ...r, note: captureNote({ truncated, sampled, keptPercent }) };
 }
 
 async function capturePdf(url, source) {

@@ -109,6 +109,54 @@ export function truncateForGeneration(text, max = MAX_CAPTURE_CHARS) {
   return { text: kept, truncated: true, keptPercent: Math.max(1, Math.floor((kept.length / s.length) * 100)) };
 }
 
+/** Marks where the text skips ahead, so the model doesn't read two excerpts as one. */
+const EXCERPT_GAP = "\n\n…\n\n";
+
+/**
+ * Fit a long, time-ordered transcript to the budget by taking excerpts from
+ * across all of it. Cutting from the start covered a lecture's opening third
+ * and nothing after, so every card came from the first minutes. The budget
+ * stays the same: generation asks for a fixed number of cards however long the
+ * input is, and the server caps a message at 30k characters, so the gain is in
+ * where the text comes from, not how much of it there is.
+ */
+export function sampleForGeneration(text, max = MAX_CAPTURE_CHARS) {
+  const s = String(text || "");
+  if (s.length <= max) return { text: s, truncated: false, sampled: false, keptPercent: 100, excerpts: 1 };
+
+  // More excerpts the further over budget, within reason: too many and each
+  // one is too short to explain anything.
+  const windows = Math.min(8, Math.max(2, Math.ceil(s.length / max) * 2));
+  const share = Math.floor((max - EXCERPT_GAP.length * (windows - 1)) / windows);
+
+  // Spread the starts so the first excerpt opens the transcript and the last
+  // one closes it: the wrap-up is often where a lecturer sums up.
+  const span = Math.max(0, s.length - share);
+  const excerpts = [];
+  for (let i = 0; i < windows; i++) {
+    let start = Math.floor((i * span) / (windows - 1));
+    if (i > 0) {
+      // Begin at the start of a paragraph or sentence, else at a word.
+      const near = s.slice(start, start + 600);
+      const para = near.indexOf("\n\n");
+      const sentence = near.indexOf(". ");
+      const space = near.indexOf(" ");
+      start += para >= 0 ? para + 2 : sentence >= 0 ? sentence + 2 : space >= 0 ? space + 1 : 0;
+    }
+    const piece = truncateForGeneration(s.slice(start).trimStart(), share).text.trim();
+    if (piece) excerpts.push(piece);
+  }
+
+  const used = excerpts.reduce((n, e) => n + e.length, 0);
+  return {
+    text: excerpts.join(EXCERPT_GAP),
+    truncated: true,
+    sampled: true,
+    keptPercent: Math.max(1, Math.floor((used / s.length) * 100)),
+    excerpts: excerpts.length,
+  };
+}
+
 export function pdfTitleFromUrl(url) {
   try {
     const file = decodeURIComponent(new URL(url).pathname.split("/").pop() || "");
@@ -119,9 +167,10 @@ export function pdfTitleFromUrl(url) {
 }
 
 /** Suffix for the success toast, saying what didn't fit. */
-export function captureNote({ truncated = false, keptPercent = 100, pages = 0, pagesRead = 0 } = {}) {
+export function captureNote({ truncated = false, sampled = false, keptPercent = 100, pages = 0, pagesRead = 0 } = {}) {
   const bits = [];
   if (pages && pagesRead && pagesRead < pages) bits.push(`read ${pagesRead} of ${pages} pages`);
-  if (truncated) bits.push(`used the first ${keptPercent}% of the text`);
+  if (truncated && sampled) bits.push(`sampled from across the whole video, ${keptPercent}% of the transcript`);
+  else if (truncated) bits.push(`used the first ${keptPercent}% of the text`);
   return bits.length ? ` (${bits.join(", ")})` : "";
 }
