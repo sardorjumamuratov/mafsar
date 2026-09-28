@@ -237,6 +237,15 @@ export const MIGRATIONS: string[] = [
   `,
   `
   ALTER TABLE sets ADD COLUMN chain_overrides TEXT;
+  `,
+  `
+  CREATE TABLE usage_counts (
+    day TEXT NOT NULL,
+    route TEXT NOT NULL,
+    mode TEXT NOT NULL,
+    count INTEGER NOT NULL DEFAULT 0,
+    PRIMARY KEY (day, route, mode)
+  );
   `
 ];
 

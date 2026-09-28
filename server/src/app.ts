@@ -21,7 +21,8 @@ import { generateStudySet, gradeAnswer, generateHypothetical, summarizeConversat
 import { DEFAULT_LIMITS, clientIp, corsOrigin, limitByIp, limitByUser, slidingWindow, tooMany, type IpSource } from "./ratelimit.js";
 import { MAX_STUDENT_TURNS, evaluateTeaching, studentTurns, teachTurn } from "./teach.js";
 import { PRIVACY_HTML } from "./privacy.js";
-import { getProvider, billingConfigured, consumeQuota, refundQuota, requireQuota, usageSummary, effectivePlan, resolveOrigin, applyPlanChange, stripeProvider, paddleProvider, NoSubscriptionError } from "./billing/index.js";
+import { trackUsage, startAnalyticsFlushing, getUsageCounts } from "./analytics.js";
+import { getProvider, billingConfigured, isAdminEmail, consumeQuota, refundQuota, requireQuota, usageSummary, effectivePlan, resolveOrigin, applyPlanChange, stripeProvider, paddleProvider, NoSubscriptionError } from "./billing/index.js";
 
 export function createApp(db: DB) {
   const app = new Hono<{ Variables: { userId: string } }>();
@@ -427,28 +428,33 @@ export function createApp(db: DB) {
   );
   app.post("/v1/generate", bodyLimit({ maxSize: 1024 * 1024 * 1, onError: (c) => c.json({ error: "too_large", message: "Generate payload too large. The limit is 1 MB." }, 413) }), requireQuota(db, "set"), async (c) => {
     const body = generateSchema.parse(await c.req.json());
-    const generated = await generateStudySet(body.messages, body.mode);
+    trackUsage("/v1/generate", body.mode || "general");
+      const generated = await generateStudySet(body.messages, body.mode);
     return c.json(generated);
   });
 
   app.post("/v1/grade", requireQuota(db, "practice"), async (c) => {
     const body = gradeSchema.parse(await c.req.json());
-    return c.json(await gradeAnswer(body.question, body.reference, body.answer));
+    trackUsage("/v1/grade", "general");
+      return c.json(await gradeAnswer(body.question, body.reference, body.answer));
   });
 
   app.post("/v1/hypothetical", requireQuota(db, "practice"), async (c) => {
     const body = hypotheticalSchema.parse(await c.req.json());
-    return c.json(await generateHypothetical(body.concept, body.reference));
+    trackUsage("/v1/hypothetical", "general");
+      return c.json(await generateHypothetical(body.concept, body.reference));
   });
 
   app.post("/v1/summarize", requireQuota(db, "practice"), async (c) => {
     const body = summarizeSchema.parse(await c.req.json());
-    return c.json(await summarizeConversation(body.messages));
+    trackUsage("/v1/summarize", "general");
+      return c.json(await summarizeConversation(body.messages));
   });
 
   app.post("/v1/blurb", limitByUser(limits.llmPerUser), async (c) => {
     const body = blurbSchema.parse(await c.req.json());
-    return c.json(await setBlurb(body.title, body.cardFronts));
+    trackUsage("/v1/blurb", "general");
+      return c.json(await setBlurb(body.title, body.cardFronts));
   });
 
   // Coding mode: one small task from a card's concept, then rubric grading of the
@@ -462,59 +468,70 @@ export function createApp(db: DB) {
   // bounded by the per-user limit instead.
   app.post("/v1/design-task", requireQuota(db, "practice"), async (c) => {
     const body = designTaskSchema.parse(await c.req.json());
-    return c.json(await generateDesignTask(body.concept, body.reference, body.mode));
+    trackUsage("/v1/design-task", body.mode || "design");
+      return c.json(await generateDesignTask(body.concept, body.reference, body.mode));
   });
 
   app.post("/v1/design-grade", limitByUser(limits.llmPerUser), async (c) => {
     const body = designGradeSchema.parse(await c.req.json());
-    return c.json(await gradeDesignAnswer(body));
+    trackUsage("/v1/design-grade", body.mode || "design");
+      return c.json(await gradeDesignAnswer(body));
   });
 
   app.post("/v1/design-curveball", limitByUser(limits.llmPerUser), async (c) => {
     const body = designCurveballSchema.parse(await c.req.json());
-    return c.json(await generateDesignCurveball(body.task, body.answer, body.previous, body.mode, body.state));
+    trackUsage("/v1/design-curveball", body.mode || "design");
+      return c.json(await generateDesignCurveball(body.task, body.answer, body.previous, body.mode, body.state));
   });
 
   app.post("/v1/estimation-task", requireQuota(db, "practice"), async (c) => {
     const body = estimationTaskSchema.parse(await c.req.json());
-    return c.json(await generateEstimationTasks(body.concept, body.reference));
+    trackUsage("/v1/estimation-task", "general");
+      return c.json(await generateEstimationTasks(body.concept, body.reference));
   });
 
   app.post("/v1/estimation-summary", limitByUser(limits.llmPerUser), async (c) => {
     const body = estimationSummarySchema.parse(await c.req.json());
-    return c.json(await generateEstimationSummary(body.results));
+    trackUsage("/v1/estimation-summary", "general");
+      return c.json(await generateEstimationSummary(body.results));
   });
 
   app.post("/v1/bottleneck-task", requireQuota(db, "practice"), async (c) => {
     const body = bottleneckTaskSchema.parse(await c.req.json());
-    return c.json(await generateBottleneckTask(body.concept, body.reference));
+    trackUsage("/v1/bottleneck-task", "general");
+      return c.json(await generateBottleneckTask(body.concept, body.reference));
   });
 
   app.post("/v1/bottleneck-hint", limitByUser(limits.llmPerUser), async (c) => {
     const body = bottleneckHintSchema.parse(await c.req.json());
-    return c.json(await generateBottleneckHint(body.state));
+    trackUsage("/v1/bottleneck-hint", "general");
+      return c.json(await generateBottleneckHint(body.state));
   });
 
   app.post("/v1/bottleneck-grade", limitByUser(limits.llmPerUser), async (c) => {
     const body = bottleneckGradeSchema.parse(await c.req.json());
-    return c.json(await gradeBottleneckAnswer(body.state, body.answer, body.usedHint));
+    trackUsage("/v1/bottleneck-grade", "general");
+      return c.json(await gradeBottleneckAnswer(body.state, body.answer, body.usedHint));
   });
 
   app.post("/v1/coding-task", requireQuota(db, "coding"), async (c) => {
     const body = codingTaskSchema.parse(await c.req.json());
-    return c.json(await generateCodingTask(body.concept, body.reference, body.language));
+    trackUsage("/v1/coding-task", "coding");
+      return c.json(await generateCodingTask(body.concept, body.reference, body.language));
   });
 
   app.post("/v1/coding-grade", limitByUser(limits.llmPerUser), async (c) => {
     const body = codingGradeSchema.parse(await c.req.json());
-    return c.json(await gradeCode(body));
+    trackUsage("/v1/coding-grade", "coding");
+      return c.json(await gradeCode(body));
   });
 
   // Teach it back. A session costs one practice unit, charged on its first turn;
   // later turns are bounded by the turn cap and the per-user limit instead.
   app.post("/v1/teach/turn", limitByUser(limits.llmPerUser), async (c) => {
     const body = teachTurnSchema.parse(await c.req.json());
-    if (studentTurns(body.messages) >= MAX_STUDENT_TURNS) {
+    trackUsage("/v1/teach/turn", "general");
+      if (studentTurns(body.messages) >= MAX_STUDENT_TURNS) {
       return c.json({ error: "too_many_turns", message: "This session is finished. Tap Finish to see how you did." }, 400);
     }
     let eventId: string | null = null;
@@ -533,10 +550,21 @@ export function createApp(db: DB) {
 
   app.post("/v1/teach/evaluate", limitByUser(limits.llmPerUser), async (c) => {
     const body = teachEvaluateSchema.parse(await c.req.json());
-    return c.json(await evaluateTeaching(body));
+    trackUsage("/v1/teach/evaluate", "general");
+      return c.json(await evaluateTeaching(body));
   });
 
-  // --- Phase 3: analytics — TODO ---
+  // --- Phase 3: analytics ---
+  app.get("/v1/admin/analytics", async (c) => {
+    const userId = c.get("userId") as string;
+    // The same ADMIN_EMAILS check the quota bypass uses, not a second parser.
+    const user = await one<{ email: string }>(db, "SELECT email FROM users WHERE id = ?", [userId]);
+    if (!isAdminEmail(user?.email)) {
+      return c.json({ error: "forbidden" }, 403);
+    }
+    return c.json({ counts: await getUsageCounts(db) });
+  });
+
   app.get("/v1/insights", async (c) => {
     const userId = c.get("userId") as string;
         const now = Date.now();
@@ -804,3 +832,4 @@ export function createApp(db: DB) {
 
   return app;
 }
+
