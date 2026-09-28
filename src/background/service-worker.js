@@ -251,17 +251,6 @@ async function saveGeneratedStudySet(session, generated) {
   });
 }
 
-// Chrome: make a toolbar-icon click open the side panel. Called on every
-// service worker start (not just onInstalled) so it survives worker restarts.
-// Must stay a direct synchronous call — routing it through an async import
-// silently loses the race with worker teardown and leaves the icon dead.
-chrome.storage.local.get(["settings"], (raw) => {
-  const sp = chrome['sidePanel'];
-  if (sp?.setPanelBehavior) {
-    sp.setPanelBehavior({ openPanelOnActionClick: !(raw?.settings?.openInTab) }).catch(() => {});
-  }
-});
-
 // A store update has downloaded but only applies once the extension restarts.
 // Don't reload here: that would cut off a review in progress. The panel shows
 // a banner and the user restarts when ready (APPLY_UPDATE).
@@ -269,10 +258,17 @@ chrome.runtime.onUpdateAvailable?.addListener((details) => {
   chrome.storage.local.set({ updateReady: details.version });
 });
 
-chrome.runtime.onInstalled.addListener((details) => {
+chrome.runtime.onInstalled.addListener(async (details) => {
   if (details.reason === "update") {
     chrome.storage.local.remove(["updateReady", "clientOutdated"]);
   }
+  
+  const raw = await chrome.storage.local.get(["settings"]);
+  const sp = chrome['sidePanel'];
+  if (sp?.setPanelBehavior) {
+    sp.setPanelBehavior({ openPanelOnActionClick: !(raw?.settings?.openInTab) }).catch(() => {});
+  }
+
   registerContextMenus();
 });
 
@@ -982,3 +978,4 @@ chrome.runtime.onInstalled.addListener(async (details) => {
     }
   }
 });
+
