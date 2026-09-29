@@ -12,7 +12,7 @@ import { goToActiveTab, inFocusView, registerTabs } from "./nav.js";
 import { renderSets } from "./views/sets.js";
 import { onActiveTabChange } from "./tab-watch.js";
 import { currentDetail, makeSet, openDetailTab, paintDetail, promptAddCard, renderSetDetail, saveCardEdit, saveNewCard, setEditingCardId, startQuizForCurrentSet, } from "./views/set-detail.js";
-import { captureCurrent, captureLastAnswer, refreshCaptureDock } from "./capture.js";
+import { captureCurrent, captureLastAnswer, refreshCaptureDock, openAddMenu } from "./capture.js";
 import { deleteCard, restoreCard, deleteSession, updateStudySet, setExamDate } from "../storage/store.js";
 import { review } from "../../shared/srs.js";
 import { applyNext, goReturn, gradeCard, revealCard, startGlobalReview, startSetReview } from "./flows/review.js";
@@ -56,7 +56,9 @@ document.addEventListener("click", (e) => {
     case "open-weak": openWeakCard(id, (/** @type {any} */ (t)).dataset.card).catch((e) => toast(e.message)); break;
     case "make-set": makeSet(id); break;
     case "capture-current": captureCurrent(/** @type {HTMLElement} */ (t)); break;
-    case "capture-last-answer": captureLastAnswer(t); break;
+    case "capture-last-answer": captureLastAnswer(/** @type {HTMLElement} */ (t)); break;
+      case "dock-add": openAddMenu(); break;
+      case "add-import": case "add-paste": case "add-create": case "add-share": /* Handled locally */ break;
     case "tab": openDetailTab((/** @type {any} */ (t)).dataset.tab); break;
     case "delete-set":
       confirmDeleteSet(id);

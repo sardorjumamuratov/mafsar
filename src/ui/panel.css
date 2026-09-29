@@ -1911,12 +1911,15 @@ button.insight-row:focus-visible { outline: 2px solid var(--accent); outline-off
 }
 
 /* --- capture dock --- */
+
 .capture-dock {
   display: flex;
   gap: 8px;
-  padding: 8px 14px 6px;
-  background: var(--bg-surface);
-  border-top: 1px solid var(--border-control);
+  padding: 8px 12px;
+  height: 60px;
+  box-sizing: border-box;
+  background: var(--bg-nav);
+  border-top: 1px solid var(--border-divider);
   transition: transform 0.2s cubic-bezier(0.2, 0, 0, 1), opacity 0.2s cubic-bezier(0.2, 0, 0, 1);
   transform: translateY(0);
 }
@@ -1928,15 +1931,42 @@ button.insight-row:focus-visible { outline: 2px solid var(--accent); outline-off
   position: absolute;
   bottom: 0;
   width: 100%;
-  box-sizing: border-box;
 }
-.capture-dock button {
+.dock-btn {
   flex: 1;
   height: 44px;
+  border-radius: 12px;
+  border: 1px solid var(--border-control);
+  background: var(--bg-surface);
+  color: var(--text-primary);
+  font-size: 14px;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  cursor: pointer;
+  padding: 0;
+}
+.dock-btn:hover {
+  border-color: var(--border-hover);
+}
+.dock-btn:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+.dock-btn.add-btn {
+  flex: 0 0 44px;
+  width: 44px;
+}
+@media (max-width: 350px) {
+  .capture-dock { gap: 6px; }
+  .dock-btn { gap: 6px; font-size: 13px; }
 }
 @media (prefers-reduced-motion: reduce) {
   .capture-dock { transition: none; }
 }
+
 
 
 :focus-visible { outline: 2px solid var(--accent-text); outline-offset: 2px; }

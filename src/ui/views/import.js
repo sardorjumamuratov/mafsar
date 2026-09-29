@@ -69,12 +69,7 @@ export function renderImport() {
       </div>
       <div class="help"><b>Anki:</b> File → Export → "Notes in Plain Text" (.txt), then upload the file below (leave HTML cleanup on).<br>
         <b>Quizlet:</b> open a set page and click the floating <b>Import to Mafsar</b> button, or export (⋯ → Export, Tab + New line) and paste below. CSV/TSV works too.</div>
-      <div class="listhd" style="margin-top:10px"><span class="t-label">Add a shared set</span></div>
-      <div class="help" style="margin:0">Have a code or link from another Mafsar user? Enter it to add a copy of their cards to your sets.</div>
-      <div class="field"><label>Share code or link</label>
-        <input id="shareCode" type="text" placeholder="e.g. 7KX2M9QRTA or mafsar.../s/..." autocomplete="off" autocapitalize="off" /></div>
-      <button class="btn-primary btn-block" data-action="share-lookup">Look up set</button>
-      <div id="sharePreview"></div>
+      
       
       <div class="listhd" style="margin-top:24px"><span class="t-label">Import file or text</span></div>
       <div class="field"><label>Title</label><input id="importTitle" type="text" placeholder="e.g. Biology — Chapter 3" /></div>
