@@ -24,6 +24,7 @@ import { checkCode, codingNext, startCodingPractice } from "./flows/coding.js";
 import { startTeach, setTeachPersona, sendTeach, finishTeach } from "./flows/teach.js";
 import { copyShareCode, revokeShareFor, toggleSetShare } from "./share.js";
 import { createTeamFromForm, joinTeamFromInput, leaveTeam, renderTeam, renderTeamCreate, renderTeams } from "./views/teams.js";
+import { renderGlobal, filterGlobalCat, openGlobalPreview, reportGlobal, confirmPublishSet, unpublishSet } from "./views/global.js";
 import { checkTyped, startTypedPractice, typedNext } from "./flows/typed.js";
 import { getAuth, login, logout, register } from "../sync/auth.js";
 import { examDraft, openExamPicker, renderHome, saveExamSelection, setExamDraft } from "./views/home.js";
@@ -151,6 +152,14 @@ document.addEventListener("click", (e) => {
     case "team-join": joinTeamFromInput(); break;
     case "team-leave": leaveTeam(id); break;
     case "nav-teams": renderTeams(); break;
+      case "nav-global": renderGlobal(); break;
+      case "global-seg-discover": renderGlobal(); break;
+      case "global-seg-teams": renderTeams(); break;
+      case "global-cat": filterGlobalCat(/** @type {HTMLElement} */ (t)); break;
+      case "global-preview": openGlobalPreview(/** @type {HTMLElement} */ (t)); break;
+      case "global-report": reportGlobal(/** @type {HTMLElement} */ (t)); break;
+      case "global-publish": confirmPublishSet(id); break;
+      case "global-unpublish": unpublishSet(id); break;
     case "nav-you": renderYou(); break;
     case "select-all":
       (/** @type {any} */ (t)).select();
@@ -330,7 +339,7 @@ window.addEventListener(SYNC_PULLED_EVENT, () => {
 });
 
 (async function init() {
-  registerTabs({ home: renderHome, sets: renderSets, teams: renderTeams, you: renderYou });
+  registerTabs({ home: renderHome, sets: renderSets, global: renderGlobal, you: renderYou });
   onActiveTabChange(() => {
       refreshCaptureDock().catch(() => {});
     });

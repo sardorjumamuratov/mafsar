@@ -16,13 +16,14 @@ import { isLinkCard, linkId } from "../../storage/chain-links.js";
 export let detail = null; // { session, studySet, summary, tab }
 export let editingCardId = null;
 
+import { getAuth } from "../../sync/auth.js";
 export async function renderSetDetail(sessionId, tab = "cards") {
   showChrome(true);
   const { sessions, studySets } = await bundle();
   const session = sessions.find((s) => s.id === sessionId);
   if (!session) return renderHome();
   const studySet = setFor(sessionId, studySets);
-  detail = { session, studySet, tab };
+  detail = { session, studySet, tab, auth: await getAuth() };
   paintDetail();
   topOfView(); // new view (also covers tab switches); paintDetail repaints must not reset
 }
@@ -466,4 +467,27 @@ function chainsTabHtml(sessionId, studySet) {
         </div>`;
     })
     .join("") + note;
+}
+
+
+function getGlobalMenuItem(session, studySet, auth) {
+  if (studySet.published) {
+    return `<button type="button" class="menu-item" role="menuitem" data-action="global-unpublish" data-id="${esc(session.id)}">Remove from global</button>`;
+  }
+  
+  if (!auth || !auth.accessToken) {
+    return `<button type="button" class="menu-item" role="menuitem" data-action="nav-you" style="color:var(--muted)">Publish (needs sign-in)</button>`;
+  }
+  
+  const src = session.source;
+  if (src === "quizlet" || src === "anki" || src === "shared" || src === "global") {
+    return `<button type="button" class="menu-item" role="menuitem" disabled style="color:var(--muted)" title="Only sets you created can be published">Publish (not author)</button>`;
+  }
+  
+  const cardCount = Object.keys(studySet.cards || {}).filter(k => !studySet.cards[k].deleted).length;
+  if (cardCount < 5) {
+    return `<button type="button" class="menu-item" role="menuitem" disabled style="color:var(--muted)" title="A set needs at least 5 cards to be published">Publish (need 5 cards)</button>`;
+  }
+  
+  return `<button type="button" class="menu-item" role="menuitem" data-action="global-publish" data-id="${esc(session.id)}">Make it global</button>`;
 }

@@ -1,3 +1,8 @@
+import { createDiscoverApp } from "./discover.js";
+import { createAdminApp } from "./admin.js";
+import { bumpCatalogue } from "./discover.js";
+import { randomUUID } from "crypto";
+
 import { bodyLimit } from "hono/body-limit";
 import { MAX_PDF_BYTES, extractPdfText } from "./pdf.js";
 import { Hono } from "hono";
@@ -62,6 +67,9 @@ export function createApp(db: DB) {
   };
 
   // Public — required by the Chrome Web Store / Firefox Add-ons listings.
+  
+  app.route("/v1/discover", createDiscoverApp(db));
+  app.route("/v1/admin", createAdminApp(db));
   app.get("/privacy", (c) => c.html(PRIVACY_HTML));
 
   // Serve landing page and its assets
@@ -799,6 +807,33 @@ export function createApp(db: DB) {
   });
 
   // --- Phase 5: payments + notifications — TODO ---
+
+  
+const reportLimiter = limitByUser(slidingWindow({ limit: 10, windowMs: 24 * 3600 * 1000 }));
+app.post("/v1/sets/:rootId/report", reportLimiter, async (c) => {
+  const userId = c.get("userId");
+  const rootId = c.req.param("rootId");
+  const { reason, note } = await c.req.json();
+  
+  
+  
+  
+  
+  
+  try {
+    await run(db, "INSERT INTO reports (id, set_id, user_id, reason, note, created_at) VALUES (?, ?, ?, ?, ?, ?)", [randomUUID(), rootId, userId, reason, note || null, new Date().toISOString()]);
+  } catch(e) {
+    // Unique constraint on (set_id, user_id)
+  }
+  
+  const count = await all<{ c: number }>(db, "SELECT COUNT(*) as c FROM reports WHERE set_id = ?", [rootId]);
+  if (count[0] && count[0].c >= 3) {
+    await run(db, "UPDATE sets SET is_hidden = 1 WHERE id = ?", [rootId]);
+    bumpCatalogue();
+  }
+  
+  return c.json({ ok: true });
+});
 
   app.get("/healthz", (c) => c.json({ ok: true }));
 

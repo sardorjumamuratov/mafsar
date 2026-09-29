@@ -4,6 +4,7 @@ import { randomUUID } from "node:crypto";
 // libSQL client — talks to Turso in production (TURSO_DATABASE_URL) or a local
 // file in dev. The server stays stateless: no DB file on the container, so
 // redeploys can't lose data.
+import type { Transaction } from "@libsql/client";
 export type DB = Client;
 
 export function openDB(url?: string): DB {
@@ -14,15 +15,15 @@ export function openDB(url?: string): DB {
 }
 
 // --- thin async query helpers ------------------------------------------------
-export async function one<T = any>(db: DB, sql: string, args: unknown[] = []): Promise<T | undefined> {
+export async function one<T = any>(db: DB | Transaction, sql: string, args: unknown[] = []): Promise<T | undefined> {
   const res = await db.execute({ sql, args: args as any[] });
   return res.rows[0] as T | undefined;
 }
-export async function all<T = any>(db: DB, sql: string, args: unknown[] = []): Promise<T[]> {
+export async function all<T = any>(db: DB | Transaction, sql: string, args: unknown[] = []): Promise<T[]> {
   const res = await db.execute({ sql, args: args as any[] });
   return res.rows as T[];
 }
-export async function run(db: DB, sql: string, args: unknown[] = []): Promise<number> {
+export async function run(db: DB | Transaction, sql: string, args: unknown[] = []): Promise<number> {
   const res = await db.execute({ sql, args: args as any[] });
   return Number(res.rowsAffected ?? 0);
 }
@@ -369,6 +370,31 @@ export const MIGRATIONS: string[] = [
 
   ('cat_oth', 'other', 'Other', NULL, '2026-09-01T00:00:00.000Z', 'seed');
   `
+  ,
+  `
+    ALTER TABLE sets ADD COLUMN rating_sum INTEGER DEFAULT 0;
+    ALTER TABLE sets ADD COLUMN rating_count INTEGER DEFAULT 0;
+    ALTER TABLE sets ADD COLUMN rating_avg REAL;
+    CREATE TABLE set_ratings (
+      set_root_id TEXT NOT NULL REFERENCES sets(id),
+      user_id TEXT NOT NULL REFERENCES users(id),
+      stars INTEGER NOT NULL,
+      updated_at TEXT NOT NULL,
+      PRIMARY KEY (set_root_id, user_id)
+    );
+    CREATE INDEX idx_set_ratings_root ON set_ratings(set_root_id);
+
+    CREATE TABLE reports (
+      id TEXT PRIMARY KEY,
+      set_id TEXT NOT NULL REFERENCES sets(id),
+      user_id TEXT NOT NULL REFERENCES users(id),
+      reason TEXT NOT NULL,
+      note TEXT,
+      created_at TEXT NOT NULL,
+      UNIQUE(set_id, user_id)
+    );
+    ALTER TABLE sets ADD COLUMN is_hidden INTEGER NOT NULL DEFAULT 0;
+    `
 ];
 
 export async function migrate(db: DB): Promise<void> {

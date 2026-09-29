@@ -1,3 +1,4 @@
+import { backendGlobalAdd } from "../sync/api.js";
 // Background service worker (ES module). Orchestrates capture storage and
 // generation through the Mafsar backend (server-side LLM key), and opens the
 // side panel when the toolbar icon is clicked.
@@ -40,7 +41,7 @@ import {
   backendBottleneckTask,
   backendBottleneckHint,
   backendBottleneckGrade,
-  backendExtractPdf,
+  backendExtractPdf, backendGlobalPublish, backendGlobalUnpublish, backendGlobalList, backendGlobalFetch, backendGlobalReport,
 } from "../sync/api.js";
 import {
   MAX_PDF_BYTES, captureNote, classifyUrl, json3ToSegments, pdfTitleFromUrl, sampleForGeneration, transcriptToText,
@@ -958,6 +959,19 @@ async function handle(msg) {
       const { code } = await backendShareCreate(msg.setId);
       return { code };
     }
+
+    
+    case "GLOBAL_PUBLISH":
+      return await backendGlobalPublish(msg.setId);
+    case "GLOBAL_UNPUBLISH":
+      return await backendGlobalUnpublish(msg.setId);
+    case "GLOBAL_LIST":
+      return await backendGlobalList(msg.tab, msg.q, msg.cursor);
+    case "GLOBAL_ADD": return await backendGlobalAdd(msg.id);
+      case "GLOBAL_FETCH":
+      return await backendGlobalFetch(msg.id);
+    case "GLOBAL_REPORT":
+      return await backendGlobalReport(msg.id);
 
     case "SHARE_FETCH": {
       return await backendShareFetch(msg.code);

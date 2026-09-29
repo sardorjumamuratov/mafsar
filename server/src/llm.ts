@@ -903,3 +903,13 @@ export async function gradeBottleneckAnswer(state: string, answer: string, usedH
     model_solution: s.model_solution,
   };
 }
+
+export async function cleanSetTitle(title: string): Promise<string> {
+  try {
+    const res = await callJson("Review this flashcard set title for safety and clarity. If it contains PII, extreme profanity, or spam, return { \"safe\": false, \"clean\": \"\" }. Otherwise, return { \"safe\": true, \"clean\": \"<a clean, readable version of the title, fixing ALL CAPS, removing emojis and 'my set'>\" }.", title);
+    if (!res.safe) return "UNSAFE";
+    return res.clean;
+  } catch(e) {
+    throw e;
+  }
+}

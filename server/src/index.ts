@@ -16,6 +16,7 @@ if (existsSync(".env")) {
 await initSentry(); // no-op unless SENTRY_DSN is set
 
 const db = openDB();
+
 await migrate(db); // creates tables on first boot (Turso or local file)
 const app = createApp(db);
 
