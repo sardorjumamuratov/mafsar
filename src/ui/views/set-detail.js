@@ -28,6 +28,8 @@ export async function renderSetDetail(sessionId, tab = "cards") {
 }
 
 export function paintDetail() {
+  const dock = document.getElementById("captureDock");
+  if (dock) dock.classList.add("hidden");
   const { session, studySet, tab } = detail;
   const s = summarize(studySet);
 

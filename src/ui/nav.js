@@ -11,6 +11,8 @@ let focusView = false;
  */
 export function showChrome(visible) {
   nav.classList.toggle("hidden", !visible);
+  const dock = document.getElementById("captureDock");
+  if (dock) dock.classList.toggle("hidden", !visible);
   focusView = !visible;
 }
 

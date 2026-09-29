@@ -79,3 +79,56 @@ export async function captureLastAnswer(btnElement) {
     toast(e.message);
   }
 }
+
+
+import { classifyUrl } from "../storage/sources.js";
+import { isAIChatTab } from "./core.js";
+
+let captureAnswerToken = 0;
+
+export async function refreshCaptureDock() {
+  const dock = document.getElementById("captureDock");
+  const answerBtn = document.getElementById("captureAnswerBtn");
+  const currentBtn = /** @type {HTMLButtonElement} */ (document.getElementById("captureCurrentBtn"));
+  if (!dock || !answerBtn || !currentBtn) return;
+
+  const tab = await queryActiveTab();
+  const source = classifyUrl(tab?.url || "");
+
+  if (source.kind === "page") {
+    delete currentBtn.dataset.kind;
+    delete currentBtn.dataset.origin;
+    
+    // Check if it's a page that cannot be captured
+    if (!tab?.url || tab.url.startsWith("chrome://") || tab.url.startsWith("moz-extension://") || tab.url.startsWith("chrome-extension://") || tab.url.startsWith("about:") || tab.url.includes("chrome.google.com/webstore") || tab.url.includes("addons.mozilla.org")) {
+      currentBtn.disabled = true;
+      currentBtn.textContent = "Can't capture this page";
+    } else {
+      currentBtn.disabled = false;
+      currentBtn.textContent = "Capture page";
+    }
+  } else {
+    currentBtn.disabled = false;
+    currentBtn.dataset.kind = source.kind;
+    currentBtn.dataset.origin = source.origin;
+    currentBtn.textContent = source.kind === "youtube" ? "Capture video" : "Capture PDF";
+  }
+
+  const token = Math.random();
+  captureAnswerToken = token;
+  
+  const chatTab = await isAIChatTab();
+  if (captureAnswerToken !== token) return; // stale response
+  
+  answerBtn.classList.toggle("hidden", !chatTab.ok);
+  if (chatTab.ok && chatTab.url) {
+    answerBtn.dataset.origin = new URL(chatTab.url).origin;
+    currentBtn.classList.remove("btn-primary");
+    currentBtn.classList.add("btn-ghost");
+  } else {
+    delete answerBtn.dataset.origin;
+    currentBtn.classList.remove("btn-ghost");
+    currentBtn.classList.add("btn-primary");
+  }
+}
+

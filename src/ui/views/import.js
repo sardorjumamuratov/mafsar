@@ -2,6 +2,11 @@ import { showChrome } from "../nav.js";
 import { app, esc, nav, setHTML, sourceLabel, toast, topOfView } from "../core.js";
 import { addSession, saveStudySet, uid } from "../../storage/store.js";
 import { initSchedule } from "../../../shared/srs.js";
+import { parseShareCode } from "../share-link.js";
+import { setSharedPreview, sharedPreview } from "./teams.js";
+import { bundle, send } from "../core.js";
+import { syncNow } from "../../sync/sync.js";
+import { renderSetDetail } from "./set-detail.js";
 import { renderHome } from "../views/home.js";
 
 // ================================================================ IMPORT
@@ -64,6 +69,14 @@ export function renderImport() {
       </div>
       <div class="help"><b>Anki:</b> File → Export → "Notes in Plain Text" (.txt), then upload the file below (leave HTML cleanup on).<br>
         <b>Quizlet:</b> open a set page and click the floating <b>Import to Mafsar</b> button, or export (⋯ → Export, Tab + New line) and paste below. CSV/TSV works too.</div>
+      <div class="listhd" style="margin-top:10px"><span class="t-label">Add a shared set</span></div>
+      <div class="help" style="margin:0">Have a code or link from another Mafsar user? Enter it to add a copy of their cards to your sets.</div>
+      <div class="field"><label>Share code or link</label>
+        <input id="shareCode" type="text" placeholder="e.g. 7KX2M9QRTA or mafsar.../s/..." autocomplete="off" autocapitalize="off" /></div>
+      <button class="btn btn-primary btn-block" data-action="share-lookup">Look up set</button>
+      <div id="sharePreview"></div>
+      
+      <div class="listhd" style="margin-top:24px"><span class="t-label">Import file or text</span></div>
       <div class="field"><label>Title</label><input id="importTitle" type="text" placeholder="e.g. Biology — Chapter 3" /></div>
       <div style="display:flex;gap:10px;align-items:center">
         <button class="btn btn-ghost" style="flex:1" data-action="import-file">⇪ Load Anki/CSV file</button>
@@ -122,3 +135,65 @@ export async function doImport() {
   renderHome();
 }
 
+
+
+export async function lookupShare() {
+  const code = parseShareCode(/** @type {HTMLInputElement} */ (document.getElementById("shareCode"))?.value || "");
+  if (!code) return toast("Enter a code first.");
+  const out = document.getElementById("sharePreview");
+  if (out) setHTML(out, '<div style="font-size:13px;color:var(--muted)">Looking up?</div>');
+  try {
+    const payload = await send({ type: "SHARE_FETCH", code });
+    const { sessions } = await bundle();
+    if (sessions.some((s) => s.shareCode === code)) {
+      setSharedPreview(null);
+      if (out) setHTML(out, "");
+      return toast("You already added this set.");
+    }
+    setSharedPreview({ code, ...payload });
+    paintSharePreview(out);
+  } catch (e) {
+    setSharedPreview(null);
+    if (out) setHTML(out, "");
+    if (/fetch|network|Failed/i.test(e.message)) toast("Can't reach the server — check your connection.");
+    else if (/Unknown or revoked/i.test(e.message)) toast("That code isn't valid — revoked, or check for typos.");
+    else toast(e.message);
+  }
+}
+
+export function paintSharePreview(out) {
+  const target = out || document.getElementById("sharePreview");
+  if (!target || !sharedPreview) return;
+  const { title, cards, quiz } = sharedPreview;
+  setHTML(target, `
+    <div class="block" style="display:flex;flex-direction:column;gap:9px">
+      <div class="t-label">Found</div>
+      <div style="font-weight:650;color:var(--ink);line-height:1.3">${esc(title)}</div>
+      <div style="font-size:12.5px;color:var(--muted)">Copy with ${cards.length} card${cards.length === 1 ? "" : "s"}${quiz?.length ? ` and ${quiz.length} quiz question${quiz.length === 1 ? "" : "s"}` : ""} ?" added fresh, reviews start from scratch.</div>
+      <button class="btn btn-primary btn-block" data-action="share-import">Add to my sets</button>
+    </div>`);
+}
+
+export async function importSharedSet() {
+  if (!sharedPreview) return;
+  const { code, title, cards, quiz } = sharedPreview;
+  const now = Date.now();
+  const flashcards = cards.map((c) => ({
+    id: uid(), front: String(c.front), back: String(c.back ?? ""),
+    updatedAt: new Date(now).toISOString(), ...initSchedule(now),
+  }));
+  const quizQs = (quiz || []).map((q) => ({
+    id: uid(), q: String(q.q), options: (q.options || []).map(String),
+    answer: Math.max(0, Number(q.answer) || 0), explain: String(q.explain ?? ""),
+    updatedAt: new Date(now).toISOString(),
+  }));
+  const session = await addSession({
+    source: "shared", sourceLabel: "Shared", title, url: "",
+    capturedAt: now, messages: [], shareCode: code, importedCount: flashcards.length,
+  });
+  await saveStudySet({ sessionId: session.id, title, createdAt: now, flashcards, quiz: quizQs });
+  syncNow().catch(() => {});
+  toast(`Added ${flashcards.length} cards`);
+  setSharedPreview(null);
+  renderSetDetail(session.id, "cards");
+}

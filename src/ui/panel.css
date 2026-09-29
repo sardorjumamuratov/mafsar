@@ -1939,3 +1939,32 @@ button.insight-row:focus-visible { outline: 2px solid var(--primary); outline-of
   .chain-body { grid-column: 1 / -1; }
   .chain-arrow { padding-left: 4px; }
 }
+
+/* --- capture dock --- */
+.capture-dock {
+  display: flex;
+  gap: 8px;
+  padding: 8px 14px 6px;
+  background: var(--surface);
+  border-top: 1px solid var(--border);
+  transition: transform 0.2s cubic-bezier(0.2, 0, 0, 1), opacity 0.2s cubic-bezier(0.2, 0, 0, 1);
+  transform: translateY(0);
+}
+.capture-dock.hidden {
+  display: flex !important;
+  opacity: 0;
+  transform: translateY(100%);
+  pointer-events: none;
+  position: absolute;
+  bottom: 0;
+  width: 100%;
+  box-sizing: border-box;
+}
+.capture-dock button {
+  flex: 1;
+  height: 44px;
+}
+@media (prefers-reduced-motion: reduce) {
+  .capture-dock { transition: none; }
+}
+

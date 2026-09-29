@@ -5,13 +5,13 @@ import { estimationNext, startEstimationDrill, submitEstimation } from "./flows/
 import { requestBottleneckHint, startBottleneckDrill, submitBottleneck } from "./flows/bottleneck.js";
 import { cancelChainEdit, dismissMedicineSuggestion, openChainStepEdit, removeChainStep, saveChainStep } from "./flows/chains.js";
 import { confirmDeleteAccount, renderDeleteAccount } from "./views/delete-account.js";
-import { doImport, previewImport, renderImport } from "./views/import.js";
+import { doImport, previewImport, renderImport, lookupShare, importSharedSet } from "./views/import.js";
 import { app, bundle, nav, send, setFor, toast } from "./core.js";
 import { goToActiveTab, inFocusView, registerTabs } from "./nav.js";
-import { importSharedSet, lookupShare, renderSets, refreshCaptureAnswerButton, refreshCaptureCurrentButton } from "./views/sets.js";
+import { renderSets } from "./views/sets.js";
 import { onActiveTabChange } from "./tab-watch.js";
 import { currentDetail, makeSet, openDetailTab, paintDetail, promptAddCard, renderSetDetail, saveCardEdit, saveNewCard, setEditingCardId, startQuizForCurrentSet, toggleSetMenu } from "./views/set-detail.js";
-import { captureCurrent, captureLastAnswer } from "./capture.js";
+import { captureCurrent, captureLastAnswer, refreshCaptureDock } from "./capture.js";
 import { deleteCard, deleteSession, updateStudySet, setExamDate } from "../storage/store.js";
 import { review } from "../../shared/srs.js";
 import { applyNext, goReturn, gradeCard, revealCard, startGlobalReview, startSetReview } from "./flows/review.js";
@@ -332,9 +332,8 @@ window.addEventListener(SYNC_PULLED_EVENT, () => {
 (async function init() {
   registerTabs({ home: renderHome, sets: renderSets, teams: renderTeams, you: renderYou });
   onActiveTabChange(() => {
-    refreshCaptureAnswerButton().catch(() => {});
-    refreshCaptureCurrentButton().catch(() => {});
-  });
+      refreshCaptureDock().catch(() => {});
+    });
   const auth = await getAuth();
   if (!auth?.accessToken) {
     renderAuthGate();
