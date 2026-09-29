@@ -1,4 +1,5 @@
-import { renderDiscover, renderStats } from "./views/discover-stats.js";
+nav.addEventListener("click", async (e) => {
+    if (editingCardId || currentDetail()?.addingCard) {import { renderDiscover, renderStats } from "./views/discover-stats.js";
 import { saveSettings } from "../storage/store.js";
 import { startCompare, selectComparePair, toggleCompareSame, createForkCards } from "./flows/compare.js";
 import { finishDesignDrill, requestDesignCurveball, startDesignDrill, submitDesign, submitDesignCurveball } from "./flows/design.js";
@@ -11,7 +12,7 @@ import { app, bundle, nav, send, setFor, toast } from "./core.js";
 import { goToActiveTab, inFocusView, registerTabs } from "./nav.js";
 import { renderSets } from "./views/sets.js";
 import { onActiveTabChange } from "./tab-watch.js";
-import { currentDetail, makeSet, openDetailTab, paintDetail, promptAddCard, renderSetDetail, saveCardEdit, saveNewCard, setEditingCardId, startQuizForCurrentSet, } from "./views/set-detail.js";
+import { currentDetail, makeSet, openDetailTab, paintDetail, promptAddCard, renderSetDetail, saveCardEdit, saveNewCard, setEditingCardId, editingCardId, startQuizForCurrentSet, } from "./views/set-detail.js";
 import { captureCurrent, captureLastAnswer, refreshCaptureDock, openAddMenu } from "./capture.js";
 import { deleteCard, restoreCard, deleteSession, updateStudySet, setExamDate } from "../storage/store.js";
 import { review } from "../../shared/srs.js";
@@ -176,8 +177,14 @@ document.addEventListener("click", (e) => {
     case "typed-next": typedNext(); break;
     case "clear-exam": setExamDate(id, null).then(() => renderSetDetail(id, "cards")).catch(e => toast(e.message)); break;
     case "add-card": promptAddCard(id); break;
-    case "card-edit": setEditingCardId(id); paintDetail(); break;
-    case "edit-cancel": setEditingCardId(null); paintDetail(); break;
+    case "card-edit": setEditingCardId(id); paintDetail(true, true); break;
+    case "edit-cancel":
+        const oldId = editingCardId;
+        setEditingCardId(null);
+        paintDetail(true, true).then(() => {
+          document.querySelector(`button[data-action="card-edit"][data-id="${oldId}"]`)?.focus();
+        });
+        break;
     case "edit-save":
       saveCardEdit(currentDetail().session.id, id).then(() => {
         setEditingCardId(null);
@@ -331,11 +338,22 @@ document.addEventListener("change", (e) => {
 document.addEventListener("click", (e) => {
   const t = (/** @type {any} */ (e.target)).closest("[data-action]");
   if (!t) return;
-  if ((/** @type {any} */ (t)).dataset.action === "add-cancel") openDetailTab("cards");
-  if ((/** @type {any} */ (t)).dataset.action === "add-save") saveNewCard((/** @type {any} */ (t)).dataset.id);
+  if ((/** @type {any} */ (t)).dataset.action === "add-cancel") {
+      currentDetail().addingCard = false;
+      paintDetail(true, true).then(() => document.querySelector('button[data-action="add-card"]')?.focus());
+    }
+  if ((/** @type {any} */ (t)).dataset.action === "add-done") saveNewCard((/** @type {any} */ (t)).dataset.id);
 });
 // bottom nav
-nav.addEventListener("click", (e) => {
+nav.addEventListener("click", async (e) => {
+    const { editingCardId, currentDetail } = await import("./views/set-detail.js");
+    if (editingCardId || currentDetail()?.addingCard) {
+      const ok = await confirmSheet({ title: "Discard your edit?", confirmLabel: "Discard", cancelLabel: "Keep editing", destructive: true });
+      if (!ok) return;
+      setEditingCardId(null);
+      if (currentDetail()) currentDetail().addingCard = false;
+      paintDetail(true, true);
+    }
   const b = (/** @type {any} */ (e.target)).closest("button[data-nav]");
   if (!b) return;
   const n = b.dataset.nav;

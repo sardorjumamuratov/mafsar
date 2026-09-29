@@ -420,6 +420,29 @@ console.log(`\n${passed} tests passed`);
 
 
 
+
+console.log("Inline edit (prompt 06)");
+test("Inline edit replaces separate blocks", () => {
+  const detail = fs.readFileSync(new URL("../src/ui/views/set-detail.js", import.meta.url), "utf8");
+  assert.ok(!detail.includes("function paintAddCard()"), "paintAddCard must be deleted");
+  assert.ok(detail.includes('card-wrapper editing'), "the editor renders inside the row container");
+  assert.ok(detail.includes('if (updateInPlace && !force && (editingCardId || detail?.addingCard)) return;'), "a sync landing mid-edit must not repaint");
+  
+  const bindEvents = detail.slice(detail.indexOf("function bindEditorEvents"));
+  assert.ok(bindEvents.includes("Both fields are required"), "hint shows when empty");
+  assert.ok(bindEvents.includes("Too long: "), "hint shows when too long");
+  assert.ok(bindEvents.includes("disabled = true"), "Done is disabled for empty or too long");
+  
+  const saveFn = detail.slice(detail.indexOf("function saveCardEdit"));
+  assert.ok(saveFn.includes("if (card.front === front && card.back === back)"), "unchanged text writes nothing");
+  assert.ok(saveFn.includes("ratio > 0.5"), "reset threshold must be 50%");
+  assert.ok(saveFn.includes("toast(\"Card saved &middot; Reset progress?\""), "Reset toast triggers");
+  assert.ok(saveFn.includes("initSchedule()"), "Reset calls initSchedule");
+  
+  const panel = fs.readFileSync(new URL("../src/ui/panel.js", import.meta.url), "utf8");
+  assert.ok(panel.includes("Discard your edit?"), "tapping nav with unsaved changes asks to discard");
+});
+
 console.log("Restyle remaining (prompt 13)");
 test("no old variable name is used outside 00 alias block", () => {
   const css = fs.readFileSync(new URL("../src/ui/panel.css", import.meta.url), "utf8");

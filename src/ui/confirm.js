@@ -17,7 +17,7 @@ export function confirmSheet({ title, body, confirmLabel, destructive }) {
         <div class="sheet-content info-sheet">
           <div style="font-size:15px; color:var(--text-secondary); line-height:1.45">${esc(body || "")}</div>
           <div style="display:flex; gap:8px; margin-top:8px">
-            <button id="confirmCancel" class="btn-ghost" style="flex:1">Cancel</button>
+            <button id="confirmCancel" class="btn-ghost" style="flex:1">${esc(cancelLabel)}</button>
             <button id="confirmOk" class="btn-primary ${destructive ? 'btn-danger' : ''}" style="flex:1">${esc(confirmLabel || "OK")}</button>
           </div>
         </div>

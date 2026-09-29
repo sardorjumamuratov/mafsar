@@ -2425,3 +2425,11 @@ input[type="checkbox"].switch:checked::after, .toggle-switch:checked::after {
   height: 100%;
   background: var(--accent);
 }
+
+.edit-textarea:focus {
+  border-color: var(--accent) !important;
+  outline: none !important;
+}
+@media (hover: none) and (pointer: coarse) {
+  .edit-hint-kbd { display: none !important; }
+}
