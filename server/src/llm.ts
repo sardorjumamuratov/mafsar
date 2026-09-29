@@ -294,7 +294,8 @@ Rules:
 - "summary" is 2-4 sentences in plain language.
 - "keyPoints" is 3-6 short bullet strings.
 
-Respond with ONLY valid JSON: { "summary": string, "keyPoints": [string] }`;
+Respond with ONLY valid JSON: { "summary": string, "keyPoints": [string], "terms": [{ "key": string, "primary": string, "secondary": string }] }
+  Include "terms" only when the content compares or defines up to 8 things (key <= 6 chars, primary <= 40, secondary <= 90).`;
 
 const BLURB_PROMPT = `You get the title and flashcard fronts of a study set. Write a single tiny
 description of what this set covers — a natural phrase of 5-6 words, no quotes, no ending period.

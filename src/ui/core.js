@@ -64,9 +64,19 @@ export const COPY_SVG =
  * with a normal toast when the work finishes. Every sticky toast MUST have a
  * guaranteed replacement on all paths, or it stays on screen forever.
  */
-export function toast(msg, ms = 2600) {
+export function toast(msg, ms = 2600, actionLabel = "", onAction = null) {
   const t = document.getElementById("toast");
-  t.textContent = msg;
+  t.setAttribute("role", "status");
+  t.setAttribute("aria-live", "polite");
+  if (actionLabel && onAction) {
+    setHTML(t, `<span>${esc(msg)}</span><button class="toast-action" style="background:transparent;border:none;color:var(--toast-action);font-weight:600;cursor:pointer;margin-left:12px;padding:0">${esc(actionLabel)}</button>`);
+    /** @type {any} */ (t.querySelector('.toast-action')).onclick = () => {
+      t.classList.add("hidden");
+      onAction();
+    };
+  } else {
+    t.textContent = msg;
+  }
   (/** @type {any} */ (t)).classList.remove("hidden");
   clearTimeout((/** @type {any} */ (toast))._t);
   if (ms > 0) {

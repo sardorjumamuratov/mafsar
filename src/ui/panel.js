@@ -11,7 +11,7 @@ import { app, bundle, nav, send, setFor, toast } from "./core.js";
 import { goToActiveTab, inFocusView, registerTabs } from "./nav.js";
 import { renderSets } from "./views/sets.js";
 import { onActiveTabChange } from "./tab-watch.js";
-import { currentDetail, makeSet, openDetailTab, paintDetail, promptAddCard, renderSetDetail, saveCardEdit, saveNewCard, setEditingCardId, startQuizForCurrentSet, toggleSetMenu } from "./views/set-detail.js";
+import { currentDetail, makeSet, openDetailTab, paintDetail, promptAddCard, renderSetDetail, saveCardEdit, saveNewCard, setEditingCardId, startQuizForCurrentSet, } from "./views/set-detail.js";
 import { captureCurrent, captureLastAnswer, refreshCaptureDock } from "./capture.js";
 import { deleteCard, deleteSession, updateStudySet, setExamDate } from "../storage/store.js";
 import { review } from "../../shared/srs.js";
@@ -44,7 +44,7 @@ document.addEventListener("click", (e) => {
       send({ type: "APPLY_UPDATE" }).catch((e) => toast(e.message));
       break;
     case "dismiss-update": dismissUpdateBanner(t); break;
-    case "set-menu": toggleSetMenu(t); break;
+    case "set-menu": /* Handled locally in set-detail.js */ break;
     case "nav-back": goToActiveTab(); break;
     case "nav-sets": renderSets(); break;
     case "open-set": renderSetDetail(id); break;
@@ -383,3 +383,51 @@ async function openWeakCard(sessionId, cardId) {
   setTimeout(() => row.classList.remove("flash-highlight"), 1500);
 }
 
+
+let pendingDeleteCard = null;
+let pendingDeleteCardTimer = null;
+window.addEventListener("pagehide", () => {
+  if (pendingDeleteCard) deleteCard(pendingDeleteCard.sessionId, pendingDeleteCard.cardId);
+});
+
+async function confirmDeleteCard(sessionId, cardId) {
+  if (pendingDeleteCard) {
+    clearTimeout(pendingDeleteCardTimer);
+    await deleteCard(pendingDeleteCard.sessionId, pendingDeleteCard.cardId);
+  }
+  
+  pendingDeleteCard = { sessionId, cardId };
+  
+  // hide card from UI
+  const d = currentDetail();
+  if (d && d.session.id === sessionId && d.studySet) {
+    d.studySet.flashcards = d.studySet.flashcards.filter(c => c.id !== cardId);
+    paintDetail(true);
+  }
+  
+  toast("Card deleted", 4000, "Undo", async () => {
+    clearTimeout(pendingDeleteCardTimer);
+    const { sessionId: sId, cardId: cId } = pendingDeleteCard;
+    pendingDeleteCard = null;
+    
+    // restore card in UI
+    const b = await bundle();
+    const origSet = setFor(sId, b.studySets);
+    const c = origSet?.flashcards?.find(x => x.id === cId);
+    if (c) {
+      const cur = currentDetail();
+      if (cur && cur.session.id === sId) {
+        cur.studySet.flashcards.push(c);
+        paintDetail(true);
+      }
+    }
+  });
+  
+  pendingDeleteCardTimer = setTimeout(async () => {
+    const pc = pendingDeleteCard;
+    pendingDeleteCard = null;
+    if (pc) {
+      try { await deleteCard(pc.sessionId, pc.cardId); } catch(e) {}
+    }
+  }, 4000);
+}
