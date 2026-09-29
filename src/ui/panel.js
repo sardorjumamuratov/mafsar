@@ -13,7 +13,7 @@ import { renderSets } from "./views/sets.js";
 import { onActiveTabChange } from "./tab-watch.js";
 import { currentDetail, makeSet, openDetailTab, paintDetail, promptAddCard, renderSetDetail, saveCardEdit, saveNewCard, setEditingCardId, startQuizForCurrentSet, } from "./views/set-detail.js";
 import { captureCurrent, captureLastAnswer, refreshCaptureDock } from "./capture.js";
-import { deleteCard, deleteSession, updateStudySet, setExamDate } from "../storage/store.js";
+import { deleteCard, restoreCard, deleteSession, updateStudySet, setExamDate } from "../storage/store.js";
 import { review } from "../../shared/srs.js";
 import { applyNext, goReturn, gradeCard, revealCard, startGlobalReview, startSetReview } from "./flows/review.js";
 import { startChainDrill } from "./flows/chain-drill.js";
@@ -27,7 +27,8 @@ import { copyShareCode, revokeShareFor, toggleSetShare } from "./share.js";
 import { createTeamFromForm, joinTeamFromInput, leaveTeam, renderTeam, renderTeamCreate, renderTeams } from "./views/teams.js";
 import { checkTyped, startTypedPractice, typedNext } from "./flows/typed.js";
 import { getAuth, login, logout, register } from "../sync/auth.js";
-import { examDraft, openExamPicker, renderHome, saveExamSelection, setExamDraft } from "./views/home.js";
+import { renderHome, setHomeExamEditing } from "./views/home.js";
+import { updateStudySet } from "../storage/store.js";
 import { answerQuiz, quickQuizLen, quizNext, startQuiz } from "./flows/quiz.js";
 import { SYNC_PULLED_EVENT, syncNow } from "../sync/sync.js";
 
@@ -44,7 +45,11 @@ document.addEventListener("click", (e) => {
       send({ type: "APPLY_UPDATE" }).catch((e) => toast(e.message));
       break;
     case "dismiss-update": dismissUpdateBanner(t); break;
-    case "set-menu": /* Handled locally in set-detail.js */ break;
+    case "set-menu":
+      case "more-regenerate":
+      case "more-type":
+      case "more-delete":
+        /* Handled locally in set-detail.js */ break;
     case "nav-back": goToActiveTab(); break;
     case "nav-sets": renderSets(); break;
     case "open-set": renderSetDetail(id); break;
@@ -177,11 +182,16 @@ document.addEventListener("click", (e) => {
         openDetailTab("cards");
       }).catch(e => toast(e.message));
       break;
-    case "card-del":
-      confirmSheet({ title: "Delete this card?", body: "It's removed from this set on all your devices. This can't be undone.", confirmLabel: "Delete card", destructive: true })
-        .then((ok) => ok && deleteCard(currentDetail().session.id, id).then(() => paintDetail()))
-        .catch((e) => toast(e.message));
-      break;
+    case "card-del": {
+        const sessionId = currentDetail().session.id;
+        deleteCard(sessionId, id).then(() => {
+          paintDetail();
+          toast("Card deleted", 2600, "Undo", () => {
+            restoreCard(sessionId, id).then(() => paintDetail());
+          });
+        });
+        break;
+      }
     // case "export-tsv": exportSetTsv(id); break; // paused with the export button
     case "gen-summary": generateSummary(id); break;
     case "export-backup": exportBackup(); break;
@@ -201,7 +211,23 @@ document.addEventListener("click", (e) => {
         renderAuthGate();
       }).catch((e) => toast(e.message));
       break;
-    case "exam-pick": openExamPicker(); break;
+    case "exam-edit-home": setHomeExamEditing(true); break;
+      case "exam-save-home":
+        (async () => {
+          const { studySets } = await bundle();
+          const v = document.getElementById("home-exam-input").value;
+          const ms = v ? new Date(v + "T12:00:00").getTime() : null;
+          for (const s of studySets) {
+            await updateStudySet(s.sessionId, { examDate: ms });
+          }
+          setHomeExamEditing(false);
+          toast(ms ? "Exam date saved for all sets" : "Exam date cleared");
+        })().catch(e => toast(e.message));
+        break;
+      case "exam-edit-set":
+        
+        if (detail) { detailState.editingExam = true; paintDetail(true); }
+        break;
     case "exam-clear":
       (async () => {
         const { studySets } = await bundle();
@@ -210,7 +236,7 @@ document.addEventListener("click", (e) => {
         renderHome();
       })().catch(e => toast(e.message));
       break;
-    case "picker-save": saveExamSelection(); break;
+    
     case "quiz-len":
       app.querySelectorAll(".qlen").forEach((b) => {
         const on = b === t;

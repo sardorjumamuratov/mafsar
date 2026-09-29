@@ -10,7 +10,7 @@ import { chainCoverage, liveChains, orderedSteps } from "../../storage/chains.js
 import { isLinkCard, linkId } from "../../storage/chain-links.js";
 import { cleanTitle } from "../../../shared/titles.js";
 import { ICONS } from "../icons.js";
-import { openSheet, closeSheet } from "../sheet.js";
+
 import { confirmSheet } from "../confirm.js";
 import { copyShareCode, revokeShareFor, toggleSetShare, ensureShareFor } from "../share.js";
 import { shareLinkFor } from "../share-link.js";
@@ -82,7 +82,7 @@ export async function paintDetail(updateInPlace = false) {
               ${learning > 0 ? `<span style="color: var(--status-learning-text)">${learning} learning</span>` : `${learning} learning`} &middot; 
               ${mastered > 0 ? `<span style="color: var(--status-mastered)">${mastered} mastered</span>` : `${mastered} mastered`}
             </div>
-            <button class="iconbtn" id="hiw-btn" style="height: 28px; padding: 0 2px; border: none; background: transparent; display: flex; align-items: center; gap: 5px; font-size: 13px; color: var(--text-muted); cursor: pointer">
+            <button class="iconbtn" id="hiw-btn" aria-label="How it works" style="height: 28px; padding: 0 2px; border: none; background: transparent; display: flex; align-items: center; gap: 5px; font-size: 13px; color: var(--text-muted); cursor: pointer">
               <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4"/><path d="M12 8h.01"/></svg>
               How it works
             </button>
@@ -215,7 +215,7 @@ export async function paintDetail(updateInPlace = false) {
     let examHtml = "";
     if (!exam) {
       examHtml = `
-        <button class="exam-row btn" data-action="exam-pick" style="width: 100%; display: flex; align-items: center; gap: 12px; padding: 12px 14px; border-radius: 14px; border: 1px solid var(--border-control); background: var(--bg-surface); text-align: left; cursor: pointer; color: var(--text-primary)">
+        <button class="exam-row btn" data-action="exam-edit-set" style="width: 100%; display: flex; align-items: center; gap: 12px; padding: 12px 14px; border-radius: 14px; border: 1px solid var(--border-control); background: var(--bg-surface); text-align: left; cursor: pointer; color: var(--text-primary)">
           <div style="width: 36px; height: 36px; border-radius: 10px; background: var(--bg-surface2); display: flex; align-items: center; justify-content: center; color: var(--accent-text); flex-shrink: 0">
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect><line x1="16" y1="2" x2="16" y2="6"></line><line x1="8" y1="2" x2="8" y2="6"></line><line x1="3" y1="10" x2="21" y2="10"></line></svg>
           </div>
@@ -244,7 +244,7 @@ export async function paintDetail(updateInPlace = false) {
       }
       
       examHtml = `
-        <button class="exam-row btn" data-action="exam-pick" style="width: 100%; display: flex; align-items: center; gap: 12px; padding: 12px 14px; border-radius: 14px; border: 1px solid var(--border-control); background: var(--bg-surface); text-align: left; cursor: pointer; color: var(--text-primary)">
+        <button class="exam-row btn" data-action="exam-edit-set" style="width: 100%; display: flex; align-items: center; gap: 12px; padding: 12px 14px; border-radius: 14px; border: 1px solid var(--border-control); background: var(--bg-surface); text-align: left; cursor: pointer; color: var(--text-primary)">
           <div style="width: 36px; height: 36px; border-radius: 10px; background: var(--bg-surface2); display: flex; align-items: center; justify-content: center; color: var(--accent-text); flex-shrink: 0">
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect><line x1="16" y1="2" x2="16" y2="6"></line><line x1="8" y1="2" x2="8" y2="6"></line><line x1="3" y1="10" x2="21" y2="10"></line></svg>
           </div>
@@ -336,7 +336,7 @@ export async function paintDetail(updateInPlace = false) {
               <button class="card-row-btn" data-id="${esc(c.id)}" aria-expanded="${expanded ? 'true' : 'false'}" aria-controls="panel-${esc(c.id)}" style="width: 100%; display: flex; align-items: flex-start; gap: 12px; padding: 14px 8px; background: transparent; border: none; text-align: left; cursor: pointer; color: var(--text-primary)">
                 <div style="width: 10px; height: 10px; border-radius: 50%; background: ${masteryColor}; margin-top: 7px; flex-shrink: 0"></div>
                 <div style="flex: 1; font-size: 15px; line-height: 1.4; text-wrap: pretty">${esc(c.front)}</div>
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#6d7c78" stroke-width="2" style="margin-top: 3px; transition: transform 0.2s; flex-shrink: 0; ${expanded ? 'transform: rotate(180deg)' : ''}"><path d="m6 9 6 6 6-6"/></svg>
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="color: var(--text-faint); margin-top: 3px; transition: transform 0.2s; flex-shrink: 0; ${expanded ? 'transform: rotate(180deg)' : ''}"><path d="m6 9 6 6 6-6"/></svg>
               </button>
               ${expanded ? `
                 <div id="panel-${esc(c.id)}" style="margin: 0 8px 14px 28px; display: flex; flex-direction: column; gap: 10px">
@@ -520,6 +520,18 @@ export async function paintDetail(updateInPlace = false) {
 }
 
 function bindEvents() {
+    app.querySelector('#save-exam')?.addEventListener("click", async () => {
+      const v = document.getElementById("exam-input").value;
+      if (v) {
+        const ms = new Date(v + "T12:00:00").getTime();
+        detail.studySet.examDate = ms;
+      } else {
+        detail.studySet.examDate = null;
+      }
+      await saveStudySet(detail.studySet);
+      state.editingExam = false;
+      paintDetail(true);
+    });
   app.querySelectorAll('.card-row-btn').forEach(btn => {
     btn.addEventListener("click", (e) => {
       const id = (/** @type {HTMLElement} */ (e.currentTarget)).dataset.id;
@@ -549,6 +561,7 @@ function bindEvents() {
     paintDetail(true);
   });
   app.querySelector('#share-btn')?.addEventListener("click", () => toggleSetShare(detail.session.id));
+    app.querySelector('[data-action="set-menu"]')?.addEventListener("click", openMoreMenu);
 }
 
 function renderStudyMenu() {
@@ -667,7 +680,7 @@ function renderStudyMenu() {
 
 function menuItemHtml(id, name, desc, iconSvg, disabled) {
   return `
-    <button class="menu-item modebtn" data-action="set-mode" data-mode="${esc(id)}" role="menuitemradio" aria-checked="false" ${disabled ? 'disabled' : ''} style="display: flex; align-items: center; gap: 12px; padding: 10px; border-radius: 12px; border: none; background: transparent; text-align: left; cursor: ${disabled ? 'default' : 'pointer'}; opacity: ${disabled ? '0.45' : '1'}">
+    <button class="menu-item modebtn" data-mode="${esc(id)}" role="menuitemradio" aria-checked="false" ${disabled ? 'disabled' : ''} style="display: flex; align-items: center; gap: 12px; padding: 10px; border-radius: 12px; border: none; background: transparent; text-align: left; cursor: ${disabled ? 'default' : 'pointer'}; opacity: ${disabled ? '0.45' : '1'}">
       <div style="width: 36px; height: 36px; border-radius: 10px; background: var(--bg-surface2); display: flex; align-items: center; justify-content: center; color: var(--accent-text); flex-shrink: 0">
         ${iconSvg}
       </div>
@@ -840,3 +853,121 @@ const __staticHacks = [
   ,'?? Coding exercises'
   ,'data-action="start-typed"'
 ];
+
+
+import { openSheet, closeSheet } from "../sheet.js";
+
+function openMoreMenu() {
+  const d = detail;
+  const hasSource = d.session.messages && d.session.messages.length > 0;
+  
+  const typeLabels = { general: "General", coding: "Coding", design: "System design", medicine: "Medicine" };
+  const currentType = typeLabels[d.studySet.mode || "general"] || "General";
+  
+  let html = `<div style="display:flex;flex-direction:column;gap:2px;padding:0 12px 24px" aria-label="Set actions">`;
+  
+  if (hasSource) {
+    html += `<button class="sheet-row" data-action="more-regenerate" style="display:flex;align-items:center;gap:14px;padding:12px;border-radius:12px;background:transparent;border:none;text-align:left;cursor:pointer;width:100%">
+      <div style="width:36px;height:36px;border-radius:10px;background:var(--bg-surface2);display:flex;align-items:center;justify-content:center;color:var(--accent-text);flex-shrink:0">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2l3 7 7 3-7 3-3 7-3-7-7-3 7-3z"/></svg>
+      </div>
+      <div>
+        <div style="font-size:15px;font-weight:600;color:var(--text-primary)">Regenerate cards</div>
+        <div style="font-size:13px;color:var(--text-muted)">Rebuild from the source</div>
+      </div>
+    </button>`;
+  }
+  
+  html += `<button class="sheet-row" data-action="more-type" style="display:flex;align-items:center;gap:14px;padding:12px;border-radius:12px;background:transparent;border:none;text-align:left;cursor:pointer;width:100%">
+    <div style="width:36px;height:36px;border-radius:10px;background:var(--bg-surface2);display:flex;align-items:center;justify-content:center;color:var(--accent-text);flex-shrink:0">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"/><line x1="7" y1="7" x2="7.01" y2="7"/></svg>
+    </div>
+    <div>
+      <div style="font-size:15px;font-weight:600;color:var(--text-primary)">Set type</div>
+      <div style="font-size:13px;color:var(--text-muted)">${currentType}</div>
+    </div>
+  </button>`;
+  
+  html += `<button class="sheet-row" data-action="more-delete" style="display:flex;align-items:center;gap:14px;padding:12px;border-radius:12px;background:transparent;border:none;text-align:left;cursor:pointer;width:100%">
+    <div style="width:36px;height:36px;border-radius:10px;background:var(--bg-surface2);display:flex;align-items:center;justify-content:center;color:var(--danger-text);flex-shrink:0">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
+    </div>
+    <div>
+      <div style="font-size:15px;font-weight:600;color:var(--danger-text)">Delete set</div>
+    </div>
+  </button>
+  </div>`;
+  
+  openSheet("", html, false);
+  
+  // Attach listeners to the sheet rows
+  const sheet = document.getElementById("sheet");
+  sheet.querySelectorAll(".sheet-row").forEach(btn => {
+    btn.addEventListener("click", (e) => {
+      const act = e.currentTarget.dataset.action;
+      closeSheet();
+      if (act === "more-regenerate") {
+        setTimeout(() => makeSet(d.session.id), 200); // reuse existing regenerate logic which calls confirmSheet
+      } else if (act === "more-delete") {
+        setTimeout(() => {
+          // Send delete-set action to panel.js
+          const ev = document.createEvent("HTMLEvents");
+          ev.initEvent("click", true, false);
+          const dummy = document.createElement("button");
+          dummy.dataset.action = "delete-set";
+          dummy.dataset.id = d.session.id;
+          document.body.appendChild(dummy);
+          dummy.dispatchEvent(ev);
+          dummy.remove();
+        }, 200);
+      } else if (act === "more-type") {
+        setTimeout(openTypeMenu, 200);
+      }
+    });
+  });
+}
+
+function openTypeMenu() {
+  const d = detail;
+  const current = d.studySet.mode || "general";
+  const types = [
+    { id: "general", name: "General", desc: "Standard AI flashcards." },
+    { id: "coding", name: "Coding", desc: "Write small exercises in an IDE." },
+    { id: "design", name: "System design", desc: "Draw architectures and spot bottlenecks." },
+    { id: "medicine", name: "Clinical medicine", desc: "Case notes and mechanism chains." }
+  ];
+  
+  let html = `<div style="display:flex;flex-direction:column;gap:0">`;
+  for (const t of types) {
+    const isSelected = t.id === current;
+    html += `<button class="sheet-row" data-id="${t.id}" style="display:flex;align-items:center;justify-content:space-between;padding:14px 20px;border:none;background:transparent;text-align:left;cursor:pointer;width:100%;border-bottom:1px solid var(--border-divider)">
+      <div>
+        <div style="font-size:15px;font-weight:600;color:var(--text-primary)">${t.name}</div>
+        <div style="font-size:13px;color:var(--text-muted);margin-top:2px">${t.desc}</div>
+      </div>
+      ${isSelected ? `<svg class="ic" viewBox="0 0 24 24" style="color:var(--accent-text)" width="20" height="20" stroke="currentColor" stroke-width="2" fill="none"><path d="M5 12l4 4 10-10"/></svg>` : ""}
+    </button>`;
+  }
+  html += `</div>`;
+  
+  openSheet("Set type", html, false);
+  const sheet = document.getElementById("sheet");
+  sheet.querySelectorAll(".sheet-row").forEach(btn => {
+    btn.addEventListener("click", (e) => {
+      const mode = e.currentTarget.dataset.id;
+      closeSheet();
+      // Send set-mode action to panel.js
+      setTimeout(() => {
+        const ev = document.createEvent("HTMLEvents");
+        ev.initEvent("click", true, false);
+        const dummy = document.createElement("button");
+        dummy.dataset.action = "set-mode";
+        dummy.dataset.mode = mode;
+        dummy.dataset.id = d.session.id;
+        document.body.appendChild(dummy);
+        dummy.dispatchEvent(ev);
+        dummy.remove();
+      }, 200);
+    });
+  });
+}

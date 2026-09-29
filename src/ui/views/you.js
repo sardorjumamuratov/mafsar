@@ -162,7 +162,7 @@ export async function refreshBilling() {
                  <span>${name}</span>
                  <span>${u} of ${l}</span>
                </div>
-               <div class="bar" style="margin-bottom:8px"><i style="width:${pct}%"></i></div>
+               <div class="bar" style="margin-bottom:8px"><i style="width:${Math.max(2, pct)}%"></i></div>
              `;
           };
 

@@ -68,7 +68,7 @@ export function paintEstimationQuestion() {
   const q = s.task.questions[s.idx];
   
   setHTML(app, `
-    <div class="ahd" style="display:flex;align-items:center;padding:12px;gap:12px"><button class="iconbtn" data-action="return-focus" aria-label="End session"><svg class="ic" viewBox="0 0 24 24" width="20" height="20" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg></button><div class="focus-track"><div class="focus-fill" style="width:${esc(((s.idx) / s.task.questions.length) * 100)}%"</div></div><div style="font-size:13px;color:var(--text-muted);font-variant-numeric:tabular-nums">${esc(s.idx + 1)} / ${esc(s.task.questions.length)}</div></div>
+    <div class="ahd" style="display:flex;align-items:center;padding:12px;gap:12px"><button class="iconbtn" data-action="return-focus" aria-label="End session"><svg class="ic" viewBox="0 0 24 24" width="20" height="20" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg></button><div class="focus-track"><div class="focus-fill" style="width:${Math.max(2, esc(((s.idx) / s.task.questions.length) * 100))}%"></div></div><div style="font-size:13px;color:var(--text-muted);font-variant-numeric:tabular-nums">${esc(s.idx + 1)} / ${esc(s.task.questions.length)}</div></div>
     <div class="rev-body teach">
       <div class="t-label">Question ${esc(s.idx + 1)}</div>
       <p class="teach-lead" style="margin-bottom:12px;font-size:18px">${esc(q.question)}</p>
@@ -117,7 +117,7 @@ function paintEstimationGrade() {
   const label = labels[r.grade];
   
   setHTML(app, `
-    <div class="ahd" style="display:flex;align-items:center;padding:12px;gap:12px"><button class="iconbtn" data-action="return-focus" aria-label="End session"><svg class="ic" viewBox="0 0 24 24" width="20" height="20" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg></button><div class="focus-track"><div class="focus-fill" style="width:${esc(((s.idx + 1) / s.task.questions.length) * 100)}%"</div></div><div style="font-size:13px;color:var(--text-muted);font-variant-numeric:tabular-nums">${esc(s.idx + 1)} / ${esc(s.task.questions.length)}</div></div>
+    <div class="ahd" style="display:flex;align-items:center;padding:12px;gap:12px"><button class="iconbtn" data-action="return-focus" aria-label="End session"><svg class="ic" viewBox="0 0 24 24" width="20" height="20" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg></button><div class="focus-track"><div class="focus-fill" style="width:${Math.max(2, esc(((s.idx + 1) / s.task.questions.length) * 100))}%"></div></div><div style="font-size:13px;color:var(--text-muted);font-variant-numeric:tabular-nums">${esc(s.idx + 1)} / ${esc(s.task.questions.length)}</div></div>
     <div class="rev-body teach">
       <div class="t-label">Question ${esc(s.idx + 1)}</div>
       <p class="teach-lead" style="margin-bottom:12px;font-size:18px">${esc(q.question)}</p>

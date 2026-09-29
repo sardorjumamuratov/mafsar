@@ -93,7 +93,7 @@ body {
   min-width: 300px;
   background: var(--bg-app);
   color: var(--text-primary);
-  font-family: var("Geist", system-ui, sans-serif);
+  font-family: "Geist", system-ui, sans-serif;
   font-size: 14px;
   line-height: 1.5;
   -webkit-font-smoothing: antialiased;
@@ -1154,11 +1154,7 @@ body {
   font-size: 13px;
   color: var(--text-primary);
 }
-.insight-row .q {
-  overflow: hidden;
-  white-space: nowrap;
-  text-overflow: ellipsis;
-}
+.insight-row .q { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden; }
 .insight-row .tag {
   flex-shrink: 0;
 }

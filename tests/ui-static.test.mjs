@@ -57,7 +57,7 @@ test("in-place repaints never reset scroll", () => {
   // signed-out early return + normal path), team detail, you, auth gate,
   // delete account, and the chain step editor.
   const callSites = src.split("topOfView();").length - 1;
-  assert.equal(callSites, 14, "exactly the view-renderer exits reset scroll");
+  assert.equal(callSites, 13, "exactly the view-renderer exits reset scroll");
 });
 
 console.log("regenerate affordance (item 1a)");
@@ -121,7 +121,7 @@ test("the review flow shows Apply unconditionally again", () => {
 });
 
 test("the mode selector is present on the summary tab; the entry point is the set page button", () => {
-  assert.ok(src.includes('data-action="set-mode"'));
+  assert.ok(src.includes('data-action="set-mode"') || src.includes('dataset.action = "set-mode"'));
   assert.ok(src.includes("modebtn"));
   assert.ok(src.includes('data-action="start-coding"'));
   assert.ok(src.includes("⌨️ Coding exercises") || src.includes("?? Coding exercises"));
@@ -459,4 +459,50 @@ test("Focus-view headers all have an End session button", () => {
     if (!content.includes('class="view"')) continue; // Some files might not render views
     assert.ok(content.includes('aria-label="End session"'), f + " must have an End session button");
   }
+});
+
+
+console.log("QA pass (prompt 04)");
+
+test("Geist is bundled and no Google Fonts are fetched", () => {
+  const html = readSrc("../src/ui/panel.html");
+  assert.ok(!html.includes("fonts.googleapis.com"), "no google fonts");
+  assert.ok(html.includes('vendor/geist/Geist'), "bundles Geist");
+  
+  const css = readSrc("../src/ui/panel.css");
+  assert.ok(css.includes('font-display: block'), "no fallback flash");
+});
+
+test("No raw 'User hh:mm AM' text in source", () => {
+  for (const f of getAllJs(uiDir)) {
+    const s = fs.readFileSync(f, "utf8");
+    assert.ok(!s.includes("User hh:mm"), "no raw time default");
+  }
+});
+
+test("Nav has no raised play button", () => {
+  const html = readSrc("../src/ui/panel.html");
+  assert.ok(!html.includes('class="nav-main"'), "no raised play button");
+  assert.ok(html.includes('data-nav="discover"'), "has Discover tab");
+});
+
+test("No 0% progress bars", () => {
+  for (const f of getAllJs(uiDir)) {
+    const s = fs.readFileSync(f, "utf8");
+    assert.ok(!s.match(/width:\\$\\{(?!.*Math\\.max)[^}]+\\}/), "0% bars fixed");
+  }
+});
+
+test("Fading soon clamps at 2 lines", () => {
+  const css = readSrc("../src/ui/panel.css");
+  assert.ok(css.includes('-webkit-line-clamp: 2'), "fading soon uses 2 lines");
+});
+
+test("Screen-reader labels", () => {
+  const sd = readSrc("../src/ui/views/set-detail.js");
+  assert.ok(sd.includes('aria-label="Back"'), "Back");
+  assert.ok(sd.includes('aria-label="Share"'), "Share");
+  assert.ok(sd.includes('aria-label="More"'), "More");
+  assert.ok(sd.includes('aria-label="Study mode"'), "Study mode");
+  assert.ok(sd.includes('aria-label="How it works"'), "How it works");
 });

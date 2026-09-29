@@ -4,8 +4,8 @@ function cleanTitle(t) { return t; } // TODO: import cleanTitle from somewhere i
 
 export function SetRowHtml(set, meta) {
   // 10. SetRow
-  const ratingText = set.rating ? ` · ? ${set.rating}` : "";
-  const globalText = set.isGlobal ? ` · ?? Global` : "";
+  const ratingText = set.rating ? ` ï¿½ ? ${set.rating}` : "";
+  const globalText = set.isGlobal ? ` ï¿½ ?? Global` : "";
   const metaLine = `${esc(set.source || "Unknown")}${ratingText}${globalText}`;
   
   const mastery = set.mastery || 0;
@@ -16,7 +16,7 @@ export function SetRowHtml(set, meta) {
     dueText = `<svg viewBox="0 0 24 24" class="due-check"><path d="M20 6L9 17l-5-5"/></svg>`;
   }
   
-  const progHtml = mastery > 0 ? `<div class="prog-bar"><div class="prog-fill" style="width:${mastery * 100}%"></div></div>` : "";
+  const progHtml = mastery > 0 ? `<div class="prog-bar"><div class="prog-fill" style="width:${Math.max(2, mastery * 100)}%"></div></div>` : "";
   
   return `<button type="button" class="set-row" data-action="open-set" data-id="${esc(set.id)}">
     <div class="sr-tile">

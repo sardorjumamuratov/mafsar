@@ -29,7 +29,7 @@ export function paintQuizQ() {
       <div class="ahd" style="display:flex;align-items:center;padding:12px;gap:12px">
         <button class="iconbtn" data-action="return-focus" aria-label="End session"><svg class="ic" viewBox="0 0 24 24" width="20" height="20" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg></button>
         <div class="focus-track">
-          <div class="focus-fill" style="width:${Math.round((quizIdx / quizSet.quiz.length) * 100)}%"</div>
+          <div class="focus-fill" style="width:${Math.max(2, Math.round((quizIdx / quizSet.quiz.length) * 100))}%"></div>
         </div>
         <div style="font-size:13px;color:var(--text-muted);font-variant-numeric:tabular-nums">${quizIdx + 1} / ${quizSet.quiz.length}</div>
       </div>
