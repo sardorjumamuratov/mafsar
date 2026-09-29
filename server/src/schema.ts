@@ -16,6 +16,7 @@ export const setSchema = z.object({
   mode: z.string().default("general"),
   examDate: z.string().nullable().optional(),
   chainOverrides: z.record(z.string()).optional(),
+  description: z.string().nullable().optional(),
   createdAt: z.string(),
   updatedAt: z.string(),
   deleted: z.boolean().optional(),

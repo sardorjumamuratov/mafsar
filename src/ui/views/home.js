@@ -3,7 +3,7 @@ import { FLAME, app, bundle, dateInputValue, esc, examDaysLeft, greeting, nav, s
 import { computeStreak, dayKey, getLastSync, setExamDate, weekActivity } from "../../storage/store.js";
 import { examReadiness, weakTopics } from "../../../shared/readiness.js";
 import { review } from "../../../shared/srs.js";
-import { setRow } from "../views/sets.js";
+import { SetRowHtml as setRow } from "../set-row.js";
 import { detail } from "../views/set-detail.js";
 import { LANDING_BASE } from "../../config.js";
 import { updateBannerHtml } from "../update-banner.js";

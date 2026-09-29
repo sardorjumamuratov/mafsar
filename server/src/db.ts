@@ -237,7 +237,10 @@ export const MIGRATIONS: string[] = [
   `,
   `
   ALTER TABLE sets ADD COLUMN chain_overrides TEXT;
-  `
+    `,
+    `
+    ALTER TABLE sets ADD COLUMN description TEXT;
+    `
 ];
 
 export async function migrate(db: DB): Promise<void> {

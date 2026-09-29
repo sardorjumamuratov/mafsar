@@ -197,7 +197,9 @@ Rules:
 
 Respond with ONLY valid JSON, no markdown fences, matching exactly:
 {
-  "flashcards": [{ "front": string, "back": string }],
+  "title": string,
+    "description": string,
+    "flashcards": [{ "front": string, "back": string }],
   "quiz": [{ "q": string, "options": [string, string, string, string], "answer": number, "explain": string }],
   "mode": "coding" | "general",
   "medical": boolean
@@ -353,11 +355,16 @@ export async function generateStudySet(messages: { role: string; text: string }[
       }));
     // A mode the learner chose wins; otherwise the model's coding/general guess.
     const outMode = mode !== "general" ? mode : String(parsed.mode).toLowerCase() === "coding" ? "coding" : "general";
-    if (flashcards.length || quiz.length) {
+    
+      let title = parsed.title ? String(parsed.title).substring(0, 60) : undefined;
+      let description = parsed.description ? String(parsed.description).substring(0, 160) : undefined;
+      if (flashcards.length || quiz.length) {
       return {
         flashcards,
         quiz,
         mode: outMode,
+          title,
+          description,
         // Drives the "Organise it as mechanism chains?" suggestion; never switches mode itself.
         suggestMedicine: mode === "general" && parsed.medical === true,
         ...(mode === "medicine" ? { chains: normalizeChains(parsed.chains) } : {}),

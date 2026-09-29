@@ -42,15 +42,15 @@ export async function applySync(db: DB, userId: string, body: SyncBody): Promise
     if (!shouldWrite(stored, { updated_at: s.updatedAt })) continue;
     await run(
       db,
-      `INSERT INTO sets (id, user_id, title, source, source_label, mode, exam_date, created_at, updated_at, deleted, server_updated_at, chain_overrides)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      `INSERT INTO sets (id, user_id, title, source, source_label, mode, exam_date, created_at, updated_at, deleted, server_updated_at, chain_overrides, description)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
          ON CONFLICT(id) DO UPDATE SET title=excluded.title, source=excluded.source,
            source_label=excluded.source_label, mode=excluded.mode, exam_date=excluded.exam_date,
            updated_at=excluded.updated_at, deleted=excluded.deleted, server_updated_at=excluded.server_updated_at,
-           chain_overrides=COALESCE(excluded.chain_overrides, sets.chain_overrides)
+           chain_overrides=COALESCE(excluded.chain_overrides, sets.chain_overrides), description=COALESCE(excluded.description, sets.description)
          WHERE sets.user_id = excluded.user_id`,
       [s.id, userId, s.title, s.source ?? null, s.sourceLabel ?? null,
-       s.mode ?? "general", s.examDate ?? null, s.createdAt, s.updatedAt, s.deleted ? 1 : 0, now, s.chainOverrides !== undefined ? JSON.stringify(s.chainOverrides) : null]
+       s.mode ?? "general", s.examDate ?? null, s.createdAt, s.updatedAt, s.deleted ? 1 : 0, now, s.chainOverrides !== undefined ? JSON.stringify(s.chainOverrides) : null, s.description !== undefined ? s.description : null]
     );
   }
 

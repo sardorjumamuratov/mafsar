@@ -1,4 +1,4 @@
-const fs = require('fs');
-let c = fs.readFileSync('tests/ui-static.test.mjs', 'utf8');
-c = c.replace(/assert\.equal\(callSites, 14, "exactly the view-renderer exits reset scroll"\);/, `assert.equal(callSites, 17, "exactly the view-renderer exits reset scroll");`);
-fs.writeFileSync('tests/ui-static.test.mjs', c);
+const fs = require("fs");
+let m = fs.readFileSync("server/tests/migrations.test.ts", "utf8");
+m = m.replace(/"51e0f0e615230e98", \/\/ 016 sets.chain_overrides\n\]/, '"51e0f0e615230e98", // 016 sets.chain_overrides\n  "25dcb3f149827527", // 017 sets.description\n]');
+fs.writeFileSync("server/tests/migrations.test.ts", m);

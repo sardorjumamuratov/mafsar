@@ -1,5 +1,7 @@
-const fs = require('fs');
-let c = fs.readFileSync('shared/sync-map.js', 'utf8');
-c = c.replace(/\.\.\.\(st\.chainOverrides \? \{ chainOverrides: st\.chainOverrides \} : \{\}\),/, `$&\n          ...(st.rating !== undefined ? { rating: st.rating } : {}),`);
-c = c.replace(/if \(set\.chainOverrides !== undefined\) st\.chainOverrides = set\.chainOverrides;/, `$&\n    if (set.rating !== undefined) st.rating = set.rating;`);
-fs.writeFileSync('shared/sync-map.js', c);
+const fs = require("fs");
+let c = fs.readFileSync("shared/sync-map.js", "utf8");
+
+c = c.replace(/sourceLabel: se\.sourceLabel \?\? null,/, `sourceLabel: se.sourceLabel ?? null,\n          description: st.description ?? se.description ?? null,`);
+c = c.replace(/source: r\.source \?\? undefined,/, `source: r.source ?? undefined,\n        description: r.description ?? undefined,`);
+
+fs.writeFileSync("shared/sync-map.js", c);

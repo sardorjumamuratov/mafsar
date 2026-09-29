@@ -51,6 +51,7 @@ export function toServer({ sessions, studySets, activity, reviewLog }, lastSync)
         title: st.title ?? se.title,
         source: se.source ?? null,
         sourceLabel: se.sourceLabel ?? null,
+          description: st.description ?? se.description ?? null,
         mode: st.mode ?? "general",
         ...(st.chainOverrides ? { chainOverrides: st.chainOverrides } : {}),
         examDate: st.examDate ? iso(st.examDate) : null,

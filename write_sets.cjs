@@ -1,11 +1,12 @@
-import { app, bundle, setHTML, esc, topOfView } from "../core.js";
+const fs = require("fs");
+const c = `import { app, bundle, setHTML, esc, topOfView } from "../core.js";
 import { setNav, showChrome } from "../nav.js";
 import { renderSetDetail } from "./set-detail.js";
 import { ICONS } from "../icons.js";
 import { SectionLabel, PrimaryButton, IconButton } from "../components.js";
 import { SetRowHtml as SetRow } from "../set-row.js";
 import { openSheet, closeSheet } from "../sheet.js";
-import { cleanTitle } from "../../../shared/titles.js";
+import { cleanTitle } from "../../shared/titles.js";
 import { saveSettings } from "../../storage/store.js";
 import { parseShareCode } from "../share-link.js";
 
@@ -16,7 +17,7 @@ let state = {
 
 function normalize(s) {
   if (!s) return "";
-  return s.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+  return s.toLowerCase().normalize("NFD").replace(/[\\u0300-\\u036f]/g, "");
 }
 
 function matchesSearch(s, query) {
@@ -74,58 +75,54 @@ export async function renderSets(opts = {}) {
     sets.sort((a, b) => new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime());
   }
 
-  let html = `
+  let html = \`
     <div style="padding: 18px 16px 28px; display: flex; flex-direction: column; gap: 14px; padding-bottom: 28px">
       <div style="display: flex; flex-direction: column; gap: 2px; padding: 0 4px">
         <h1 style="font-size: 24px; font-weight: 650; letter-spacing: -0.02em; margin: 0">Sets</h1>
         <div style="font-size: 13px; color: var(--text-muted)">
-          ${b.studySets.length === 1 ? "1 set" : `${b.studySets.length} sets`} &middot; 
-          ${b.studySets.reduce((acc, s) => acc + (s.due || 0), 0) === 1 ? "1 card due" : `${b.studySets.reduce((acc, s) => acc + (s.due || 0), 0)} cards due`}
+          \${b.studySets.length === 1 ? "1 set" : \`\${b.studySets.length} sets\`} &middot; 
+          \${b.studySets.reduce((acc, s) => acc + (s.due || 0), 0) === 1 ? "1 card due" : \`\${b.studySets.reduce((acc, s) => acc + (s.due || 0), 0)} cards due\`}
         </div>
       </div>
       
       <div style="display: flex; gap: 8px">
         <label style="flex: 1; min-width: 0; display: flex; align-items: center; gap: 10px; height: 44px; padding: 0 14px; border-radius: 12px; background: var(--bg-surface); border: 1px solid var(--border-card); color: var(--text-faint)" tabindex="-1" class="search-label">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
-          <input type="search" placeholder="Search sets and cards" aria-label="Search sets and cards" value="${esc(state.query)}" style="flex: 1; min-width: 0; background: transparent; border: none; outline: none; color: var(--text-primary); font-size: 15px; font-family: inherit">
+          <input type="search" placeholder="Search sets and cards" aria-label="Search sets and cards" value="\${esc(state.query)}" style="flex: 1; min-width: 0; background: transparent; border: none; outline: none; color: var(--text-primary); font-size: 15px; font-family: inherit">
         </label>
         
-        <button class="filter-btn" aria-label="Filter and sort" style="width: 44px; height: 44px; border-radius: 12px; background: var(--bg-surface); flex-shrink: 0; display: flex; align-items: center; justify-content: center; position: relative; ${state.filterShow !== 'All sets' ? 'border: 1px solid var(--border-hover); color: var(--accent)' : 'border: 1px solid var(--border-card); color: var(--text-secondary)'}">
+        <button class="filter-btn" aria-label="Filter and sort" style="width: 44px; height: 44px; border-radius: 12px; background: var(--bg-surface); flex-shrink: 0; display: flex; align-items: center; justify-content: center; position: relative; \${state.filterShow !== 'All sets' ? 'border: 1px solid var(--border-hover); color: var(--accent)' : 'border: 1px solid var(--border-card); color: var(--text-secondary)'}">
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="4" x2="20" y1="9" y2="9"/><circle cx="15" cy="9" r="2" fill="var(--bg-surface)"/><line x1="4" x2="20" y1="15" y2="15"/><circle cx="9" cy="15" r="2" fill="var(--bg-surface)"/></svg>
-          ${state.filterShow !== 'All sets' ? `<div style="position: absolute; top: 8px; right: 8px; width: 8px; height: 8px; border-radius: 50%; background: var(--accent); box-shadow: 0 0 0 2px var(--bg-surface)"></div>` : ''}
+          \${state.filterShow !== 'All sets' ? \`<div style="position: absolute; top: 8px; right: 8px; width: 8px; height: 8px; border-radius: 50%; background: var(--accent); box-shadow: 0 0 0 2px var(--bg-surface)"></div>\` : ''}
         </button>
       </div>
 
       <div style="display: flex; justify-content: space-between; align-items: center; gap: 8px; min-height: 30px; padding: 0 4px; font-size: 13px">
         <div style="display: flex; gap: 8px; align-items: center">
-          <div aria-live="polite" style="color: var(--text-muted)">${sets.length === 1 ? "1 set" : `${sets.length} sets`}</div>
-          ${state.filterShow !== 'All sets' ? `
+          <div aria-live="polite" style="color: var(--text-muted)">\${sets.length === 1 ? "1 set" : \`\${sets.length} sets\`}</div>
+          \${state.filterShow !== 'All sets' ? \`
             <button class="clear-filter-pill" aria-label="Clear filter" style="height: 28px; padding: 0 6px 0 10px; border-radius: 999px; border: 1px solid var(--border-hover); background: var(--bg-surface2); color: var(--text-primary); font-size: 13px; font-weight: 600; display: flex; align-items: center; gap: 4px; cursor: pointer">
-              ${esc(state.filterShow)}
+              \${esc(state.filterShow)}
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--text-muted)" stroke-width="2.4"><path d="M18 6 6 18M6 6l12 12"/></svg>
             </button>
-          ` : ''}
+          \` : ''}
         </div>
         
         <button class="filter-btn" style="height: 30px; padding: 0 4px; background: transparent; border: none; color: var(--text-secondary); font-weight: 600; display: flex; align-items: center; gap: 6px; cursor: pointer; font-size: 13px">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m7 15 5 5 5-5M7 9l5-5 5 5"/></svg>
-          ${esc(sortOrder)}
+          \${esc(sortOrder)}
         </button>
       </div>
       
       <div style="display: flex; flex-direction: column; gap: 8px">
-        ${b.studySets.length === 0 ? `
+        \${b.studySets.length === 0 ? \`
           <div style="text-align: center; padding: 28px 12px; font-size: 14px; color: var(--text-muted)">No sets yet. Capture a page or an AI answer with the buttons below.</div>
-        ` : sets.length === 0 ? `
-          <div style="text-align: center; padding: 28px 12px; font-size: 14px; color: var(--text-muted)">${q ? `No sets match "${esc(state.query)}"` : `No sets match this filter.`}</div>
-        ` : sets.map(s => SetRow(s)).join("")}
-      
-      <div style="display: flex; flex-direction: column; gap: 8px; margin-top: 16px">
-        <button class="btn btn-ghost btn-block hidden" id="captureAnswerBtn" data-action="capture-last-answer" style="border: 1px solid var(--border-card); background: var(--bg-surface); color: var(--text-primary); border-radius: 12px; height: 50px; font-weight: 600">Capture last answer</button>
-        <button class="btn btn-ghost btn-block" id="captureCurrentBtn" data-action="capture-current" style="border: 1px solid var(--border-card); background: var(--bg-surface); color: var(--text-primary); border-radius: 12px; height: 50px; font-weight: 600">Capture this page</button>
+        \` : sets.length === 0 ? \`
+          <div style="text-align: center; padding: 28px 12px; font-size: 14px; color: var(--text-muted)">\${q ? \`No sets match "\${esc(state.query)}"\` : \`No sets match this filter.\`}</div>
+        \` : sets.map(s => SetRow(s)).join("")}
       </div>
     </div>
-  `;
+  \`;
   
   if (opts.updateInPlace) {
     const main = app.querySelector("div");
@@ -139,8 +136,6 @@ export async function renderSets(opts = {}) {
   setNav("sets");
   bindEvents();
   showChrome();
-  refreshCaptureAnswerButton().catch(() => {});
-  refreshCaptureCurrentButton().catch(() => {});
   
   function bindEvents() {
     app.querySelector('input[type="search"]')?.addEventListener("input", (e) => {
@@ -192,45 +187,45 @@ function openFilterSheet(sortOrder, showOptions, matchCount) {
   const sortOptions = ["Most due", "Recently opened", "A-Z", "Newest"];
   
   function renderContent() {
-    return `
+    return \`
       <div style="display: flex; flex-direction: column; gap: 14px; padding-top: 14px">
         <div style="display: flex; flex-direction: column">
-          ${SectionLabel("SHOW")}
+          \${SectionLabel("SHOW")}
           <div role="radiogroup" style="display: flex; flex-direction: column; gap: 4px; padding-top: 4px">
-            ${showOptions.map(opt => `
-              <div role="radio" data-opt="${esc(opt)}" class="show-opt" style="height: 48px; padding: 0 12px; border-radius: 12px; display: flex; align-items: center; gap: 12px; cursor: pointer; ${tempShow === opt ? 'background: var(--bg-surface2); border: 1px solid var(--border-hover)' : 'background: transparent; border: 1px solid transparent'}">
-                <div style="flex: 1; font-size: 15px; font-weight: 600">${esc(opt)}</div>
-                ${tempShow === opt ? `
+            \${showOptions.map(opt => \`
+              <div role="radio" data-opt="\${esc(opt)}" class="show-opt" style="height: 48px; padding: 0 12px; border-radius: 12px; display: flex; align-items: center; gap: 12px; cursor: pointer; \${tempShow === opt ? 'background: var(--bg-surface2); border: 1px solid var(--border-hover)' : 'background: transparent; border: 1px solid transparent'}">
+                <div style="flex: 1; font-size: 15px; font-weight: 600">\${esc(opt)}</div>
+                \${tempShow === opt ? \`
                   <div style="width: 18px; display: flex; flex-direction: column">
                     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" stroke-width="2.4"><polyline points="20 6 9 17 4 12"></polyline></svg>
                   </div>
-                ` : ''}
+                \` : ''}
               </div>
-            `).join('')}
+            \`).join('')}
           </div>
         </div>
         
         <div style="display: flex; flex-direction: column">
-          ${SectionLabel("SORT BY")}
+          \${SectionLabel("SORT BY")}
           <div role="radiogroup" style="display: flex; flex-direction: column; gap: 4px; padding-top: 4px">
-            ${sortOptions.map(opt => `
-              <div role="radio" data-opt="${esc(opt)}" class="sort-opt" style="height: 48px; padding: 0 12px; border-radius: 12px; display: flex; align-items: center; gap: 12px; cursor: pointer; ${tempSort === opt ? 'background: var(--bg-surface2); border: 1px solid var(--border-hover)' : 'background: transparent; border: 1px solid transparent'}">
-                <div style="flex: 1; font-size: 15px; font-weight: 600">${esc(opt)}</div>
-                ${tempSort === opt ? `
+            \${sortOptions.map(opt => \`
+              <div role="radio" data-opt="\${esc(opt)}" class="sort-opt" style="height: 48px; padding: 0 12px; border-radius: 12px; display: flex; align-items: center; gap: 12px; cursor: pointer; \${tempSort === opt ? 'background: var(--bg-surface2); border: 1px solid var(--border-hover)' : 'background: transparent; border: 1px solid transparent'}">
+                <div style="flex: 1; font-size: 15px; font-weight: 600">\${esc(opt)}</div>
+                \${tempSort === opt ? \`
                   <div style="width: 18px; display: flex; flex-direction: column">
                     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" stroke-width="2.4"><polyline points="20 6 9 17 4 12"></polyline></svg>
                   </div>
-                ` : ''}
+                \` : ''}
               </div>
-            `).join('')}
+            \`).join('')}
           </div>
         </div>
       </div>
       
       <div style="padding-top: 10px">
-        ${PrimaryButton(`Show ${matchCount === 1 ? '1 set' : `${matchCount} sets`}`, { id: "filter-apply", style: "height: 50px; border-radius: 12px; font-size: 15px; font-weight: 650; width: 100%" })}
+        \${PrimaryButton(\`Show \${matchCount === 1 ? '1 set' : \`\${matchCount} sets\`}\`, { id: "filter-apply", style: "height: 50px; border-radius: 12px; font-size: 15px; font-weight: 650; width: 100%" })}
       </div>
-    `;
+    \`;
   }
   
   function bindSheet(sheetDiv) {
@@ -242,7 +237,7 @@ function openFilterSheet(sortOrder, showOptions, matchCount) {
           const newMatch = document.querySelectorAll('.setrow').length;
           const applyBtn = sheetDiv.querySelector('#filter-apply');
           if (applyBtn) {
-            applyBtn.textContent = `Show ${newMatch === 1 ? '1 set' : `${newMatch} sets`}`;
+            applyBtn.textContent = \`Show \${newMatch === 1 ? '1 set' : \`\${newMatch} sets\`}\`;
           }
         });
         const content = sheetDiv.querySelector('.sheet-content');
@@ -278,40 +273,5 @@ function openFilterSheet(sortOrder, showOptions, matchCount) {
       if (sheet) bindSheet(sheet);
   }, 0);
 }
-
-let captureAnswerToken = 0;
-import { isAIChatTab } from "../core.js";
-import { classifyUrl } from "../../storage/sources.js";
-import { queryActiveTab } from "../core.js";
-
-export async function refreshCaptureCurrentButton() {
-  const btn = document.getElementById("captureCurrentBtn");
-  if (!btn) return;
-  const tab = await queryActiveTab();
-  const source = classifyUrl(tab?.url || "");
-  if (source.kind === "page") {
-    delete btn.dataset.kind;
-    delete btn.dataset.origin;
-    return;
-  }
-  btn.dataset.kind = source.kind;
-  btn.dataset.origin = source.origin;
-}
-
-export async function refreshCaptureAnswerButton() {
-  const btn = document.getElementById("captureAnswerBtn");
-  if (!btn) return;
-  
-  const token = Math.random();
-  captureAnswerToken = token;
-  
-  const chatTab = await isAIChatTab();
-  if (captureAnswerToken !== token) return;
-  
-  btn.classList.toggle("hidden", !chatTab.ok);
-  if (chatTab.url) {
-    btn.dataset.origin = new URL(chatTab.url).origin;
-  } else {
-    delete btn.dataset.origin;
-  }
-}
+`;
+fs.writeFileSync("src/ui/views/sets.js", c);
