@@ -49,11 +49,11 @@ for example: *"Implement docs/prompts/02-abuse-protection.md. Follow AGENTS.md."
 files almost everything else touches, so run it on its own and merge it the same
 day. 24, 29 and 30 all edit `server/src/app.ts` — never two at once.
 
-**32 to 37:** 32 and 34 can run side by side (one is UI only, the other server
-only). 33 edits the panel shell, so run it on its own. Then 35, 36 and 37 in
-that order, merging each before the next. 34, 35 and 36 each append a migration,
-and so does the unmerged `feat/usage-counts` (slot 017): whichever merges later
-takes the next free slot, and never two of them at once.
+**32 to 37 are replaced by the redesign** in [`redesign/`](redesign/README.md)
+(Home, Sets, Set detail, Discover and Stats, pixel-exact to the design). Don't
+start 37. Whatever 32 to 36 already built is the starting point that the
+redesign prompts restyle and extend. After them, run only the redesign
+prompts, in the order in `redesign/README.md`.
 
 **Running in parallel:** 02, 03, 05, 06, 07 and 08 all edit
 `server/src/app.ts`, and 03 to 08 all edit `server/src/privacy.ts`. Run those one
