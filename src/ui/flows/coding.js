@@ -26,7 +26,7 @@ export function paintCodingQ() {
     setHTML(app, `
       <div class="view">
         <div class="done-msg"><div class="big">⌨️</div>
-          <div style="font-weight:650;color:var(--ink)">Coding practice complete</div>
+          <div style="font-weight:650;color:var(--text-primary)">Coding practice complete</div>
           <div style="margin-top:4px">${items.length} exercise${items.length === 1 ? "" : "s"} graded.</div>
         </div>
         <button class="btn btn-primary btn-block" data-action="return-focus">Done</button>
@@ -40,8 +40,8 @@ export function paintCodingQ() {
     <div class="rev-body">
       <div class="t-label">Solve in code</div>
       <div style="display:flex;align-items:center;gap:10px;margin-top:8px">
-        <span class="spinner" style="border-color:var(--border);border-top-color:var(--primary)"></span>
-        <span style="font-size:13px;color:var(--muted)">Writing a small exercise from “${esc(card.front)}”…</span>
+        <span class="spinner" style="border-color:var(--border-control);border-top-color:var(--accent)"></span>
+        <span style="font-size:13px;color:var(--text-muted)">Writing a small exercise from “${esc(card.front)}”…</span>
       </div>
     </div>`);
   requestCodingTask();
@@ -172,7 +172,7 @@ export function paintCodeGraded(g) {
   setHTML(box, `
     <div class="score-row">
       <div class="score tnum ${g.correct ? "ok" : "no"}">${g.score}</div>
-      <div><b style="color:${g.correct ? "var(--success)" : "var(--danger)"}">${g.correct ? "Passes" : "Not yet"}</b>
+      <div><b style="color:${g.correct ? "var(--status-mastered)" : "var(--danger-text)"}">${g.correct ? "Passes" : "Not yet"}</b>
         <div class="feedback">${esc(g.feedback)}</div></div>
     </div>
     <div class="checklist graded-ck">

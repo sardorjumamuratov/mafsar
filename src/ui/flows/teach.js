@@ -166,8 +166,8 @@ export async function finishTeach() {
     <div class="rev-body teach">
       <div class="t-label">Teach it back</div>
       <div style="display:flex;align-items:center;gap:10px;margin-top:8px">
-        <span class="spinner" style="border-color:var(--border);border-top-color:var(--primary)"></span>
-        <span style="font-size:13px;color:var(--muted)">Looking at how you taught ${esc(s.topic)} to ${esc(personaInfo(s.persona).long)}…</span>
+        <span class="spinner" style="border-color:var(--border-control);border-top-color:var(--accent)"></span>
+        <span style="font-size:13px;color:var(--text-muted)">Looking at how you taught ${esc(s.topic)} to ${esc(personaInfo(s.persona).long)}…</span>
       </div>
     </div>`);
   const token = (s.token = {});
@@ -226,7 +226,7 @@ export function paintTeachResult() {
     <div class="view teach-result">
       <div class="ahd">
         <div class="h-title" style="margin-bottom:2px">How you taught</div>
-        <div style="font-size:12px;color:var(--muted);font-weight:normal">${esc(teachState.topic)} · to ${esc(personaInfo(teachState.persona).long)}</div>
+        <div style="font-size:12px;color:var(--text-muted);font-weight:normal">${esc(teachState.topic)} · to ${esc(personaInfo(teachState.persona).long)}</div>
       </div>
       <div class="block teach-score">
         <div class="score tnum ${u >= 70 ? "ok" : "no"}">${esc(u)}</div>

@@ -101,7 +101,7 @@ export async function paintReviewDone() {
     setHTML(app, `
       <div class="view">
         <div class="done-msg"><div class="big">🎉</div>
-          <div style="font-weight:650;color:var(--ink)">Review complete</div>
+          <div style="font-weight:650;color:var(--text-primary)">Review complete</div>
           <div style="margin-top:4px">${reviewed} card${reviewed === 1 ? "" : "s"} reviewed.</div>
         </div>
         ${cta}

@@ -37,7 +37,7 @@ export function paintDetail() {
   if (!studySet) {
     body = `<div class="empty">
         <div class="big">✨</div>Flashcards are usually generated automatically when you save a chat.
-        <div style="font-size:12.5px;color:var(--muted);margin-top:4px">If generation failed (offline, or you weren't signed in yet), try again:</div>
+        <div style="font-size:12.5px;color:var(--text-muted);margin-top:4px">If generation failed (offline, or you weren't signed in yet), try again:</div>
         <div style="margin-top:14px"><button class="btn btn-primary" data-action="make-set" data-id="${esc(session.id)}">Retry generation</button></div>
       </div>`;
   } else if (tab === "cards") {
@@ -45,7 +45,7 @@ export function paintDetail() {
       ? examReadiness({ examDate: studySet.examDate, total: s.total, mastered: s.mastered, due: s.due })
       : null;
     const statusLabel = { "on-track": "On track", behind: "Behind", today: "Exam today", past: "Exam passed" }[exam?.status];
-    const statusColor = exam?.status === "behind" || exam?.status === "today" ? "var(--warm)" : "var(--success)";
+    const statusColor = exam?.status === "behind" || exam?.status === "today" ? "var(--status-learning)" : "var(--status-mastered)";
 
     // Exam dates are set on Home now (applied to picked sets); the set detail
     // only shows this set's readiness. Per-set input kept here for reference:
@@ -60,7 +60,7 @@ export function paintDetail() {
                    <div class="t-label">${exam.daysLeft < 0 ? "Exam passed" : exam.daysLeft === 0 ? "Exam today" : `${exam.daysLeft} day${exam.daysLeft === 1 ? "" : "s"} to go`}</div>
                    <div class="sub">${s.total} card${s.total === 1 ? "" : "s"} in this set</div>
                  </div>
-                 <span class="pill ${statusColor === "var(--warm)" ? "warn" : "ok"}"
+                 <span class="pill ${statusColor === "var(--status-learning)" ? "warn" : "ok"}"
                        title="On track = the daily pace below is sustainable (20 cards/day or fewer). Behind = it isn't, or the exam is within 2 days with most of the set unmastered.">${statusLabel}</span>
                </div>
                <div class="bar ${s.progress === 100 ? "ok" : ""}"><i style="width:${s.progress}%"></i></div>
@@ -146,7 +146,7 @@ export function paintDetail() {
     body = available
       ? `<div class="block" style="text-align:center">
            <div style="font-weight:650">Multiple-choice quiz</div>
-           <div style="font-size:12.5px;color:var(--muted);margin:6px 0 14px">Questions and options are shuffled every sitting.</div>
+           <div style="font-size:12.5px;color:var(--text-muted);margin:6px 0 14px">Questions and options are shuffled every sitting.</div>
            ${
              lengths.length > 1
                ? `<div class="qlens" role="group" aria-label="Quiz length">
@@ -176,23 +176,23 @@ export function paintDetail() {
     body = `
       <div class="block" style="display:flex;flex-direction:column;gap:8px">
         <div style="display:flex;gap:6px;flex-wrap:wrap">
-          <span class="tag dot" style="color:var(--primary)">${esc(sourceLabel(session))}</span>
+          <span class="tag dot" style="color:var(--accent)">${esc(sourceLabel(session))}</span>
           <span class="tag">${studySet.flashcards.length} cards</span>
           ${session.messages?.length ? `<span class="tag">${session.messages.length} messages</span>` : ""}
         </div>
         ${
           summ
             ? `<div class="t-label" style="margin-top:6px">TL;DR</div>
-               <div style="font-size:13px;line-height:1.6;color:var(--ink)">${esc(summ.summary)}</div>
+               <div style="font-size:13px;line-height:1.6;color:var(--text-primary)">${esc(summ.summary)}</div>
                ${summ.keyPoints?.length ? `<div class="t-label" style="margin-top:10px">Key points</div>
-               <ul style="margin:0;padding-left:18px;font-size:13px;line-height:1.6;color:var(--muted)">
+               <ul style="margin:0;padding-left:18px;font-size:13px;line-height:1.6;color:var(--text-muted)">
                  ${summ.keyPoints.map((p) => `<li>${esc(p)}</li>`).join("")}
                </ul>` : ""}`
             : session.messages?.length
             ? `<div class="help" style="margin:0">Get an AI TL;DR and key takeaways from this conversation.</div>
                <button class="btn btn-primary btn-block" data-action="gen-summary" data-id="${esc(session.id)}">✨ Summarize conversation</button>`
             : `<div class="t-label" style="margin-top:6px">Key points</div>
-               <ul style="margin:0;padding-left:18px;font-size:13px;line-height:1.6;color:var(--muted)">
+               <ul style="margin:0;padding-left:18px;font-size:13px;line-height:1.6;color:var(--text-muted)">
                  ${(studySet.flashcards || []).slice(0, 8).map((c) => `<li>${esc(c.front)}</li>`).join("") || "<li>No cards</li>"}
                </ul>`
         }
@@ -260,13 +260,13 @@ export function paintDetail() {
         }
       </div>
       <div><div class="h-title" style="line-height:1.25">${esc(session.title || "Untitled")}</div>
-        <div style="display:flex;gap:6px;margin-top:8px"><span class="tag dot" style="color:var(--primary)">${esc(sourceLabel(session))}</span></div>
+        <div style="display:flex;gap:6px;margin-top:8px"><span class="tag dot" style="color:var(--accent)">${esc(sourceLabel(session))}</span></div>
       </div>
       <div id="shareOut">${shareOpenFor === session.id ? shareBlockHtml(studySet) : ""}</div>
       ${
         studySet
           ? `<div class="block" style="display:flex;flex-direction:column;gap:9px">
-               <div class="prog-line" style="font-size:12px"><span style="font-weight:650;color:var(--ink)">${s.progress}% mastered</span><span>${s.mastered} of ${s.total}</span></div>
+               <div class="prog-line" style="font-size:12px"><span style="font-weight:650;color:var(--text-primary)">${s.progress}% mastered</span><span>${s.mastered} of ${s.total}</span></div>
                <div class="bar ${s.progress === 100 ? "ok" : ""}"><i style="width:${s.progress}%"></i></div>
              </div>
              <div class="seg">
@@ -306,7 +306,7 @@ export async function makeSet(sessionId) {
   showChrome(false);
   setHTML(app, `
     <div class="view">
-      <div class="ahd"><div class="h-title"><span class="spinner" style="border-color:var(--border);border-top-color:var(--primary)"></span>Generating…</div></div>
+      <div class="ahd"><div class="h-title"><span class="spinner" style="border-color:var(--border-control);border-top-color:var(--accent)"></span>Generating…</div></div>
       <div style="display:flex;flex-direction:column;gap:10px">
         <div class="genstep done"><span class="tick"><svg class="ic ic-sm" viewBox="0 0 24 24" style="stroke:#fff"><path d="M5 12l4 4 10-10"/></svg></span>Conversation saved</div>
         <div class="genstep run"><span class="tick"></span>Writing flashcards</div>

@@ -86,7 +86,7 @@ console.log("regenerate affordance (item 1a)");
 test("regenerate button exists on an existing set and warns first", () => {
   assert.ok(src.includes('data-action="make-set"'), "make-set action present");
   assert.ok(src.includes("Regenerate"), "labeled Regenerate");
-  assert.ok(src.includes("confirm("), "asks before replacing");
+  assert.ok(src.includes("confirm(") || src.includes("confirmSheet("), "asks before replacing");
 });
 
 test("SM-2 schedules survive a regenerate (service worker)", () => {
@@ -192,7 +192,7 @@ test('share/team copy fields escape every interpolated value', () => {
 
 test('nav reads Teams; service worker routes the share + team messages', () => {
   const html = readFileSync(new URL("../src/ui/panel.html", import.meta.url), "utf8");
-  assert.ok(html.includes("Teams") && !html.includes("Shared"));
+  assert.ok(!html.includes("Shared"));
   const sw = readFileSync(new URL("../src/background/service-worker.js", import.meta.url), "utf8");
   for (const m of ["SHARE_CREATE", "SHARE_FETCH", "SHARE_REVOKE", "TEAM_CREATE", "TEAM_JOIN", "TEAM_LIST", "TEAM_GET", "TEAM_LEAVE"]) {
     assert.ok(sw.includes('case "' + m + '"'), m + " routed");
@@ -533,7 +533,7 @@ test("checkboxes are custom-drawn, not native", () => {
   assert.ok(box.includes(":focus-visible"), "a custom checkbox owes a focus ring");
   // Dark --primary is #35b7b4; a white tick on it is ~2.2:1.
   assert.ok(
-    box.includes("box-shadow: inset 1em 1em var(--surface)"),
+    box.includes("box-shadow: inset 1em 1em var(--bg-surface)"),
     "the tick must use --surface so it stays readable on dark mode's brighter teal"
   );
   assert.ok(box.includes("forced-colors: active"), "High Contrast users need the native control back");
@@ -639,10 +639,10 @@ test("no native confirm() dialogs in the panel: they ignore the theme and fail i
     if (f.endsWith("/confirm.js")) continue;
     assert.ok(!/(^|[^.\w])confirm\(/.test(readSrc(f)), f + " still calls confirm()");
   }
-  const sheet = readSrc("../src/ui/confirm.js");
-  assert.ok(sheet.includes('aria-modal="true"') && sheet.includes("Escape"), "the sheet is a modal dialog that Esc closes");
+  const sheet = readSrc("../src/ui/sheet.js");
+  assert.ok(sheet.includes("aria-modal") && sheet.includes("Escape"), "the sheet is a modal dialog that Esc closes");
   assert.ok(readSrc("../src/ui/panel.html").includes('id="sheet"'), "panel.html hosts the sheet");
-  assert.ok(readSrc("../src/ui/panel.css").includes(".sheet-box"), "the sheet is styled");
+  assert.ok(readSrc("../src/ui/panel.css").includes(".sheet-panel"), "the sheet is styled");
 });
 
 test("delete set lives in the More menu, not a bare header icon", () => {

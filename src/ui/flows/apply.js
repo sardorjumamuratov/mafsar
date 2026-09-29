@@ -16,8 +16,8 @@ export async function startApply() {
     <div class="rev-body">
       <div class="t-label">Apply it</div>
       <div style="display:flex;align-items:center;gap:10px;margin-top:8px">
-        <span class="spinner" style="border-color:var(--border);border-top-color:var(--primary)"></span>
-        <span style="font-size:13px;color:var(--muted)">Writing a fresh scenario…</span>
+        <span class="spinner" style="border-color:var(--border-control);border-top-color:var(--accent)"></span>
+        <span style="font-size:13px;color:var(--text-muted)">Writing a fresh scenario…</span>
       </div>
     </div>`);
   try {
@@ -89,7 +89,7 @@ export function paintGraded(grading, nextAction) {
   setHTML(box, `
     <div class="score-row">
       <div class="score tnum ${grading.correct ? "ok" : "no"}">${grading.score}</div>
-      <div><b style="color:${grading.correct ? "var(--success)" : "var(--danger)"}">${grading.correct ? "Correct" : "Needs work"}</b>
+      <div><b style="color:${grading.correct ? "var(--status-mastered)" : "var(--danger-text)"}">${grading.correct ? "Correct" : "Needs work"}</b>
         <div class="feedback">${esc(grading.feedback)}</div></div>
     </div>
     <button class="btn btn-primary btn-block" data-action="${nextAction}">Continue</button>`);

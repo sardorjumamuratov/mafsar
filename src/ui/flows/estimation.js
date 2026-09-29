@@ -39,8 +39,8 @@ function paintEstimationLoader(msg) {
     <div class="rev-body teach">
       <div class="t-label">Estimation drill</div>
       <div style="display:flex;align-items:center;gap:10px;margin-top:8px">
-        <span class="spinner" style="border-color:var(--border);border-top-color:var(--primary)"></span>
-        <span style="font-size:13px;color:var(--muted)">${esc(msg)}</span>
+        <span class="spinner" style="border-color:var(--border-control);border-top-color:var(--accent)"></span>
+        <span style="font-size:13px;color:var(--text-muted)">${esc(msg)}</span>
       </div>
     </div>`);
 }
@@ -126,14 +126,14 @@ function paintEstimationGrade() {
       <div class="t-label">Question ${esc(s.idx + 1)}</div>
       <p class="teach-lead" style="margin-bottom:12px;font-size:18px">${esc(q.question)}</p>
       
-      <div style="background:var(--surface-2);border-radius:8px;padding:12px;margin-bottom:12px">
+      <div style="background:var(--bg-surface2);border-radius:8px;padding:12px;margin-bottom:12px">
         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
           <span style="font-weight:600">Your answer</span>
           <span class="idea-chip ${cl}">${esc(label)}</span>
         </div>
         <div style="font-size:20px;font-weight:700">${esc(r.answer.original)}</div>
-        <div style="font-size:13px;color:var(--muted);margin-top:4px">Reference: ${esc(q.reference_value)} ${esc(q.reference_unit)}</div>
-        ${r.note ? `<div style="font-size:13px;color:var(--danger);margin-top:4px">${esc(r.note)}</div>` : ""}
+        <div style="font-size:13px;color:var(--text-muted);margin-top:4px">Reference: ${esc(q.reference_value)} ${esc(q.reference_unit)}</div>
+        ${r.note ? `<div style="font-size:13px;color:var(--danger-text);margin-top:4px">${esc(r.note)}</div>` : ""}
       </div>
       
       <div class="t-label">Solution</div>
@@ -191,17 +191,17 @@ function paintEstimationSummary(summary) {
       <div class="ahd"><div class="h-title">Drill complete</div></div>
       
       <div style="display:flex;gap:8px;margin-bottom:16px;text-align:center">
-        <div style="flex:1;background:var(--surface-2);border-radius:8px;padding:12px">
-          <div style="font-size:24px;font-weight:700;color:var(--success)">${spotOn}</div>
-          <div style="font-size:12px;color:var(--muted)">Spot on</div>
+        <div style="flex:1;background:var(--bg-surface2);border-radius:8px;padding:12px">
+          <div style="font-size:24px;font-weight:700;color:var(--status-mastered)">${spotOn}</div>
+          <div style="font-size:12px;color:var(--text-muted)">Spot on</div>
         </div>
-        <div style="flex:1;background:var(--surface-2);border-radius:8px;padding:12px">
-          <div style="font-size:24px;font-weight:700;color:var(--warm)">${ballpark}</div>
-          <div style="font-size:12px;color:var(--muted)">Ballpark</div>
+        <div style="flex:1;background:var(--bg-surface2);border-radius:8px;padding:12px">
+          <div style="font-size:24px;font-weight:700;color:var(--status-learning)">${ballpark}</div>
+          <div style="font-size:12px;color:var(--text-muted)">Ballpark</div>
         </div>
-        <div style="flex:1;background:var(--surface-2);border-radius:8px;padding:12px">
-          <div style="font-size:24px;font-weight:700;color:var(--danger)">${off}</div>
-          <div style="font-size:12px;color:var(--muted)">Off</div>
+        <div style="flex:1;background:var(--bg-surface2);border-radius:8px;padding:12px">
+          <div style="font-size:24px;font-weight:700;color:var(--danger-text)">${off}</div>
+          <div style="font-size:12px;color:var(--text-muted)">Off</div>
         </div>
       </div>
       

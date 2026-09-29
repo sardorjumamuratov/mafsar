@@ -1,3 +1,4 @@
+import { renderDiscover, renderStats } from "./views/discover-stats.js";
 import { saveSettings } from "../storage/store.js";
 import { startCompare, selectComparePair, toggleCompareSame, createForkCards } from "./flows/compare.js";
 import { finishDesignDrill, requestDesignCurveball, startDesignDrill, submitDesign, submitDesignCurveball } from "./flows/design.js";
@@ -192,6 +193,7 @@ document.addEventListener("click", (e) => {
       break;
     case "delete-account-open": renderDeleteAccount(); break;
     case "delete-account-confirm": confirmDeleteAccount(); break;
+    case "nav-teams": renderTeams(); break;
     case "auth-signout":
       logout().then(() => {
         toast("Signed out. Your sets stay on this device.");
@@ -311,7 +313,8 @@ nav.addEventListener("click", (e) => {
   if (n === "review") return startGlobalReview();
   if (n === "home") renderHome();
   else if (n === "sets") renderSets();
-  else if (n === "teams") renderTeams();
+  else if (n === "discover") renderDiscover();
+  else if (n === "stats") renderStats();
   else if (n === "you") renderYou();
 });
 

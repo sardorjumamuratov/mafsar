@@ -68,7 +68,7 @@ function finishDrill(failedLinks) {
         <ol class="chain-steps">
           ${cSteps.map((s, i) => {
              const arrow = i ? `<li class="chain-arrow" aria-hidden="true">↓</li>` : "";
-             const failedStyle = s.failed ? `style="border:1px solid var(--danger);"` : "";
+             const failedStyle = s.failed ? `style="border:1px solid var(--danger-text);"` : "";
              return `${arrow}<li class="chain-step" ${failedStyle}>
                  <span class="chain-label">${esc(s.label)}</span>
                  <details class="chain-body" open>
@@ -118,8 +118,8 @@ function renderRebuild() {
     const isError = state.errorIdx === i;
     const isReveal = state.revealIdx === i;
     let style = "text-align:left;width:100%;margin-bottom:8px;";
-    if (isError) style += "border-color:var(--danger);transform:translateX(5px);";
-    if (isReveal) style += "border-color:var(--success);background-color:rgba(0,255,0,0.1);";
+    if (isError) style += "border-color:var(--danger-text);transform:translateX(5px);";
+    if (isReveal) style += "border-color:var(--status-mastered);background-color:rgba(0,255,0,0.1);";
     return `<button class="chain-step linkbtn" data-drill-action="rebuild-pick" data-idx="${i}" style="${style}">
       <div class="chain-text">${esc(cSteps[i].step.statement)}</div>
     </button>`;
@@ -130,8 +130,8 @@ function renderRebuild() {
     <div class="rev-body" style="padding-bottom:100px;">
       <div class="h-title" style="margin-bottom:16px">Rebuild the chain</div>
       <div class="help">Tap the next step in the sequence.</div>
-      <div class="block chain" style="margin-bottom:20px;min-height:40px;border:1px dashed var(--border);padding:10px;border-radius:8px">
-        ${placedHtml || `<div class="empty" style="text-align:center;color:var(--faint)">Sequence starts here</div>`}
+      <div class="block chain" style="margin-bottom:20px;min-height:40px;border:1px dashed var(--border-control);padding:10px;border-radius:8px">
+        ${placedHtml || `<div class="empty" style="text-align:center;color:var(--text-faint)">Sequence starts here</div>`}
       </div>
       <div>
         ${remainingHtml}
@@ -178,7 +178,7 @@ function renderGap() {
     const arrow = i ? `<div class="chain-arrow" aria-hidden="true">↓</div>` : "";
     if (i === state.blankIdx) {
       if (state.result) {
-         const cl = state.result.correct ? "" : `border:1px solid var(--danger);`;
+         const cl = state.result.correct ? "" : `border:1px solid var(--danger-text);`;
          return `${arrow}<div class="chain-step" style="${cl}">
            <span class="chain-label">${esc(s.label)}</span>
            <div class="chain-text">${esc(s.step.statement)}</div>
@@ -254,7 +254,7 @@ function renderBackwards() {
          </div>${arrow}`);
     } else {
        const hist = state.history.find(h => h.idx === i);
-       const cl = hist && !hist.correct ? `border:1px solid var(--danger);` : "";
+       const cl = hist && !hist.correct ? `border:1px solid var(--danger-text);` : "";
        stepsHtml.push(`<div class="chain-step" style="${cl}">
            <span class="chain-label">${esc(cSteps[i].label)}</span>
            <div class="chain-text">${esc(cSteps[i].step.statement)}</div>

@@ -62,7 +62,7 @@ export async function renderHome() {
          </div>
          <div class="bar ${exam.progress === 100 ? "ok" : ""}"><i style="width:${totals.total ? exam.progress : 0}%"></i></div>
          <div class="prog-line" style="font-size:12px">
-           <span style="font-weight:600;color:var(--ink)">${exam.progress}% mastered</span>
+           <span style="font-weight:600;color:var(--text-primary)">${exam.progress}% mastered</span>
            <span>${exam.dailyTarget}/day to finish</span>
          </div>
          <label class="date-field">
@@ -100,7 +100,7 @@ export async function renderHome() {
              (w) =>
                `<button type="button" class="insight-row" data-action="open-weak" data-id="${esc(w.sessionId)}" data-card="${esc(w.cardId)}">
                    <span class="q">${esc(w.front)}</span>
-                   ${w.forgetRisk ? `<span class="tag dot" style="color:var(--warm)">Forget soon</span>` : w.misses > 0 ? `<span class="tag">Missed ${w.misses}×</span>` : `<span class="tag">Felt hard</span>`}
+                   ${w.forgetRisk ? `<span class="tag dot" style="color:var(--status-learning)">Forget soon</span>` : w.misses > 0 ? `<span class="tag">Missed ${w.misses}×</span>` : `<span class="tag">Felt hard</span>`}
                    <svg class="ic chev" viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"/></svg>
                  </button>`
            )
@@ -120,7 +120,7 @@ export async function renderHome() {
     : `<div class="block tint" style="text-align:center">
          <div style="font-size:26px">✅</div>
          <div style="font-weight:650;margin-top:6px">You're all caught up</div>
-         <div style="font-size:12.5px;color:var(--muted);margin-top:4px">No cards due right now. Capture a chat or import a set.</div>
+         <div style="font-size:12.5px;color:var(--text-muted);margin-top:4px">No cards due right now. Capture a chat or import a set.</div>
        </div>`;
 
   const updateBanner = await updateBannerHtml();
@@ -166,7 +166,7 @@ export async function renderHome() {
           : `<div class="empty">No study sets yet.<br>Open ChatGPT, Claude, or Gemini and click <b>Save to Mafsar</b>.</div>`
       }
       ${withSets.length > 4 ? `<button class="btn btn-ghost btn-block" data-action="nav-sets">View all ${withSets.length} sets</button>` : ""}
-      ${reviewedToday ? `<div style="text-align:center;font-size:12px;color:var(--faint)">${reviewedToday} cards reviewed today</div>` : ""}
+      ${reviewedToday ? `<div style="text-align:center;font-size:12px;color:var(--text-faint)">${reviewedToday} cards reviewed today</div>` : ""}
     </div>`);
   topOfView();
   

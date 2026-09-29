@@ -10,7 +10,7 @@ import { renderSetDetail } from "../views/set-detail.js";
 
 export function setRow(session, s) {
   const dueTag = s.due
-    ? `<span class="tag dot" style="color:var(--warm)">${s.due} due</span>`
+    ? `<span class="tag dot" style="color:var(--status-learning)">${s.due} due</span>`
     : s.progress === 100 && s.total
     ? `<span class="tag">Mastered</span>`
     : `<span class="tag">0 due</span>`;

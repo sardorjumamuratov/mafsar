@@ -27,7 +27,7 @@ export function paintTypedQ() {
     setHTML(app, `
       <div class="view">
         <div class="done-msg"><div class="big">✍️</div>
-          <div style="font-weight:650;color:var(--ink)">Practice complete</div>
+          <div style="font-weight:650;color:var(--text-primary)">Practice complete</div>
           <div style="margin-top:4px">${items.length} typed answer${items.length === 1 ? "" : "s"} graded.</div>
         </div>
         <button class="btn btn-primary btn-block" data-action="return-focus">Done</button>
