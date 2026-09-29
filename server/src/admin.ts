@@ -46,5 +46,9 @@ app.post("/sets/:id/:action", async (c) => {
   return c.json({ ok: true });
 });
 
+    app.get("/feedback", async (c) => {
+        const rows = await all<any>(db, "SELECT * FROM feedback ORDER BY created_at DESC", []);
+    return c.json({ feedback: rows });
+  });
   return app;
 }

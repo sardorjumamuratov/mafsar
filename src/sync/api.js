@@ -177,10 +177,12 @@ export function backendGlobalList(tab, q, cursor) {
 export function backendGlobalFetch(id) {
   return get("/v1/discover/" + encodeURIComponent(id) + "/preview");
 }
+export function backendSendFeedback(text, image, route, appVersion, platform) {
+  return post("/v1/feedback", { text, image, route, appVersion, platform });
+}
+
 export function backendGlobalReport(id, reason, note) {
   return post("/v1/sets/" + encodeURIComponent(id) + "/report", { reason, note });
-});
-});
 }
 
 export function backendGlobalAdd(id) {

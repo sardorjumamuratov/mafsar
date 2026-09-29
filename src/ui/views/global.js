@@ -1,3 +1,17 @@
+
+function presentSheet(html, opts) {
+  const host = document.getElementById("sheet");
+  if (!host) return;
+  host.innerHTML = html;
+  host.classList.remove("hidden");
+}
+function closeSheet() {
+  const host = document.getElementById("sheet");
+  if (host) {
+    host.classList.add("hidden");
+    host.innerHTML = "";
+  }
+}
 import { app, esc, setHTML, send, topOfView, toast } from "../core.js";
 import { setNav, showChrome } from "../nav.js";
 import { getAuth } from "../../sync/auth.js";
@@ -229,7 +243,7 @@ function paintGlobal(sets, isOffline) {
 }
 
 // ... preview sheet goes here ...
-import { presentSheet, closeSheet } from "../sheet.js";
+
 import { renderSetDetail } from "./set-detail.js";
 
 export async function openGlobalPreview(btn) {

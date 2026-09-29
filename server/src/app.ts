@@ -70,6 +70,35 @@ export function createApp(db: DB) {
   
   app.route("/v1/discover", createDiscoverApp(db));
   app.route("/v1/admin", createAdminApp(db));
+  
+
+
+const unauthFeedbackLimiter = limitByIp(slidingWindow({ limit: 5, windowMs: 60 * 60 * 1000 }), (c) => clientIp(c.req.raw.headers));
+const authFeedbackLimiter = limitByUser(slidingWindow({ limit: 20, windowMs: 24 * 60 * 60 * 1000 }));
+
+app.post("/v1/feedback", async (c, next) => {
+  const userId = c.get("userId");
+  if (userId) return authFeedbackLimiter(c, next);
+  return unauthFeedbackLimiter(c, next);
+}, async (c) => {
+  const body = await c.req.json().catch(() => null);
+  if (!body) return c.json({ error: "invalid_body" }, 400);
+  
+  if (c.req.header("content-length") && parseInt(c.req.header("content-length")!) > 2 * 1024 * 1024) {
+    return c.json({ error: "too_large" }, 413);
+  }
+
+  const { text, image, appVersion, platform, route } = body;
+  if (!text || typeof text !== "string") return c.json({ error: "missing_text" }, 400);
+  
+  const userId = c.get("userId");
+    
+  await run(db, 
+    "INSERT INTO feedback (id, user_id, text, image_data, app_version, platform, route, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+    [randomUUID(), userId || null, text, image || null, appVersion || null, platform || null, route || null, new Date().toISOString()]
+  );
+  return c.json({ ok: true });
+});
   app.get("/privacy", (c) => c.html(PRIVACY_HTML));
 
   // Serve landing page and its assets

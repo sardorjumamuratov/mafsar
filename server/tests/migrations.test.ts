@@ -31,6 +31,7 @@ const FROZEN = [
   "51e0f0e615230e98", // 016 sets.chain_overrides
   "05dd56fd5ccddca7", // 017 categories
   "6805e52b750468ef", // 018 discover
+  "e8ae3be71844c239", // 019 stats
 ];
 
 const fingerprint = (sql: string) =>

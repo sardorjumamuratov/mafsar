@@ -395,6 +395,20 @@ export const MIGRATIONS: string[] = [
     );
     ALTER TABLE sets ADD COLUMN is_hidden INTEGER NOT NULL DEFAULT 0;
     `
+  ,
+  `
+  ALTER TABLE review_log ADD COLUMN duration_ms INTEGER;
+  CREATE TABLE feedback (
+    id TEXT PRIMARY KEY,
+    user_id TEXT REFERENCES users(id),
+    text TEXT NOT NULL,
+    image_data TEXT,
+    app_version TEXT,
+    platform TEXT,
+    route TEXT,
+    created_at TEXT NOT NULL
+  );
+  `
 ];
 
 export async function migrate(db: DB): Promise<void> {
