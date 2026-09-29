@@ -32,6 +32,10 @@ export function shouldWrite(stored: Row | undefined, incoming: Row): boolean {
  * guard the conflicting write is a no-op. A composite (id, user_id) primary
  * key would express this in the schema, but that needs a data migration.
  */
+import { computeInterests } from "./categories.js";
+
+const interestDebounce = new Map<string, NodeJS.Timeout>();
+
 export async function applySync(db: DB, userId: string, body: SyncBody): Promise<void> {
   const now = nowISO();
 
@@ -41,17 +45,31 @@ export async function applySync(db: DB, userId: string, body: SyncBody): Promise
     );
     if (!shouldWrite(stored, { updated_at: s.updatedAt })) continue;
     await run(
-      db,
-      `INSERT INTO sets (id, user_id, title, source, source_label, mode, exam_date, created_at, updated_at, deleted, server_updated_at, chain_overrides)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-         ON CONFLICT(id) DO UPDATE SET title=excluded.title, source=excluded.source,
-           source_label=excluded.source_label, mode=excluded.mode, exam_date=excluded.exam_date,
-           updated_at=excluded.updated_at, deleted=excluded.deleted, server_updated_at=excluded.server_updated_at,
-           chain_overrides=COALESCE(excluded.chain_overrides, sets.chain_overrides)
-         WHERE sets.user_id = excluded.user_id`,
-      [s.id, userId, s.title, s.source ?? null, s.sourceLabel ?? null,
-       s.mode ?? "general", s.examDate ?? null, s.createdAt, s.updatedAt, s.deleted ? 1 : 0, now, s.chainOverrides !== undefined ? JSON.stringify(s.chainOverrides) : null]
-    );
+        db,
+        `INSERT INTO sets (id, user_id, title, source, source_label, mode, exam_date, created_at, updated_at, deleted, server_updated_at, chain_overrides, category_stale, origin_set_id, is_global, category_id, category_confidence, category_model, categorised_at, categorised_card_count)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 
+             CASE WHEN ? IS NOT NULL THEN 0 ELSE 1 END,
+             ?, ?,
+             (SELECT category_id FROM sets s2 WHERE s2.id = ?),
+             (SELECT category_confidence FROM sets s2 WHERE s2.id = ?),
+             (SELECT category_model FROM sets s2 WHERE s2.id = ?),
+             (SELECT categorised_at FROM sets s2 WHERE s2.id = ?),
+             (SELECT categorised_card_count FROM sets s2 WHERE s2.id = ?)
+           )
+           ON CONFLICT(id) DO UPDATE SET 
+             category_stale = CASE WHEN sets.title != excluded.title THEN 1 ELSE sets.category_stale END,
+             title=excluded.title, source=excluded.source,
+             source_label=excluded.source_label, mode=excluded.mode, exam_date=excluded.exam_date,
+             updated_at=excluded.updated_at, deleted=excluded.deleted, server_updated_at=excluded.server_updated_at,
+             chain_overrides=COALESCE(excluded.chain_overrides, sets.chain_overrides)
+           WHERE sets.user_id = excluded.user_id`,
+        [s.id, userId, s.title, s.source ?? null, s.sourceLabel ?? null,
+         s.mode ?? "general", s.examDate ?? null, s.createdAt, s.updatedAt, s.deleted ? 1 : 0, now, 
+         s.chainOverrides !== undefined ? JSON.stringify(s.chainOverrides) : null,
+         s.originSetId ?? null,
+         s.originSetId ?? null, s.isGlobal ? 1 : 0,
+         s.originSetId ?? null, s.originSetId ?? null, s.originSetId ?? null, s.originSetId ?? null, s.originSetId ?? null]
+      );
   }
 
   // Cards/quizzes reference a set; ensure the set row exists even if the
@@ -76,6 +94,21 @@ export async function applySync(db: DB, userId: string, body: SyncBody): Promise
        WHERE cards.user_id = excluded.user_id`,
       [c.id, c.setId, userId, c.front, c.back, c.easiness ?? 2.5, c.interval ?? 0,
        c.repetitions ?? 0, c.dueDate ?? null, c.updatedAt, c.deleted ? 1 : 0, now, c.stability ?? null, c.difficulty ?? null, c.state ?? null, c.lapses ?? 0, c.lastReview ?? null]
+    );
+  }
+
+  // Check 30% card count change
+  const updatedSetIds = new Set(body.cards.map(c => c.setId));
+  for (const setId of updatedSetIds) {
+    await run(
+      db,
+      `UPDATE sets SET category_stale = 1
+       WHERE id = ? AND user_id = ? AND deleted = 0 AND categorised_card_count IS NOT NULL
+       AND (
+         categorised_card_count = 0 OR
+         ABS((SELECT COUNT(*) FROM cards WHERE set_id = sets.id AND deleted = 0) - categorised_card_count) * 1.0 / categorised_card_count > 0.3
+       )`,
+      [setId, userId]
     );
   }
 
@@ -171,6 +204,7 @@ export async function changesSince(db: DB, userId: string, since?: string) {
     id: r.id, title: r.title, source: r.source, sourceLabel: r.source_label,
     mode: r.mode, examDate: r.exam_date, createdAt: r.created_at,
     updatedAt: r.updated_at, deleted: !!r.deleted, chainOverrides: r.chain_overrides ? JSON.parse(r.chain_overrides) : undefined,
+    originSetId: r.origin_set_id, isGlobal: !!r.is_global,
   }));
   const cards = (await all<any>(
     db, "SELECT * FROM cards WHERE user_id = ? AND server_updated_at > ?", [userId, sinceEffective]

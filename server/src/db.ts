@@ -238,6 +238,137 @@ export const MIGRATIONS: string[] = [
   `
   ALTER TABLE sets ADD COLUMN chain_overrides TEXT;
   `
+  ,
+  `
+  CREATE TABLE categories (
+    id TEXT PRIMARY KEY,
+    slug TEXT NOT NULL UNIQUE,
+    name TEXT NOT NULL,
+    parent_id TEXT REFERENCES categories(id),
+    created_at TEXT NOT NULL,
+    created_by TEXT NOT NULL
+  );
+  
+  CREATE INDEX idx_categories_slug ON categories(slug);
+
+  CREATE TABLE user_interests (
+    user_id TEXT NOT NULL REFERENCES users(id),
+    category_id TEXT NOT NULL REFERENCES categories(id),
+    weight REAL NOT NULL DEFAULT 0,
+    updated_at TEXT NOT NULL,
+    PRIMARY KEY (user_id, category_id)
+  );
+
+  ALTER TABLE sets ADD COLUMN origin_set_id TEXT;
+  ALTER TABLE sets ADD COLUMN is_global INTEGER NOT NULL DEFAULT 0;
+  ALTER TABLE sets ADD COLUMN category_id TEXT REFERENCES categories(id);
+  ALTER TABLE sets ADD COLUMN category_confidence REAL;
+  ALTER TABLE sets ADD COLUMN category_model TEXT;
+  ALTER TABLE sets ADD COLUMN categorised_at TEXT;
+  ALTER TABLE sets ADD COLUMN categorised_card_count INTEGER;
+  ALTER TABLE sets ADD COLUMN category_stale INTEGER NOT NULL DEFAULT 0;
+  
+  -- Insert seed categories
+  INSERT INTO categories (id, slug, name, parent_id, created_at, created_by) VALUES
+  ('cat_med', 'medicine', 'Medicine', NULL, '2026-09-01T00:00:00.000Z', 'seed'),
+  ('cat_med_ana', 'anatomy', 'Anatomy', 'cat_med', '2026-09-01T00:00:00.000Z', 'seed'),
+  ('cat_med_phy', 'physiology', 'Physiology', 'cat_med', '2026-09-01T00:00:00.000Z', 'seed'),
+  ('cat_med_pha', 'pharmacology', 'Pharmacology', 'cat_med', '2026-09-01T00:00:00.000Z', 'seed'),
+  ('cat_med_pat', 'pathology', 'Pathology', 'cat_med', '2026-09-01T00:00:00.000Z', 'seed'),
+  ('cat_med_car', 'cardiology', 'Cardiology', 'cat_med', '2026-09-01T00:00:00.000Z', 'seed'),
+  ('cat_med_neu', 'neurology', 'Neurology', 'cat_med', '2026-09-01T00:00:00.000Z', 'seed'),
+  ('cat_med_cli', 'clinical-medicine', 'Clinical medicine', 'cat_med', '2026-09-01T00:00:00.000Z', 'seed'),
+  ('cat_med_lic', 'medical-licensing-exams', 'Medical licensing exams', 'cat_med', '2026-09-01T00:00:00.000Z', 'seed'),
+  
+  ('cat_nur', 'nursing', 'Nursing', NULL, '2026-09-01T00:00:00.000Z', 'seed'),
+  
+  ('cat_bio', 'biology', 'Biology', NULL, '2026-09-01T00:00:00.000Z', 'seed'),
+  ('cat_bio_cel', 'cell-biology', 'Cell biology', 'cat_bio', '2026-09-01T00:00:00.000Z', 'seed'),
+  ('cat_bio_gen', 'genetics', 'Genetics', 'cat_bio', '2026-09-01T00:00:00.000Z', 'seed'),
+  ('cat_bio_imm', 'immunology', 'Immunology', 'cat_bio', '2026-09-01T00:00:00.000Z', 'seed'),
+  ('cat_bio_mic', 'microbiology', 'Microbiology', 'cat_bio', '2026-09-01T00:00:00.000Z', 'seed'),
+  ('cat_bio_eco', 'ecology', 'Ecology', 'cat_bio', '2026-09-01T00:00:00.000Z', 'seed'),
+
+  ('cat_che', 'chemistry', 'Chemistry', NULL, '2026-09-01T00:00:00.000Z', 'seed'),
+  ('cat_che_gen', 'general-chemistry', 'General chemistry', 'cat_che', '2026-09-01T00:00:00.000Z', 'seed'),
+  ('cat_che_org', 'organic-chemistry', 'Organic chemistry', 'cat_che', '2026-09-01T00:00:00.000Z', 'seed'),
+  ('cat_che_bio', 'biochemistry', 'Biochemistry', 'cat_che', '2026-09-01T00:00:00.000Z', 'seed'),
+
+  ('cat_phy', 'physics', 'Physics', NULL, '2026-09-01T00:00:00.000Z', 'seed'),
+  ('cat_phy_mec', 'mechanics', 'Mechanics', 'cat_phy', '2026-09-01T00:00:00.000Z', 'seed'),
+  ('cat_phy_ele', 'electromagnetism', 'Electromagnetism', 'cat_phy', '2026-09-01T00:00:00.000Z', 'seed'),
+
+  ('cat_mat', 'mathematics', 'Mathematics', NULL, '2026-09-01T00:00:00.000Z', 'seed'),
+  ('cat_mat_cal', 'calculus', 'Calculus', 'cat_mat', '2026-09-01T00:00:00.000Z', 'seed'),
+  ('cat_mat_lin', 'linear-algebra', 'Linear algebra', 'cat_mat', '2026-09-01T00:00:00.000Z', 'seed'),
+  ('cat_mat_sta', 'statistics-probability', 'Statistics & probability', 'cat_mat', '2026-09-01T00:00:00.000Z', 'seed'),
+
+  ('cat_csc', 'computer-science', 'Computer Science', NULL, '2026-09-01T00:00:00.000Z', 'seed'),
+  ('cat_csc_net', 'networking', 'Networking', 'cat_csc', '2026-09-01T00:00:00.000Z', 'seed'),
+  ('cat_csc_alg', 'algorithms-data-structures', 'Algorithms & data structures', 'cat_csc', '2026-09-01T00:00:00.000Z', 'seed'),
+  ('cat_csc_ope', 'operating-systems', 'Operating systems', 'cat_csc', '2026-09-01T00:00:00.000Z', 'seed'),
+  ('cat_csc_dat', 'databases', 'Databases', 'cat_csc', '2026-09-01T00:00:00.000Z', 'seed'),
+  ('cat_csc_sec', 'security', 'Security', 'cat_csc', '2026-09-01T00:00:00.000Z', 'seed'),
+  ('cat_csc_sys', 'system-design', 'System design', 'cat_csc', '2026-09-01T00:00:00.000Z', 'seed'),
+
+  ('cat_prg', 'programming', 'Programming', NULL, '2026-09-01T00:00:00.000Z', 'seed'),
+  ('cat_prg_jav', 'java', 'Java', 'cat_prg', '2026-09-01T00:00:00.000Z', 'seed'),
+  ('cat_prg_pyt', 'python', 'Python', 'cat_prg', '2026-09-01T00:00:00.000Z', 'seed'),
+  ('cat_prg_jst', 'javascript-typescript', 'JavaScript & TypeScript', 'cat_prg', '2026-09-01T00:00:00.000Z', 'seed'),
+  ('cat_prg_ccc', 'c-cpp', 'C & C++', 'cat_prg', '2026-09-01T00:00:00.000Z', 'seed'),
+  ('cat_prg_web', 'web-development', 'Web development', 'cat_prg', '2026-09-01T00:00:00.000Z', 'seed'),
+  ('cat_prg_mob', 'mobile-development', 'Mobile development', 'cat_prg', '2026-09-01T00:00:00.000Z', 'seed'),
+
+  ('cat_dai', 'data-ai', 'Data & AI', NULL, '2026-09-01T00:00:00.000Z', 'seed'),
+  ('cat_dai_mac', 'machine-learning', 'Machine learning', 'cat_dai', '2026-09-01T00:00:00.000Z', 'seed'),
+  ('cat_dai_ana', 'data-analysis', 'Data analysis', 'cat_dai', '2026-09-01T00:00:00.000Z', 'seed'),
+
+  ('cat_eng', 'engineering', 'Engineering', NULL, '2026-09-01T00:00:00.000Z', 'seed'),
+  ('cat_eng_ele', 'electrical-engineering', 'Electrical', 'cat_eng', '2026-09-01T00:00:00.000Z', 'seed'),
+  ('cat_eng_mec', 'mechanical-engineering', 'Mechanical', 'cat_eng', '2026-09-01T00:00:00.000Z', 'seed'),
+  ('cat_eng_civ', 'civil-engineering', 'Civil', 'cat_eng', '2026-09-01T00:00:00.000Z', 'seed'),
+
+  ('cat_bus', 'business', 'Business', NULL, '2026-09-01T00:00:00.000Z', 'seed'),
+  ('cat_bus_eco', 'economics', 'Economics', 'cat_bus', '2026-09-01T00:00:00.000Z', 'seed'),
+  ('cat_bus_fin', 'finance', 'Finance', 'cat_bus', '2026-09-01T00:00:00.000Z', 'seed'),
+  ('cat_bus_acc', 'accounting', 'Accounting', 'cat_bus', '2026-09-01T00:00:00.000Z', 'seed'),
+  ('cat_bus_mar', 'marketing', 'Marketing', 'cat_bus', '2026-09-01T00:00:00.000Z', 'seed'),
+  ('cat_bus_man', 'management', 'Management', 'cat_bus', '2026-09-01T00:00:00.000Z', 'seed'),
+
+  ('cat_law', 'law', 'Law', NULL, '2026-09-01T00:00:00.000Z', 'seed'),
+
+  ('cat_hum', 'humanities', 'Humanities', NULL, '2026-09-01T00:00:00.000Z', 'seed'),
+  ('cat_hum_his', 'history', 'History', 'cat_hum', '2026-09-01T00:00:00.000Z', 'seed'),
+  ('cat_hum_phi', 'philosophy', 'Philosophy', 'cat_hum', '2026-09-01T00:00:00.000Z', 'seed'),
+  ('cat_hum_lit', 'literature', 'Literature', 'cat_hum', '2026-09-01T00:00:00.000Z', 'seed'),
+  ('cat_hum_art', 'art-music', 'Art & music', 'cat_hum', '2026-09-01T00:00:00.000Z', 'seed'),
+
+  ('cat_soc', 'social-sciences', 'Social sciences', NULL, '2026-09-01T00:00:00.000Z', 'seed'),
+  ('cat_soc_psy', 'psychology', 'Psychology', 'cat_soc', '2026-09-01T00:00:00.000Z', 'seed'),
+  ('cat_soc_soc', 'sociology', 'Sociology', 'cat_soc', '2026-09-01T00:00:00.000Z', 'seed'),
+  ('cat_soc_pol', 'political-science', 'Political science', 'cat_soc', '2026-09-01T00:00:00.000Z', 'seed'),
+  ('cat_soc_geo', 'geography', 'Geography', 'cat_soc', '2026-09-01T00:00:00.000Z', 'seed'),
+
+  ('cat_lan', 'languages', 'Languages', NULL, '2026-09-01T00:00:00.000Z', 'seed'),
+  ('cat_lan_spe', 'english-speaking', 'English speaking', 'cat_lan', '2026-09-01T00:00:00.000Z', 'seed'),
+  ('cat_lan_gra', 'english-grammar-vocabulary', 'English grammar & vocabulary', 'cat_lan', '2026-09-01T00:00:00.000Z', 'seed'),
+  ('cat_lan_spa', 'spanish', 'Spanish', 'cat_lan', '2026-09-01T00:00:00.000Z', 'seed'),
+  ('cat_lan_ger', 'german', 'German', 'cat_lan', '2026-09-01T00:00:00.000Z', 'seed'),
+  ('cat_lan_fre', 'french', 'French', 'cat_lan', '2026-09-01T00:00:00.000Z', 'seed'),
+  ('cat_lan_oth', 'other-languages', 'Other languages', 'cat_lan', '2026-09-01T00:00:00.000Z', 'seed'),
+
+  ('cat_tst', 'test-prep', 'Test prep', NULL, '2026-09-01T00:00:00.000Z', 'seed'),
+  ('cat_tst_sch', 'school-university-entrance-exams', 'School and university entrance exams', 'cat_tst', '2026-09-01T00:00:00.000Z', 'seed'),
+  ('cat_tst_lan', 'language-exams', 'Language exams', 'cat_tst', '2026-09-01T00:00:00.000Z', 'seed'),
+
+  ('cat_ski', 'skills', 'Skills', NULL, '2026-09-01T00:00:00.000Z', 'seed'),
+  ('cat_ski_pub', 'public-speaking', 'Public speaking', 'cat_ski', '2026-09-01T00:00:00.000Z', 'seed'),
+  ('cat_ski_wri', 'writing', 'Writing', 'cat_ski', '2026-09-01T00:00:00.000Z', 'seed'),
+  ('cat_ski_pro', 'productivity', 'Productivity', 'cat_ski', '2026-09-01T00:00:00.000Z', 'seed'),
+  ('cat_ski_con', 'consumer-tech', 'Consumer tech', 'cat_ski', '2026-09-01T00:00:00.000Z', 'seed'),
+
+  ('cat_oth', 'other', 'Other', NULL, '2026-09-01T00:00:00.000Z', 'seed');
+  `
 ];
 
 export async function migrate(db: DB): Promise<void> {
