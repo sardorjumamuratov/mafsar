@@ -529,3 +529,36 @@ test("Screen-reader labels", () => {
   assert.ok(sd.includes('aria-label="Study mode"'), "Study mode");
   assert.ok(sd.includes('aria-label="How it works"'), "How it works");
 });
+
+test("Ratings (prompt 07)", async () => {
+  const detail = fs.readFileSync("src/ui/views/set-detail.js", "utf8");
+  const ratings = fs.readFileSync("src/storage/ratings.js", "utf8");
+  const setRow = fs.readFileSync("src/ui/set-row.js", "utf8");
+  const sync = fs.readFileSync("src/sync/sync.js", "utf8");
+  
+  // store
+  assert.ok(ratings.includes("pending"), "optimistic update state exists");
+  assert.ok(ratings.includes("backup"), "rollback implemented");
+  assert.ok(ratings.includes("flushPendingRatings"), "offline queue flush function exists");
+  assert.ok(sync.includes("flushPendingRatings"), "syncNow calls flush");
+  
+  // radiogroup semantics
+  assert.ok(detail.includes('role="radiogroup"'), "radiogroup used");
+  assert.ok(detail.includes('aria-checked='), "aria-checked used");
+  assert.ok(detail.includes('e.key === "Backspace" || e.key === "Delete"'), "keyboard clear");
+  assert.ok(detail.includes('ArrowRight'), "keyboard nav");
+  
+  // formatting
+  const format = fs.readFileSync("shared/format.js", "utf8");
+  assert.ok(format.includes("toFixed(1)"), "average formatted with 1 decimal");
+  
+  // text states
+  assert.ok(detail.includes("Your rating &bull;"), "private rated text");
+  assert.ok(detail.includes("Tap to rate"), "private unrated text");
+  assert.ok(detail.includes("No ratings yet"), "global unrated text");
+  assert.ok(detail.includes("rating(s)"), "global rated text");
+  
+  // SetRow meta
+  assert.ok(setRow.includes("yours"), "SetRow private suffix");
+  assert.ok(setRow.includes("Global"), "SetRow global suffix");
+});

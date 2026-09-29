@@ -10,7 +10,7 @@ import type { DB } from "./db.js";
 import {
   register, login, requireAuth, signAccessToken, signRefreshToken, upsertGoogleUser, verifyPassword,
 } from "./auth.js";
-import { syncSchema, registerSchema, loginSchema, generateSchema, gradeSchema, hypotheticalSchema, summarizeSchema, blurbSchema, codingTaskSchema, teachTurnSchema, teachEvaluateSchema, codingGradeSchema, designTaskSchema, designGradeSchema, designCurveballSchema, estimationTaskSchema, estimationSummarySchema, bottleneckTaskSchema, bottleneckHintSchema, bottleneckGradeSchema, shareCreateSchema, shareRevokeSchema, teamCreateSchema, teamJoinSchema, pollSchema, deleteAccountSchema } from "./schema.js";
+import { ratingSchema, ratingLookupSchema, syncSchema, registerSchema, loginSchema, generateSchema, gradeSchema, hypotheticalSchema, summarizeSchema, blurbSchema, codingTaskSchema, teachTurnSchema, teachEvaluateSchema, codingGradeSchema, designTaskSchema, designGradeSchema, designCurveballSchema, estimationTaskSchema, estimationSummarySchema, bottleneckTaskSchema, bottleneckHintSchema, bottleneckGradeSchema, shareCreateSchema, shareRevokeSchema, teamCreateSchema, teamJoinSchema, pollSchema, deleteAccountSchema } from "./schema.js";
 import { googleConfigured, buildAuthUrl, pkcePair, exchangeCode, verifyIdToken } from "./google.js";
 import { applySync, changesSince } from "./sync.js";
 import { deleteUserData } from "./account.js";
@@ -801,6 +801,90 @@ export function createApp(db: DB) {
   // --- Phase 5: payments + notifications — TODO ---
 
   app.get("/healthz", (c) => c.json({ ok: true }));
+
+  
+app.put("/v1/sets/:id/rating", async (c) => {
+  console.log("HIT PUT RATING!");
+  const userId = c.get("userId") as string;
+  const setId = c.req.param("id");
+  const body = ratingSchema.parse(await c.req.json().catch(() => ({})));
+  
+  const set = await one<{id: string, origin_set_id: string}>(db, "SELECT id, origin_set_id FROM sets WHERE id = ? AND user_id = ?", [setId, userId]);
+  if (!set) return c.json({ error: "not_found", message: "Set not found" }, 404);
+  
+  const rootId = set.origin_set_id ?? set.id;
+  const now = new Date().toISOString();
+  
+  await run(db, "BEGIN TRANSACTION");
+  try {
+    await run(db, "INSERT INTO set_ratings (set_root_id, user_id, stars, created_at, updated_at) VALUES (?, ?, ?, ?, ?) ON CONFLICT(set_root_id, user_id) DO UPDATE SET stars=excluded.stars, updated_at=excluded.updated_at", [rootId, userId, body.stars, now, now]);
+    const agg = await one<{s: number, c: number}>(db, "SELECT SUM(stars) as s, COUNT(*) as c FROM set_ratings WHERE set_root_id = ?", [rootId]);
+    const sum = agg?.s ?? 0;
+    const count = agg?.c ?? 0;
+    const avg = count > 0 ? sum / count : null;
+    await run(db, "UPDATE sets SET rating_sum = ?, rating_count = ?, rating_avg = ?, server_updated_at = ? WHERE id = ?", [sum, count, avg, now, rootId]);
+    await run(db, "COMMIT");
+    return c.json({ yourStars: body.stars, avg: avg !== null ? Math.round(avg * 10) / 10 : null, count });
+  } catch (e) {
+    await run(db, "ROLLBACK");
+    throw e;
+  }
+});
+
+app.delete("/v1/sets/:id/rating", async (c) => {
+  const userId = c.get("userId") as string;
+  const setId = c.req.param("id");
+  
+  const set = await one<{id: string, origin_set_id: string}>(db, "SELECT id, origin_set_id FROM sets WHERE id = ? AND user_id = ?", [setId, userId]);
+  if (!set) return c.json({ error: "not_found", message: "Set not found" }, 404);
+  
+  const rootId = set.origin_set_id ?? set.id;
+  const now = new Date().toISOString();
+  
+  await run(db, "BEGIN TRANSACTION");
+  try {
+    await run(db, "DELETE FROM set_ratings WHERE set_root_id = ? AND user_id = ?", [rootId, userId]);
+    const agg = await one<{s: number, c: number}>(db, "SELECT SUM(stars) as s, COUNT(*) as c FROM set_ratings WHERE set_root_id = ?", [rootId]);
+    const sum = agg?.s ?? 0;
+    const count = agg?.c ?? 0;
+    const avg = count > 0 ? sum / count : null;
+    await run(db, "UPDATE sets SET rating_sum = ?, rating_count = ?, rating_avg = ?, server_updated_at = ? WHERE id = ?", [sum, count, avg, now, rootId]);
+    await run(db, "COMMIT");
+    return c.json({ yourStars: null, avg: avg !== null ? Math.round(avg * 10) / 10 : null, count });
+  } catch (e) {
+    await run(db, "ROLLBACK");
+    throw e;
+  }
+});
+
+app.post("/v1/ratings/lookup", async (c) => {
+  const userId = c.get("userId") as string;
+  const body = ratingLookupSchema.parse(await c.req.json().catch(() => ({})));
+  
+  if (body.ids.length === 0) return c.json({});
+  
+  const placeholders = body.ids.map(() => "?").join(",");
+  const params = [userId, ...body.ids, userId];
+  
+  const rows = await all<any>(db, `
+    SELECT s.id, s.origin_set_id, s.is_global, root.rating_avg, root.rating_count, r.stars as your_stars
+    FROM sets s
+    LEFT JOIN sets root ON root.id = COALESCE(s.origin_set_id, s.id)
+    LEFT JOIN set_ratings r ON r.set_root_id = COALESCE(s.origin_set_id, s.id) AND r.user_id = ?
+    WHERE s.id IN (${placeholders}) AND s.user_id = ?
+  `, params);
+  
+  const res: Record<string, any> = {};
+  for (const row of rows) {
+    res[row.id] = {
+      yourStars: row.your_stars ?? null,
+      ratingAvg: row.rating_avg !== null ? Math.round(row.rating_avg * 10) / 10 : null,
+      ratingCount: row.rating_count ?? 0,
+      isGlobal: !!row.is_global
+    };
+  }
+  return c.json(res);
+});
 
   return app;
 }

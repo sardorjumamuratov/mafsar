@@ -8,6 +8,8 @@ export const registerSchema = z.object({
 
 export const loginSchema = registerSchema;
 
+export const ratingSchema = z.object({ stars: z.number().int().min(1).max(5) });
+export const ratingLookupSchema = z.object({ ids: z.array(z.string()).max(200) });
 export const setSchema = z.object({
   id: z.string().min(1),
   title: z.string().min(1),
@@ -16,6 +18,11 @@ export const setSchema = z.object({
   mode: z.string().default("general"),
   examDate: z.string().nullable().optional(),
   chainOverrides: z.record(z.string()).optional(),
+  yourStars: z.number().int().min(1).max(5).nullable().optional(),
+  ratingAvg: z.number().nullable().optional(),
+  ratingCount: z.number().int().optional(),
+  isGlobal: z.boolean().optional(),
+  originSetId: z.string().nullable().optional(),
   description: z.string().nullable().optional(),
   createdAt: z.string(),
   updatedAt: z.string(),

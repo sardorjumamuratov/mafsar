@@ -40,7 +40,10 @@ function chunk(arr, size) {
  * Run one sync round-trip. Returns { pushed, pulled, serverTime } or
  * { skipped: reason } when there's nothing to do.
  */
+import { flushPendingRatings } from "../storage/ratings.js";
+
 export async function syncNow() {
+  flushPendingRatings().catch(console.error);
   if (syncing) return { skipped: "in-progress" };
   const auth = await getAuth();
   if (!auth?.accessToken) return { skipped: "signed-out" };

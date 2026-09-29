@@ -1,12 +1,25 @@
 import { esc } from "./core.js";
+import { cleanTitle } from "../../shared/titles.js";
+import { formatAvg, formatCount } from "../../shared/format.js";
+import { ICONS } from "./icons.js";
 
-function cleanTitle(t) { return t; } // TODO: import cleanTitle from somewhere if exists
+export function SetRowHtml(set, ratings) {
+  // If ratings isn't passed, gracefully handle (e.g. from tests)
+  const r = ratings ? ratings[set.originSetId || set.id] : null;
+  
+  let ratingText = "";
+  if (r && r.ratingAvg !== null) {
+    const avg = formatAvg(r.ratingAvg);
+    const suffix = r.isGlobal ? ` (${formatCount(r.ratingCount)})` : " yours";
+    ratingText = ` &bull; <span style="display:inline-flex;align-items:center;gap:3px;color:var(--text-secondary);font-weight:600">${ICONS.star.replace('stroke="currentColor"', 'fill="var(--text-secondary)" stroke="var(--text-secondary)" width="12" height="12"')}${avg}</span><span style="color:var(--text-muted)">${suffix}</span>`;
+  }
+  
+  let globalText = "";
+  if (r && r.isGlobal) {
+    globalText = ` &bull; <span style="display:inline-flex;align-items:center;gap:3px">${ICONS.globe.replace('<svg', '<svg width="12" height="12"')} Global</span>`;
+  }
 
-export function SetRowHtml(set, meta) {
-  // 10. SetRow
-  const ratingText = set.rating ? ` � ? ${set.rating}` : "";
-  const globalText = set.isGlobal ? ` � ?? Global` : "";
-  const metaLine = `${esc(set.source || "Unknown")}${ratingText}${globalText}`;
+  const metaLine = `<div style="display:flex;flex-wrap:wrap;align-items:center;gap:6px">${esc(set.source || "Unknown")}${ratingText}${globalText}</div>`;
   
   const mastery = set.mastery || 0;
   let dueText = "";

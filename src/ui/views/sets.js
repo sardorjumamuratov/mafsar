@@ -7,6 +7,7 @@ import { SetRowHtml as SetRow } from "../set-row.js";
 import { openSheet, closeSheet } from "../sheet.js";
 import { cleanTitle } from "../../../shared/titles.js";
 import { saveSettings } from "../../storage/store.js";
+import { readRatings, refreshRatings } from "../../storage/ratings.js";
 import { parseShareCode } from "../share-link.js";
 
 let state = {
@@ -31,8 +32,10 @@ function matchesSearch(s, query) {
 export async function renderSets(opts = {}) {
   const b = await bundle();
   const sortOrder = b.settings.sortOrder || "Most due";
+  const ratings = await readRatings();
   
   let sets = [...b.studySets];
+  refreshRatings(sets.map(s => s.originSetId || s.id)).catch(() => {});
   
   const hasGlobal = sets.some(s => s.mode === "global");
   const showOptions = ["All sets", "Due now"];
@@ -118,7 +121,7 @@ export async function renderSets(opts = {}) {
           <div style="text-align: center; padding: 28px 12px; font-size: 14px; color: var(--text-muted)">No sets yet. Capture a page or an AI answer with the buttons below.</div>
         ` : sets.length === 0 ? `
           <div style="text-align: center; padding: 28px 12px; font-size: 14px; color: var(--text-muted)">${q ? `No sets match "${esc(state.query)}"` : `No sets match this filter.`}</div>
-        ` : sets.map(s => SetRow(s)).join("")}
+        ` : sets.map(s => SetRow(s, ratings)).join("")}
       
       
     </div>

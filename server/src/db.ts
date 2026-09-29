@@ -240,8 +240,25 @@ export const MIGRATIONS: string[] = [
     `,
     `
     ALTER TABLE sets ADD COLUMN description TEXT;
+      `,
+      `
+      ALTER TABLE sets ADD COLUMN rating_sum INTEGER DEFAULT 0;
+      ALTER TABLE sets ADD COLUMN rating_count INTEGER DEFAULT 0;
+      ALTER TABLE sets ADD COLUMN rating_avg REAL;
+      ALTER TABLE sets ADD COLUMN origin_set_id TEXT;
+      ALTER TABLE sets ADD COLUMN is_global INTEGER DEFAULT 0;
+      ;
+      CREATE TABLE set_ratings (
+        set_root_id TEXT NOT NULL REFERENCES sets(id),
+        user_id TEXT NOT NULL REFERENCES users(id),
+        stars INTEGER NOT NULL,
+        created_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL,
+        PRIMARY KEY (set_root_id, user_id)
+      );
+      CREATE INDEX idx_set_ratings_root ON set_ratings(set_root_id);
     `
-];
+  ];
 
 export async function migrate(db: DB): Promise<void> {
   await db.execute(

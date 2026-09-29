@@ -184,44 +184,44 @@ export async function refreshCaptureDock() {
 }
 
 export function openAddMenu() {
-  const html = "<div style="display:flex;flex-direction:column;gap:0">" +
-    "<button class="sheet-row" data-action="add-import" style="display:flex;align-items:center;gap:14px;padding:12px 20px;border:none;background:transparent;text-align:left;cursor:pointer;width:100%;border-bottom:1px solid var(--border-divider)">" +
-      "<div style="width:36px;height:36px;border-radius:10px;background:var(--bg-surface2);display:flex;align-items:center;justify-content:center;color:var(--text-primary);flex-shrink:0">" +
+  const html = '<div style=\"display:flex;flex-direction:column;gap:0\">' +
+    '<button class=\"sheet-row\" data-action=\"add-import\" style=\"display:flex;align-items:center;gap:14px;padding:12px 20px;border:none;background:transparent;text-align:left;cursor:pointer;width:100%;border-bottom:1px solid var(--border-divider)\">' +
+      '<div style=\"width:36px;height:36px;border-radius:10px;background:var(--bg-surface2);display:flex;align-items:center;justify-content:center;color:var(--text-primary);flex-shrink:0\">' +
         "<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>" +
-      "</div>" +
-      "<div>" +
+      '</div>' +
+      '<div>' +
         "<div style="font-size:15px;font-weight:600;color:var(--text-primary)">Import file</div>" +
         "<div style="font-size:13px;color:var(--text-muted);margin-top:2px">CSV, Anki or Quizlet</div>" +
-      "</div>" +
-    "</button>" +
-    "<button class="sheet-row" data-action="add-paste" style="display:flex;align-items:center;gap:14px;padding:12px 20px;border:none;background:transparent;text-align:left;cursor:pointer;width:100%;border-bottom:1px solid var(--border-divider)">" +
-      "<div style="width:36px;height:36px;border-radius:10px;background:var(--bg-surface2);display:flex;align-items:center;justify-content:center;color:var(--text-primary);flex-shrink:0">" +
+      '</div>' +
+    '</button>' +
+    '<button class=\"sheet-row\" data-action=\"add-paste\" style=\"display:flex;align-items:center;gap:14px;padding:12px 20px;border:none;background:transparent;text-align:left;cursor:pointer;width:100%;border-bottom:1px solid var(--border-divider)\">' +
+      '<div style=\"width:36px;height:36px;border-radius:10px;background:var(--bg-surface2);display:flex;align-items:center;justify-content:center;color:var(--text-primary);flex-shrink:0\">' +
         "<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>" +
-      "</div>" +
-      "<div>" +
+      '</div>' +
+      '<div>' +
         "<div style="font-size:15px;font-weight:600;color:var(--text-primary)">Paste text</div>" +
         "<div style="font-size:13px;color:var(--text-muted);margin-top:2px">Make cards from notes you paste</div>" +
-      "</div>" +
-    "</button>" +
-    "<button class="sheet-row" data-action="add-create" style="display:flex;align-items:center;gap:14px;padding:12px 20px;border:none;background:transparent;text-align:left;cursor:pointer;width:100%;border-bottom:1px solid var(--border-divider)">" +
-      "<div style="width:36px;height:36px;border-radius:10px;background:var(--bg-surface2);display:flex;align-items:center;justify-content:center;color:var(--text-primary);flex-shrink:0">" +
+      '</div>' +
+    '</button>' +
+    '<button class=\"sheet-row\" data-action=\"add-create\" style=\"display:flex;align-items:center;gap:14px;padding:12px 20px;border:none;background:transparent;text-align:left;cursor:pointer;width:100%;border-bottom:1px solid var(--border-divider)\">' +
+      '<div style=\"width:36px;height:36px;border-radius:10px;background:var(--bg-surface2);display:flex;align-items:center;justify-content:center;color:var(--text-primary);flex-shrink:0\">' +
         "<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><line x1="12" y1="8" x2="12" y2="16"/><line x1="8" y1="12" x2="16" y2="12"/></svg>" +
-      "</div>" +
-      "<div>" +
+      '</div>' +
+      '<div>' +
         "<div style="font-size:15px;font-weight:600;color:var(--text-primary)">Create empty set</div>" +
         "<div style="font-size:13px;color:var(--text-muted);margin-top:2px">Start from scratch and add cards yourself</div>" +
-      "</div>" +
-    "</button>" +
-    "<button class="sheet-row" data-action="add-share" style="display:flex;align-items:center;gap:14px;padding:12px 20px;border:none;background:transparent;text-align:left;cursor:pointer;width:100%">" +
-      "<div style="width:36px;height:36px;border-radius:10px;background:var(--bg-surface2);display:flex;align-items:center;justify-content:center;color:var(--text-primary);flex-shrink:0">" +
+      '</div>' +
+    '</button>' +
+    '<button class=\"sheet-row\" data-action=\"add-share\" style=\"display:flex;align-items:center;gap:14px;padding:12px 20px;border:none;background:transparent;text-align:left;cursor:pointer;width:100%\">' +
+      '<div style=\"width:36px;height:36px;border-radius:10px;background:var(--bg-surface2);display:flex;align-items:center;justify-content:center;color:var(--text-primary);flex-shrink:0\">' +
         "<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>" +
-      "</div>" +
-      "<div>" +
+      '</div>' +
+      '<div>' +
         "<div style="font-size:15px;font-weight:600;color:var(--text-primary)">Enter a share code</div>" +
         "<div style="font-size:13px;color:var(--text-muted);margin-top:2px">Add a set someone shared with you</div>" +
-      "</div>" +
-    "</button>" +
-  "</div>";
+      '</div>' +
+    '</button>' +
+  '</div>';
   
   openSheet("Add a set", html, true);
   
@@ -244,13 +244,13 @@ export function openAddMenu() {
 }
 
 function openPasteMenu() {
-  const html = "<div style="display:flex;flex-direction:column;gap:12px;padding:16px 20px">" +
-    "<textarea id="pasteText" placeholder="Paste your notes here..." style="width:100%;min-height:140px;max-height:400px;background:var(--bg-surface);border:1px solid var(--border-control);border-radius:12px;padding:12px;color:var(--text-primary);font-size:15px;font-family:inherit;resize:vertical;box-sizing:border-box"></textarea>" +
-    "<div style="display:flex;justify-content:space-between;align-items:center">" +
-      "<div id="pasteCount" style="font-size:13px;color:var(--text-muted)">0 / 30,000</div>" +
-      "<button id="pasteSubmit" class="btn btn-primary" disabled style="height:50px;border-radius:12px;padding:0 24px">Make cards</button>" +
-    "</div>" +
-  "</div>";
+  const html = '<div style="display:flex;flex-direction:column;gap:12px;padding:16px 20px">' +
+    '<textarea id="pasteText" placeholder="Paste your notes here..." style="width:100%;min-height:140px;max-height:400px;background:var(--bg-surface);border:1px solid var(--border-control);border-radius:12px;padding:12px;color:var(--text-primary);font-size:15px;font-family:inherit;resize:vertical;box-sizing:border-box"></textarea>' +
+    '<div style="display:flex;justify-content:space-between;align-items:center">' +
+      '<div id="pasteCount" style="font-size:13px;color:var(--text-muted)">0 / 30,000</div>' +
+      '<button id="pasteSubmit" class="btn btn-primary" disabled style="height:50px;border-radius:12px;padding:0 24px">Make cards</button>' +
+    '</div>' +
+  '</div>';
   openSheet("Paste text", html, false);
   
   const ta = document.getElementById("pasteText");
@@ -297,10 +297,10 @@ function openPasteMenu() {
 }
 
 function openCreateEmptyMenu() {
-  const html = "<div style="display:flex;flex-direction:column;gap:12px;padding:16px 20px">" +
-    "<input type="text" id="emptyTitle" placeholder="Name your set" style="width:100%;height:44px;background:var(--bg-surface);border:1px solid var(--border-control);border-radius:12px;padding:0 12px;color:var(--text-primary);font-size:15px;font-family:inherit;box-sizing:border-box" autofocus />" +
+  const html = '<div style="display:flex;flex-direction:column;gap:12px;padding:16px 20px">' +
+    '<input type=\"text\" id=\"emptyTitle\" placeholder=\"Name your set\" style=\"width:100%;height:44px;background:var(--bg-surface);border:1px solid var(--border-control);border-radius:12px;padding:0 12px;color:var(--text-primary);font-size:15px;font-family:inherit;box-sizing:border-box\" autofocus />' +
     "<button id="emptySubmit" class="btn btn-primary" disabled style="height:50px;border-radius:12px">Create</button>" +
-  "</div>";
+  '</div>';
   openSheet("Create empty set", html, false);
   
   const inp = document.getElementById("emptyTitle");
@@ -326,10 +326,10 @@ function openCreateEmptyMenu() {
 }
 
 function openShareCodeMenu() {
-  const html = "<div style="display:flex;flex-direction:column;gap:12px;padding:16px 20px">" +
-    "<input type="text" id="shareCodeInput" placeholder="Enter share code" style="width:100%;height:44px;background:var(--bg-surface);border:1px solid var(--border-control);border-radius:12px;padding:0 12px;color:var(--text-primary);font-size:15px;font-family:inherit;box-sizing:border-box;text-transform:uppercase" autofocus />" +
+  const html = '<div style="display:flex;flex-direction:column;gap:12px;padding:16px 20px">' +
+    '<input type=\"text\" id=\"shareCodeInput\" placeholder=\"Enter share code\" style=\"width:100%;height:44px;background:var(--bg-surface);border:1px solid var(--border-control);border-radius:12px;padding:0 12px;color:var(--text-primary);font-size:15px;font-family:inherit;box-sizing:border-box;text-transform:uppercase\" autofocus />' +
     "<button id="shareCodeSubmit" class="btn btn-primary" disabled style="height:50px;border-radius:12px">Lookup</button>" +
-  "</div>";
+  '</div>';
   openSheet("Enter a share code", html, false);
   
   const inp = document.getElementById("shareCodeInput");

@@ -166,11 +166,17 @@ export async function applySync(db: DB, userId: string, body: SyncBody): Promise
 export async function changesSince(db: DB, userId: string, since?: string) {
   const sinceEffective = since ?? "1970-01-01T00:00:00.000Z";
   const sets = (await all<any>(
-    db, "SELECT * FROM sets WHERE user_id = ? AND server_updated_at > ?", [userId, sinceEffective]
+    db, "SELECT s.*, r.stars as your_stars FROM sets s LEFT JOIN set_ratings r ON s.id = r.set_root_id AND r.user_id = ? WHERE s.user_id = ? AND s.server_updated_at > ?", [userId, userId, sinceEffective]
   )).map((r) => ({
     id: r.id, title: r.title, source: r.source, sourceLabel: r.source_label,
     mode: r.mode, examDate: r.exam_date, createdAt: r.created_at,
     updatedAt: r.updated_at, deleted: !!r.deleted, chainOverrides: r.chain_overrides ? JSON.parse(r.chain_overrides) : undefined,
+    description: r.description ?? undefined,
+    yourStars: r.your_stars ?? null,
+    ratingAvg: r.rating_avg !== null ? Math.round(r.rating_avg * 10) / 10 : null,
+    ratingCount: r.rating_count ?? 0,
+    isGlobal: !!r.is_global,
+    originSetId: r.origin_set_id ?? null,
   }));
   const cards = (await all<any>(
     db, "SELECT * FROM cards WHERE user_id = ? AND server_updated_at > ?", [userId, sinceEffective]

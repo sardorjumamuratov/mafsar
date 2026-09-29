@@ -1,5 +1,4 @@
-nav.addEventListener("click", async (e) => {
-    if (editingCardId || currentDetail()?.addingCard) {import { renderDiscover, renderStats } from "./views/discover-stats.js";
+import { renderDiscover, renderStats } from "./views/discover-stats.js";
 import { saveSettings } from "../storage/store.js";
 import { startCompare, selectComparePair, toggleCompareSame, createForkCards } from "./flows/compare.js";
 import { finishDesignDrill, requestDesignCurveball, startDesignDrill, submitDesign, submitDesignCurveball } from "./flows/design.js";

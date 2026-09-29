@@ -53,6 +53,10 @@ export async function paintDetail(updateInPlace = false, force = false) {
   const { session, studySet, tab } = detail;
   const cards = studySet?.flashcards || [];
   
+  const ratingsStore = await readRatings();
+  const rootId = studySet?.originSetId || session?.id;
+  const ratingData = rootId ? ratingsStore[rootId] : null;
+  
   let bodyHTML = "";
   
   if (!studySet) {
@@ -480,7 +484,42 @@ export async function paintDetail(updateInPlace = false, force = false) {
 
   // Top bar & Header
   let title = session.title ? cleanTitle(session.title) : "Untitled";
-  let descHtml = "";
+  
+    let ratingWidgetHtml = "";
+    if (ratingData) {
+      const rs = ratingData;
+      let text = "";
+      if (rs.isGlobal) {
+        if (rs.ratingCount > 0) {
+          text = `Avg ${formatAvg(rs.ratingAvg)} &bull; ${formatCount(rs.ratingCount)} rating(s)`;
+        } else {
+          text = "No ratings yet";
+        }
+      } else {
+        if (rs.yourStars) {
+          text = `Your rating &bull; ${rs.yourStars}`;
+        } else {
+          text = "Tap to rate";
+        }
+      }
+      
+      const yourStars = rs.yourStars || 0;
+      let starsHtml = "";
+      for (let i = 1; i <= 5; i++) {
+        const isFilled = i <= yourStars;
+        const fill = isFilled ? "var(--rating-star, #f0c75e)" : "none";
+        const stroke = isFilled ? "var(--rating-star, #f0c75e)" : "var(--rating-empty, #6d7c78)";
+        starsHtml += `<button type="button" role="radio" aria-label="${i} star${i>1?'s':''}" aria-checked="${isFilled?'true':'false'}" tabindex="${(yourStars === i || (yourStars === 0 && i === 1)) ? '0' : '-1'}" class="rating-star-btn" data-val="${i}" data-id="${esc(rootId)}" style="width: 34px; height: 34px; border: none; background: transparent; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; padding: 0"><svg width="22" height="22" viewBox="0 0 24 24" fill="${fill}" stroke="${stroke}" stroke-width="1.7" stroke-linejoin="round" style="pointer-events: none"><path d="M12 3.5l2.6 5.3 5.9.9-4.3 4.1 1 5.8L12 16.9l-5.2 2.7 1-5.8L3.5 9.7l5.9-.9z"/></svg></button>`;
+      }
+      ratingWidgetHtml = `
+        <div style="display: flex; align-items: center; gap: 8px; margin-left: -6px; margin-top: 4px">
+          <div role="radiogroup" aria-label="Rate this set" style="display: flex" id="rating-group-${esc(rootId)}">
+            ${starsHtml}
+          </div>
+          <div style="font-size: 13px; color: var(--text-muted)">${text}</div>
+        </div>`;
+    }
+    let descHtml = "";
   if (session.description) {
     descHtml = `<div style="font-size: 15px; line-height: 1.45; color: var(--text-body2); text-wrap: pretty">${esc(session.description)}</div>`;
   }
@@ -600,6 +639,90 @@ function bindEditorEvents(id, oldFront) {
   }
 
   function bindEvents() {
+    const ratingGroup = app.querySelector('[role="radiogroup"]');
+    if (ratingGroup) {
+      const btns = Array.from(ratingGroup.querySelectorAll('.rating-star-btn'));
+      
+      const updateHover = (val) => {
+        btns.forEach(b => {
+          const v = parseInt(b.dataset.val, 10);
+          const svg = b.querySelector('svg');
+          if (v <= val) {
+            svg.setAttribute('fill', 'var(--rating-star, #f0c75e)');
+            svg.setAttribute('stroke', 'var(--rating-star, #f0c75e)');
+          } else {
+            const checked = b.getAttribute('aria-checked') === 'true';
+            if (checked) {
+              svg.setAttribute('fill', 'var(--rating-star, #f0c75e)');
+              svg.setAttribute('stroke', 'var(--rating-star, #f0c75e)');
+            } else {
+              svg.setAttribute('fill', 'none');
+              svg.setAttribute('stroke', 'var(--rating-empty, #6d7c78)');
+            }
+          }
+        });
+      };
+      
+      const resetHover = () => {
+        btns.forEach(b => {
+          const svg = b.querySelector('svg');
+          const checked = b.getAttribute('aria-checked') === 'true';
+          if (checked) {
+            svg.setAttribute('fill', 'var(--rating-star, #f0c75e)');
+            svg.setAttribute('stroke', 'var(--rating-star, #f0c75e)');
+          } else {
+            svg.setAttribute('fill', 'none');
+            svg.setAttribute('stroke', 'var(--rating-empty, #6d7c78)');
+          }
+        });
+      };
+      
+      ratingGroup.addEventListener('pointerleave', resetHover);
+      
+      btns.forEach((btn, i) => {
+        btn.addEventListener('pointerenter', (e) => {
+          if (e.pointerType !== "mouse") return;
+          updateHover(parseInt(btn.dataset.val, 10));
+        });
+        
+        btn.addEventListener('click', async (e) => {
+          const val = parseInt(btn.dataset.val, 10);
+          const id = btn.dataset.id;
+          const isChecked = btn.getAttribute('aria-checked') === 'true';
+          try {
+            if (isChecked) {
+              await clearRating(id);
+            } else {
+              await setRating(id, val);
+            }
+          } catch(err) {
+            import("../core.js").then(m => m.toast("Couldn't save rating"));
+          }
+        });
+        
+        btn.addEventListener('keydown', async (e) => {
+          const isChecked = btn.getAttribute('aria-checked') === 'true';
+          if (e.key === "Backspace" || e.key === "Delete") {
+            e.preventDefault();
+            if (isChecked || btns.some(b => b.getAttribute('aria-checked') === 'true')) {
+              try {
+                await clearRating(btn.dataset.id);
+              } catch(err) {
+                import("../core.js").then(m => m.toast("Couldn't save rating"));
+              }
+            }
+            return;
+          }
+          if (e.key === "ArrowRight" || e.key === "ArrowLeft") {
+            e.preventDefault();
+            const nextIdx = e.key === "ArrowRight" ? Math.min(4, i + 1) : Math.max(0, i - 1);
+            btns[nextIdx].focus();
+            return;
+          }
+        });
+      });
+    }
+
     app.querySelector('#save-exam')?.addEventListener("click", async () => {
       const v = document.getElementById("exam-input").value;
       if (v) {
