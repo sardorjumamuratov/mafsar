@@ -14,8 +14,8 @@ import { confirmSheet } from "../confirm.js";
 export let sharedPreview = null; // { code, title, cards, quiz }
 
 export async function renderTeams() {
-  setNav("teams");
-  showChrome(true);
+  showChrome(false);
+  
   sharedPreview = null;
   const auth = await getAuth();
 
@@ -24,12 +24,12 @@ export async function renderTeams() {
   if (!auth?.accessToken) {
     setHTML(app, `
       <div class="view">
-        <div class="ahd"><div class="h-title">Teams</div></div>
+        <div class="ahd"><button class="iconbtn" data-action="nav-you" aria-label="Back"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="19" y1="12" x2="5" y2="12"></line><polyline points="12 19 5 12 12 5"></polyline></svg></button><div class="h-title" style="font-size:16px;margin:0 12px">Teams</div><div style="width:40px"></div></div>
         <div class="block tint" style="text-align:center">
           <div style="font-size:26px">👥</div>
           <div style="font-weight:650;margin-top:6px">Teams need an account</div>
           <div style="font-size:12.5px;color:var(--text-muted);margin-top:4px">Sign in to create a team, share its code, and follow a leaderboard with your study group.</div>
-          <button class="btn btn-primary" style="margin-top:12px" data-action="nav-you">Sign in on the You tab</button>
+          <button class="btn-primary" style="margin-top:12px" data-action="nav-you">Sign in on the You tab</button>
         </div>
       </div>`);
     topOfView();
@@ -41,16 +41,16 @@ export async function renderTeams() {
 
   const teamActionsBlock = `
       <div class="team-actions">
-        <button class="btn btn-primary" data-action="team-create">Create a team</button>
-        <div class="join-row">
+        <button class="btn-primary" data-action="team-create">Create a team</button>
+        <div class="join-row field">
           <input id="teamCode" type="text" placeholder="Enter team code" autocomplete="off" autocapitalize="characters" aria-label="Enter team code" />
-          <button class="btn btn-ghost" data-action="team-join">Join</button>
+          <button class="btn-ghost" data-action="team-join">Join</button>
         </div>
       </div>`;
 
   setHTML(app, `
     <div class="view teams-view">
-      <div class="ahd"><div class="h-title">Teams</div></div>
+      <div class="ahd"><button class="iconbtn" data-action="nav-you" aria-label="Back"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="19" y1="12" x2="5" y2="12"></line><polyline points="12 19 5 12 12 5"></polyline></svg></button><div class="h-title" style="font-size:16px;margin:0 12px">Teams</div><div style="width:40px"></div></div>
       <div class="help" style="margin:0">A team is a study group with a shared code: everyone joins, then the leaderboard compares mastered cards.</div>
       <div id="teamsSlot">${teamsSkeleton()}</div>
 ${teamActionsBlock}
@@ -218,7 +218,7 @@ export async function renderTeam(id) {
       <div class="block">${board || '<div class="empty">No members yet.</div>'}</div>
       <div class="listhd"><span class="t-label">Who's learning what</span></div>
       <div class="block">${learning || '<div class="empty">Nothing yet.</div>'}</div>
-      <button class="btn btn-ghost btn-block" data-action="team-leave" data-id="${esc(team.id)}">Leave team</button>
+      <button class="btn-ghost btn-block" data-action="team-leave" data-id="${esc(team.id)}">Leave team</button>
     </div>`);
   topOfView();
 }

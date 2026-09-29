@@ -38,8 +38,14 @@ export function paintReviewCard() {
   if (qIdx >= queue.length) return paintReviewDone();
   const { card } = queue[qIdx];
   setHTML(app, `
-    <div class="rev-top">${XBTN}<div class="bar"><i style="width:${Math.round((qIdx / queue.length) * 100)}%"></i></div>
-      <span class="rev-count tnum">${qIdx + 1} / ${queue.length}</span></div>
+    
+      <div class="ahd" style="display:flex;align-items:center;padding:12px;gap:12px">
+        <button class="iconbtn" data-action="return-focus" aria-label="End session"><svg class="ic" viewBox="0 0 24 24" width="20" height="20" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg></button>
+        <div class="focus-track">
+          <div class="focus-fill" style="width:${Math.round((qIdx / queue.length) * 100)}%"</div>
+        </div>
+        <div style="font-size:13px;color:var(--text-muted);font-variant-numeric:tabular-nums">${qIdx + 1} / ${queue.length}</div>
+      </div>
     <div class="rev-body">
       <div class="flashcard" data-action="flip">
         <div class="lab">Question</div>
@@ -57,12 +63,12 @@ export function revealCard() {
     <div class="rule"></div><div class="back">${esc(card.back || "—")}</div>`);
   const hint = app.querySelector(".flip-hint");
   replaceHTML(hint, `<div class="grades">
-      <button class="grade again" data-action="grade" data-g="0"><span class="g">Again</span><span class="iv">${gradePreview(card, 0, queue[qIdx].examDate)}d</span></button>
-      <button class="grade" data-action="grade" data-g="3"><span class="g">Hard</span><span class="iv">${gradePreview(card, 3, queue[qIdx].examDate)}d</span></button>
-      <button class="grade good" data-action="grade" data-g="4"><span class="g">Good</span><span class="iv">${gradePreview(card, 4, queue[qIdx].examDate)}d</span></button>
-      <button class="grade good" data-action="grade" data-g="5"><span class="g">Easy</span><span class="iv">${gradePreview(card, 5, queue[qIdx].examDate)}d</span></button>
+      <button class="btn-ghost" style="color:var(--danger-text)" data-action="grade" data-g="0"><span class="g">Again</span><span class="iv">${gradePreview(card, 0, queue[qIdx].examDate)}d</span></button>
+      <button class="btn-ghost" style="color:var(--status-learning-text)" data-action="grade" data-g="3"><span class="g">Hard</span><span class="iv">${gradePreview(card, 3, queue[qIdx].examDate)}d</span></button>
+      <button class="btn-ghost" style="color:var(--accent-text)" data-action="grade" data-g="4"><span class="g">Good</span><span class="iv">${gradePreview(card, 4, queue[qIdx].examDate)}d</span></button>
+      <button class="btn-ghost" style="color:var(--status-mastered)" data-action="grade" data-g="5"><span class="g">Easy</span><span class="iv">${gradePreview(card, 5, queue[qIdx].examDate)}d</span></button>
     </div>
-    <button class="btn btn-ghost btn-block" data-action="apply-card" style="margin-top:10px">🎯 Apply it — fresh scenario</button>`);
+    <button class="btn-ghost btn-block" data-action="apply-card" style="margin-top:10px">🎯 Apply it — fresh scenario</button>`);
 }
 
 export async function gradeCard(g) {
@@ -120,7 +126,7 @@ export async function paintReviewDone() {
   const n = quickQuizLen(set); // must match what the button actually launches
   paint(
     `<div class="help" style="margin:0 0 10px;text-align:center">You've seen the answers — now try recalling them cold.</div>
-     <button class="btn btn-primary btn-block" data-action="quiz-after-review" data-id="${esc(ids[0])}">Take a quick quiz · ${n} question${n === 1 ? "" : "s"}</button>`
+     <button class="btn-primary btn-block" data-action="quiz-after-review" data-id="${esc(ids[0])}">Take a quick quiz · ${n} question${n === 1 ? "" : "s"}</button>`
   );
 }
 

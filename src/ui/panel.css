@@ -2129,3 +2129,273 @@ button.insight-row:focus-visible { outline: 2px solid var(--accent); outline-off
 
   }
 }
+
+
+/* PROMPT 13 RE-STYLES */
+
+.btn-primary, .due-hero .btn-primary {
+  height: 50px;
+  border-radius: 12px;
+  border: none;
+  background: var(--accent);
+  color: var(--accent-on);
+  font-size: 15px;
+  font-weight: 650;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  width: 100%;
+}
+.btn-primary:hover:not(:disabled), .due-hero .btn-primary:hover:not(:disabled) {
+  background: var(--accent-hover);
+}
+
+.btn-ghost {
+  height: 44px;
+  border-radius: 12px;
+  border: 1px solid var(--border-control);
+  background: var(--bg-surface);
+  color: var(--text-primary);
+  font-size: 14px;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  width: 100%;
+}
+.btn-ghost:hover:not(:disabled) {
+  border-color: var(--border-hover);
+  background: var(--bg-surface);
+}
+
+.btn-sm, .linkbtn {
+  height: 36px;
+  padding: 0 12px;
+  border-radius: 10px;
+  font-size: 13px;
+  font-weight: 600;
+  border: 1px solid var(--border-control);
+  background: transparent;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.btn-sm:hover:not(:disabled), .linkbtn:hover:not(:disabled) {
+  background: var(--bg-surface2);
+}
+
+.iconbtn {
+  width: 40px;
+  height: 40px;
+  border-radius: 12px;
+  border: 1px solid var(--border-control);
+  background: transparent;
+  color: var(--text-primary);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+}
+
+.block, .card {
+  padding: 16px;
+  border-radius: 16px;
+  background: var(--bg-surface);
+  border: 1px solid var(--border-card);
+}
+
+.block.tint, .help, .info-note {
+  padding: 12px 14px;
+  border-radius: 12px;
+  background: var(--bg-surface2);
+  font-size: 14px;
+  line-height: 1.45;
+  color: var(--text-secondary);
+}
+
+.field input, select {
+  height: 44px;
+  padding: 0 14px;
+  border-radius: 12px;
+  background: var(--bg-surface);
+  border: 1px solid var(--border-card);
+  font-size: 15px;
+  color: var(--text-primary);
+  box-sizing: border-box;
+}
+.field input:focus, select:focus {
+  border-color: var(--border-hover);
+  outline: none;
+}
+
+.field textarea {
+  background: var(--bg-app);
+  border: 1px solid var(--border-control);
+  border-radius: 10px;
+  padding: 10px 12px;
+  font-size: 15px;
+  line-height: 1.4;
+  color: var(--text-primary);
+  box-sizing: border-box;
+}
+.field textarea:focus {
+  border-color: var(--accent);
+  outline: none;
+}
+
+.field label, .t-label, .listhd {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0 4px;
+  font-size: 13px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--text-muted);
+}
+
+.setting-row {
+  display: flex;
+  align-items: center;
+  padding: 14px;
+  border-radius: 14px;
+  border: 1px solid var(--border-control);
+  background: transparent;
+  gap: 12px;
+  width: 100%;
+  box-sizing: border-box;
+}
+.setting-row .title {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+.setting-row .sub {
+  font-size: 13px;
+  color: var(--text-muted);
+  margin-top: 0;
+}
+.setting-row .chev {
+  width: 16px;
+  height: 16px;
+  color: #6d7c78;
+}
+
+/* Switch styling for checkboxes/toggles */
+input[type="checkbox"].switch, .toggle-switch {
+  appearance: none;
+  -webkit-appearance: none;
+  width: 40px;
+  height: 24px;
+  border-radius: 12px;
+  background: var(--border-control);
+  position: relative;
+  outline: none;
+  cursor: pointer;
+}
+input[type="checkbox"].switch::after, .toggle-switch::after {
+  content: "";
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: var(--text-primary);
+  transition: transform 0.2s;
+}
+input[type="checkbox"].switch:checked, .toggle-switch:checked {
+  background: var(--accent);
+}
+input[type="checkbox"].switch:checked::after, .toggle-switch:checked::after {
+  transform: translateX(16px);
+  background: var(--accent-on);
+}
+
+.tag, .pill {
+  padding: 1px 7px;
+  border-radius: 999px;
+  background: var(--bg-surface2);
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-secondary);
+  display: inline-block;
+}
+
+.seg {
+  /* segmented tabs */
+  display: flex;
+  background: var(--bg-nav);
+  padding: 4px;
+  border-radius: 16px;
+  gap: 2px;
+}
+.seg button {
+  flex: 1;
+  height: 36px;
+  border-radius: 12px;
+  border: none;
+  background: transparent;
+  color: var(--text-muted);
+  font-size: 14px;
+  font-weight: 600;
+}
+.seg button.active {
+  background: var(--bg-segment-active);
+  color: var(--text-primary);
+}
+
+.bar {
+  height: 6px;
+  border-radius: 3px;
+  background: #27322f;
+  width: 100%;
+  overflow: hidden;
+}
+.bar .fill {
+  height: 100%;
+  background: var(--accent);
+}
+.bar .fill.mastered {
+  background: var(--status-mastered);
+}
+
+.h-title {
+  font-size: 24px;
+  font-weight: 650;
+  letter-spacing: -0.02em;
+  margin: 0;
+  color: var(--text-primary);
+}
+
+.empty {
+  text-align: center;
+  padding: 28px 12px;
+  font-size: 14px;
+  color: var(--text-muted);
+}
+
+.btn-danger, .btn-primary.btn-danger {
+  background: var(--danger-text) !important;
+  color: var(--bg-surface) !important;
+}
+@media (prefers-color-scheme: dark) {
+  .btn-danger, .btn-primary.btn-danger {
+    color: #0e1513 !important;
+  }
+}
+
+.focus-track {
+  flex: 1;
+  height: 4px;
+  background: #27322f;
+  border-radius: 2px;
+  overflow: hidden;
+}
+.focus-fill {
+  height: 100%;
+  background: var(--accent);
+}

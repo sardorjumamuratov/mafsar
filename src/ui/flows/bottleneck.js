@@ -73,11 +73,11 @@ export function paintBottleneckQuestion() {
       <div class="t-label">Architecture</div>
       <pre class="arch-flow" role="img" aria-label="Request flow: ${esc((s.task.architecture || []).join(", then "))}">${esc(renderArchitecture(s.task.architecture))}</pre>
       
-      ${s.hint ? `<div class="t-label">Hint</div><div class="block tint" style="margin-bottom:16px">${esc(s.hint)}</div>` : `<button class="btn btn-ghost btn-sm" data-action="bottleneck-hint" style="margin-bottom:16px">Get a hint (costs half a point)</button>`}
+      ${s.hint ? `<div class="t-label">Hint</div><div class="block tint" style="margin-bottom:16px">${esc(s.hint)}</div>` : `<button class="btn-ghost btn-sm" data-action="bottleneck-hint" style="margin-bottom:16px">Get a hint (costs half a point)</button>`}
       
       <div class="t-label">What breaks and why?</div>
       <textarea id="bottleneckAnswer" class="sa-input" placeholder="What breaks, why (under what load or failure), and how you'd fix it." rows="6">${esc(s.draft)}</textarea>
-      <button class="btn btn-primary btn-block" data-action="bottleneck-submit" style="margin-top:12px">Submit</button>
+      <button class="btn-primary btn-block" data-action="bottleneck-submit" style="margin-top:12px">Submit</button>
     </div>`);
 }
 
@@ -165,7 +165,7 @@ function paintBottleneckReveal() {
         <div style="font-size:14px;color:var(--text-primary);line-height:1.5"><b>A good fix:</b> ${esc(r.model_solution)}</div>
       </div>
       
-      <button class="btn btn-primary btn-block" data-action="return-focus" style="margin-top:16px">Done</button>
+      <button class="btn-primary btn-block" data-action="return-focus" style="margin-top:16px">Done</button>
     </div>`);
 }
 

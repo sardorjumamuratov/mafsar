@@ -1,34 +1,36 @@
 import { esc } from "./core.js";
-import { openSheet, closeSheet } from "./sheet.js";
-import { PrimaryButton, OutlineButton } from "./components.js";
 
-export function confirmSheet(title, message, confirmLabel, confirmActionClass, onConfirm) {
+export function confirmSheet({ title, body, confirmLabel, destructive }) {
   return new Promise((resolve) => {
-    // Instead of using global document click listeners, we just construct the buttons with IDs
-    const contentHtml = `
-      <div style="font-size:15px; color:var(--text-body2); line-height:1.4">${esc(message)}</div>
-      <div style="display:flex; gap:10px; margin-top:20px;">
-        <div style="flex:1" id="confirmSheetCancel">${OutlineButton("Cancel", 50, 0, 14, "--text-primary", "", false)}</div>
-        <div style="flex:1" id="confirmSheetOk">${PrimaryButton(confirmLabel, "", false)}</div>
+    let sheet = document.getElementById("sheet");
+    if (!sheet) {
+      sheet = document.createElement("div");
+      sheet.id = "sheet";
+      sheet.className = "bottom-sheet";
+      document.body.appendChild(sheet);
+    }
+    
+    sheet.innerHTML = `
+      <div class="sheet-panel">
+        <div class="sheet-grabber"></div>
+        <div class="sheet-title">${esc(title)}</div>
+        <div class="sheet-content info-sheet">
+          <div style="font-size:15px; color:var(--text-secondary); line-height:1.45">${esc(body || "")}</div>
+          <div style="display:flex; gap:8px; margin-top:8px">
+            <button id="confirmCancel" class="btn-ghost" style="flex:1">Cancel</button>
+            <button id="confirmOk" class="btn-primary ${destructive ? 'btn-danger' : ''}" style="flex:1">${esc(confirmLabel || "OK")}</button>
+          </div>
+        </div>
       </div>
     `;
-    // For primary button we can patch its class if confirmActionClass is "danger"
-    // To match the original confirm behavior:
-    openSheet(esc(title), contentHtml, false);
+    sheet.classList.remove("hidden");
     
-    // Add listeners
-    document.getElementById("confirmSheetCancel").onclick = () => {
-      closeSheet();
+    document.getElementById("confirmCancel").onclick = () => {
+      sheet.classList.add("hidden");
       resolve(false);
     };
-    const okBtn = document.getElementById("confirmSheetOk").querySelector("button");
-    if (confirmActionClass === "danger") {
-      okBtn.style.background = "var(--danger-text)";
-      okBtn.style.color = "#fff"; // Assuming danger text has white text
-    }
-    okBtn.onclick = () => {
-      closeSheet();
-      if (onConfirm) onConfirm();
+    document.getElementById("confirmOk").onclick = () => {
+      sheet.classList.add("hidden");
       resolve(true);
     };
   });

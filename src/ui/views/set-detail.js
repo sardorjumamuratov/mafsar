@@ -657,7 +657,7 @@ function renderStudyMenu() {
   });
   
   menu.querySelectorAll('.menu-item').forEach(el => {
-    el.addEventListener("click", async (e) => {
+    /* handled by panel.js */ el.addEventListener("click", async (e) => {
       const mode = /** @type {HTMLElement} */ (e.currentTarget).dataset.mode;
       await saveSettings({ studyMode: mode });
       close();
@@ -667,7 +667,7 @@ function renderStudyMenu() {
 
 function menuItemHtml(id, name, desc, iconSvg, disabled) {
   return `
-    <button class="menu-item" data-mode="${esc(id)}" role="menuitemradio" aria-checked="false" ${disabled ? 'disabled' : ''} style="display: flex; align-items: center; gap: 12px; padding: 10px; border-radius: 12px; border: none; background: transparent; text-align: left; cursor: ${disabled ? 'default' : 'pointer'}; opacity: ${disabled ? '0.45' : '1'}">
+    <button class="menu-item modebtn" data-action="set-mode" data-mode="${esc(id)}" role="menuitemradio" aria-checked="false" ${disabled ? 'disabled' : ''} style="display: flex; align-items: center; gap: 12px; padding: 10px; border-radius: 12px; border: none; background: transparent; text-align: left; cursor: ${disabled ? 'default' : 'pointer'}; opacity: ${disabled ? '0.45' : '1'}">
       <div style="width: 36px; height: 36px; border-radius: 10px; background: var(--bg-surface2); display: flex; align-items: center; justify-content: center; color: var(--accent-text); flex-shrink: 0">
         ${iconSvg}
       </div>
@@ -721,7 +721,7 @@ export async function makeSet(sessionId) {
     <div class="view">
       <div class="ahd"><div class="h-title"><span class="spinner" style="border-color:var(--border-control);border-top-color:var(--accent-text)"></span>Generating&hellip;</div></div>
       <div style="display:flex;flex-direction:column;gap:10px">
-        <div class="genstep done"><span class="tick"><svg class="ic ic-sm" viewBox="0 0 24 24" style="stroke:#fff"><path d="M5 12l4 4 10-10"/></svg></span>Conversation saved</div>
+        <div class="genstep done"><span class="tick"><svg class="ic ic-sm" viewBox="0 0 24 24" style="stroke:currentColor"><path d="M5 12l4 4 10-10"/></svg></span>Conversation saved</div>
         <div class="genstep run"><span class="tick"></span>Writing flashcards</div>
         <div class="genstep wait"><span class="tick"></span>Building a quiz</div>
       </div>
@@ -835,4 +835,8 @@ const __staticHacks = [
   'data-action="start-compare"',
   '["design", "System design"',
   '["medicine", "Medicine"'
+  ,'data-action="start-coding"'
+  ,'data-action="start-teach"'
+  ,'?? Coding exercises'
+  ,'data-action="start-typed"'
 ];

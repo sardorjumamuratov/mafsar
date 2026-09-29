@@ -34,7 +34,7 @@ export async function renderYou() {
              }</div>
            </div>
          </div>
-         <button type="button" class="btn btn-ghost btn-block" data-action="nav-teams">Teams</button>
+         
           <button class="btn btn-ghost btn-block" data-action="auth-signout">Sign out</button>
        </div>`
     : `<div class="block" style="display:flex;flex-direction:column;gap:10px">
@@ -54,30 +54,41 @@ export async function renderYou() {
   setHTML(app, `
     <div class="view">
       ${updateBanner}
-      <div class="ahd"><div class="wordmark">Maf<b>sar</b></div></div>
-      <div class="block" style="text-align:center;padding:20px">
-        <div style="font-size:13px;color:var(--text-muted)">${auth?.user ? "Your sets are backed up" : "Sign in to back up your sets"}</div>
-        <div style="display:flex;justify-content:center;gap:8px;margin-top:12px">
-          <span class="streak">${FLAME}${streak}-day streak</span>
+      <div class="ahd"><h1 class="h-title">You</h1></div>
+      
+      <div class="listhd"><span class="t-label">Progress</span></div>
+      <button type="button" class="setting-row" data-action="nav-stats">
+        <div style="display:flex;align-items:center;justify-content:center;width:40px;height:40px;border-radius:12px;background:var(--accent-chip-bg);color:var(--accent-text);margin-right:2px"><svg viewBox="0 0 24 24" width="20" height="20" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"><path d="M18 20V10M12 20V4M6 20v-4"/></svg></div>
+        <div class="txt" style="flex:1;text-align:left">
+          <div class="title">Your stats</div>
+          <div class="sub">${streak}-day streak &middot; ${mastered} mastered</div>
         </div>
-      </div>
-      <div class="stats">
-        <div class="stat"><div class="v tnum">${mastered}</div><div class="k">Mastered</div></div>
+        <svg class="ic chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 18l6-6-6-6"/></svg>
+      </button>
+      <button type="button" class="setting-row" data-action="nav-teams" style="margin-top:8px">
+        <div style="display:flex;align-items:center;justify-content:center;width:40px;height:40px;border-radius:12px;background:var(--accent-chip-bg);color:var(--accent-text);margin-right:2px"><svg viewBox="0 0 24 24" width="20" height="20" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle><path d="M23 21v-2a4 4 0 0 0-3-3.87"></path><path d="M16 3.13a4 4 0 0 1 0 7.75"></path></svg></div>
+        <div class="txt" style="flex:1;text-align:left">
+          <div class="title">Teams</div>
+          <div class="sub">Study with a group</div>
+        </div>
+        <svg class="ic chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 18l6-6-6-6"/></svg>
+      </button>
+<div class="k">Mastered</div></div>
         <div class="stat"><div class="v tnum">${total}</div><div class="k">Cards</div></div>
         <div class="stat"><div class="v tnum">${studySets.length}</div><div class="k">Sets</div></div>
       </div>
       ${accountHtml}
             <div class="listhd"><span class="t-label">Layout</span></div>
       <label class="setting-row">
-        <span class="txt"><span class="main" style="display:block">Open Mafsar in a tab</span><span class="sub" style="display:block">Use a full page instead of the side panel</span></span>
-        <input type="checkbox" id="openInTabCheck" ${settings.openInTab ? "checked" : ""} />
+        <div class="txt" style="flex:1;text-align:left"><div class="title">Open Mafsar in a tab</div><div class="sub">Use a full page instead of the side panel</div></span>
+        <input type="checkbox" class="switch" id="openInTabCheck" ${settings.openInTab ? "checked" : ""} />
       </label>
       <div class="listhd"><span class="t-label">Backup</span></div>
       <div id="backupSlot"></div>
       <input type="file" id="backupFile" accept="application/json,.json" class="hidden" />
       ${auth?.user ? `<div class="listhd"><span class="t-label">Account</span></div>
       <button type="button" class="setting-row" data-action="delete-account-open">
-        <span class="txt"><span class="main" style="display:block">Delete account</span><span class="sub" style="display:block">Permanently delete your account and data</span></span>
+        <div class="txt" style="flex:1;text-align:left"><div class="title">Delete account</div><div class="sub">Permanently delete your account and data</div></span>
         <svg class="ic chev" viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"/></svg>
       </button>` : ""}
     </div>`);

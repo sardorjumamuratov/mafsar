@@ -152,6 +152,7 @@ document.addEventListener("click", (e) => {
     case "team-join": joinTeamFromInput(); break;
     case "team-leave": leaveTeam(id); break;
     case "nav-teams": renderTeams(); break;
+      case "nav-stats": renderStats(); break;
     case "nav-you": renderYou(); break;
     case "select-all":
       (/** @type {any} */ (t)).select();

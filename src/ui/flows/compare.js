@@ -33,7 +33,7 @@ function paintComparePicker() {
       <div class="t-label">Compare conditions</div>
       <p class="help">Two conditions side by side, so you can see where they split. Closest pairs first.</p>
       ${pairs.map((p) => `
-        <button class="btn btn-ghost btn-block cmp-pair" data-action="compare-select" data-id1="${esc(p.c1.id)}" data-id2="${esc(p.c2.id)}">
+        <button class="btn-ghost btn-block cmp-pair" data-action="compare-select" data-id1="${esc(p.c1.id)}" data-id2="${esc(p.c2.id)}">
           <span class="cmp-pair-title">${esc(p.c1.title)} vs ${esc(p.c2.title)}</span>
           <span class="help">${esc(p.shared)} steps look the same</span>
         </button>`).join("")}
@@ -77,7 +77,7 @@ function paintCompareView() {
       <div class="t-label">${esc(s.c1.title)} vs ${esc(s.c2.title)}</div>
       <p class="help">Muted steps read the same in both. The rest is where they fork.</p>
       ${rows}
-      <button class="btn btn-primary btn-block" data-action="compare-fork-cards">Make cards for the differences</button>
+      <button class="btn-primary btn-block" data-action="compare-fork-cards">Make cards for the differences</button>
       <div class="chain-note">Study aid built from your notes. Not medical advice.</div>
     </div>`);
 }

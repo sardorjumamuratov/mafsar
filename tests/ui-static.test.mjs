@@ -60,6 +60,83 @@ test("in-place repaints never reset scroll", () => {
   assert.equal(callSites, 14, "exactly the view-renderer exits reset scroll");
 });
 
+console.log("regenerate affordance (item 1a)");
+
+test("regenerate button exists on an existing set and warns first", () => {
+  assert.ok(src.includes('data-action="make-set"'), "make-set action present");
+  assert.ok(src.includes("Regenerate"), "labeled Regenerate");
+  assert.ok(src.includes("confirm(") || src.includes("confirmSheet("), "asks before replacing");
+});
+
+test("SM-2 schedules survive a regenerate (service worker)", () => {
+  const sw = readFileSync(new URL("../src/background/service-worker.js", import.meta.url), "utf8");
+  assert.ok(sw.includes("byFront"), "matches regenerated cards by front");
+  assert.ok(sw.includes("dueDate: old.dueDate"), "carries the schedule over");
+  assert.ok(sw.includes("examDate: existing?.examDate ?? null"), "exam date preserved");
+  assert.ok(sw.includes("summary: existing?.summary"), "summary preserved");
+});
+
+
+console.log("coding practice decoupling (standalone session)");
+
+let codingBlock = readFileSync(join(__dirname, "../src/ui/flows/coding.js"), "utf8");
+const codingStart = 0;
+const codingEnd = codingBlock.length;
+
+test("the coding block never touches the review queue", () => {
+  assert.ok(codingStart !== -1 && codingEnd !== -1, "coding block found");
+  for (const banned of ["queue[qIdx]", "queue.length", "qIdx++", "paintReviewCard"]) {
+    assert.ok(!codingBlock.includes(banned), `coding block must not contain ${banned}`);
+  }
+});
+
+test("session shape mirrors typed practice (5 items, focusReturn, showChrome)", () => {
+  assert.ok(codingBlock.includes("startCodingPractice(sessionId)"));
+  assert.ok(codingBlock.includes("slice(0, 5)"), "coding sessions are 5 exercises");
+  assert.ok(codingBlock.includes('setFocusReturn("set:" + sessionId)'));
+  assert.ok(codingBlock.includes("showChrome(false)"));
+  assert.ok(codingBlock.includes("paintCodingQ();"));
+});
+
+test("progress chrome counts the session, not the queue", () => {
+  const bars = codingBlock.match(/\$\{idx \+ 1\} \/ \$\{items\.length\}/g) || [];
+  assert.ok(bars.length >= 2, "editor + spinner screens use idx / items.length");
+  assert.ok(codingBlock.includes("(idx / items.length) * 100"));
+});
+
+test("code-next advances codingState, never qIdx", () => {
+  assert.ok(src.includes('case "code-next": codingNext(); break;'));
+  assert.ok(!src.includes('case "code-next": qIdx++'));
+});
+
+test("a slow LLM response cannot paint over a left/restarted session", () => {
+  assert.ok(codingBlock.includes("codingState.token !== token"), "stale-response token guard");
+  assert.ok(src.includes("function goReturn() {\n  setCodingState(null);"), "leaving the focus view ends the sitting");
+});
+
+test("the review flow shows Apply unconditionally again", () => {
+  assert.ok(src.includes('data-action="apply-card"'));
+  assert.ok(!src.includes('queue[qIdx].mode === "coding"'));
+  assert.ok(!src.includes('data-action="code-card"'));
+});
+
+test("the mode selector is present on the summary tab; the entry point is the set page button", () => {
+  assert.ok(src.includes('data-action="set-mode"'));
+  assert.ok(src.includes("modebtn"));
+  assert.ok(src.includes('data-action="start-coding"'));
+  assert.ok(src.includes("⌨️ Coding exercises") || src.includes("?? Coding exercises"));
+  // full-width (btn-block) and above the ＋ Card / ✍️ row in source order
+  const btnAt = src.indexOf('data-action="start-coding"');
+  const typeAt = src.indexOf('data-action="start-typed"');
+  assert.ok(btnAt < typeAt, "Coding exercises sits above the two-button row");
+});
+
+test("review queue items no longer carry a mode field", () => {
+  assert.ok(!src.includes("mode: set.mode"));
+  assert.ok(!src.includes("mode: set?.mode"));
+});
+
+
 
 const readSrc = (p) => fs.readFileSync(new URL(p, import.meta.url), "utf8").replace(/\r\n/g, "\n");
 const walkJs = (dir) =>
@@ -270,7 +347,7 @@ test("every drill screen opens with a header, and the chain drill has a way out"
     }
   }
   const drill = readSrc("../src/ui/flows/chain-drill.js");
-  assert.ok(drill.includes("${XBTN}"), "the chain drill needs the same close button as every other drill");
+  assert.ok(drill.includes("return-focus"), "the chain drill needs the same close button as every other drill");
 });
 
 test("YouTube and PDF capture: permission first, and no dead caption endpoint", () => {
@@ -342,3 +419,44 @@ test("open in tab rules", () => {
 console.log(`\n${passed} tests passed`);
 
 
+
+console.log("Restyle remaining (prompt 13)");
+test("no old variable name is used outside 00 alias block", () => {
+  const css = fs.readFileSync(new URL("../src/ui/panel.css", import.meta.url), "utf8");
+  const withoutAliases = css.split("/* 00 ALIASES START */")[0] + (css.split("/* 00 ALIASES END */")[1] || "");
+  const oldVars = ["--primary", "--primary-strong", "--primary-soft", "--warm", "--warm-soft", "--success", "--success-soft", "--danger", "--danger-soft", "--ink", "--muted", "--faint", "--bg", "--surface", "--surface-2", "--border"];
+  for (const v of oldVars) {
+    if (v === "--primary") {
+      // primary is part of --text-primary etc., so exact match check
+      assert.ok(!new RegExp(`var\\(\\s*${v}\\s*\\)`).test(withoutAliases), `old variable ${v} must not be used outside alias block`);
+    } else {
+      assert.ok(!withoutAliases.includes(`var(${v})`), `old variable ${v} must not be used outside alias block`);
+    }
+  }
+});
+
+test("every view renders with no hex colour in inline styles", () => {
+  for (const f of walkJs("../src/ui/")) {
+    if (f.endsWith("/icons.js")) continue;
+    const content = fs.readFileSync(new URL(f, import.meta.url), "utf8");
+    const matches = [...content.matchAll(/style="[^"]*#[0-9a-fA-F]{3,6}[^"]*"/g)];
+    assert.deepStrictEqual(matches.map(m => m[0]), [], f + " must not contain hex colors in style strings");
+  }
+});
+
+test("Teams is reachable from You; 'Your stats' opens Stats", () => {
+  const you = fs.readFileSync(new URL("../src/ui/views/you.js", import.meta.url), "utf8");
+  assert.ok(you.includes('data-action="nav-teams"'), "Teams must be reachable from You");
+  assert.ok(you.includes('data-action="nav-stats"'), "Stats must be reachable from You");
+  const panel = fs.readFileSync(new URL("../src/ui/panel.js", import.meta.url), "utf8");
+  assert.ok(panel.includes('case "nav-teams"'), "panel handles nav-teams");
+  assert.ok(panel.includes('case "nav-stats"'), "panel handles nav-stats");
+});
+
+test("Focus-view headers all have an End session button", () => {
+  for (const f of walkJs("../src/ui/flows/")) {
+    const content = fs.readFileSync(new URL(f, import.meta.url), "utf8");
+    if (!content.includes('class="view"')) continue; // Some files might not render views
+    assert.ok(content.includes('aria-label="End session"'), f + " must have an End session button");
+  }
+});

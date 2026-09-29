@@ -68,9 +68,7 @@ export function paintEstimationQuestion() {
   const q = s.task.questions[s.idx];
   
   setHTML(app, `
-    <div class="rev-top">${XBTN}<div class="bar"><i style="width:${esc(((s.idx) / s.task.questions.length) * 100)}%"></i></div>
-      <span class="rev-count tnum">${esc(s.idx + 1)} / ${esc(s.task.questions.length)}</span>
-    </div>
+    <div class="ahd" style="display:flex;align-items:center;padding:12px;gap:12px"><button class="iconbtn" data-action="return-focus" aria-label="End session"><svg class="ic" viewBox="0 0 24 24" width="20" height="20" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg></button><div class="focus-track"><div class="focus-fill" style="width:${esc(((s.idx) / s.task.questions.length) * 100)}%"</div></div><div style="font-size:13px;color:var(--text-muted);font-variant-numeric:tabular-nums">${esc(s.idx + 1)} / ${esc(s.task.questions.length)}</div></div>
     <div class="rev-body teach">
       <div class="t-label">Question ${esc(s.idx + 1)}</div>
       <p class="teach-lead" style="margin-bottom:12px;font-size:18px">${esc(q.question)}</p>
@@ -78,7 +76,7 @@ export function paintEstimationQuestion() {
       <div style="display:flex;flex-direction:column;gap:8px">
         <input type="text" id="estimationValue" class="sa-input" inputmode="text" placeholder="e.g. 300 TB, 12k QPS, 2.5 GB/s" aria-label="Your estimate, with a unit" style="font-size:18px;padding:12px" autofocus />
       </div>
-      <button class="btn btn-primary btn-block" data-action="estimation-submit" style="margin-top:16px">Check</button>
+      <button class="btn-primary btn-block" data-action="estimation-submit" style="margin-top:16px">Check</button>
     </div>`);
     
   // Allow enter to submit
@@ -119,9 +117,7 @@ function paintEstimationGrade() {
   const label = labels[r.grade];
   
   setHTML(app, `
-    <div class="rev-top">${XBTN}<div class="bar"><i style="width:${esc(((s.idx + 1) / s.task.questions.length) * 100)}%"></i></div>
-      <span class="rev-count tnum">${esc(s.idx + 1)} / ${esc(s.task.questions.length)}</span>
-    </div>
+    <div class="ahd" style="display:flex;align-items:center;padding:12px;gap:12px"><button class="iconbtn" data-action="return-focus" aria-label="End session"><svg class="ic" viewBox="0 0 24 24" width="20" height="20" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg></button><div class="focus-track"><div class="focus-fill" style="width:${esc(((s.idx + 1) / s.task.questions.length) * 100)}%"</div></div><div style="font-size:13px;color:var(--text-muted);font-variant-numeric:tabular-nums">${esc(s.idx + 1)} / ${esc(s.task.questions.length)}</div></div>
     <div class="rev-body teach">
       <div class="t-label">Question ${esc(s.idx + 1)}</div>
       <p class="teach-lead" style="margin-bottom:12px;font-size:18px">${esc(q.question)}</p>
@@ -139,7 +135,7 @@ function paintEstimationGrade() {
       <div class="t-label">Solution</div>
       <div class="block tint" style="font-size:14px;line-height:1.5">${esc(q.worked_solution)}</div>
       
-      <button class="btn btn-primary btn-block" data-action="estimation-next" style="margin-top:16px">Next</button>
+      <button class="btn-primary btn-block" data-action="estimation-next" style="margin-top:16px">Next</button>
     </div>`);
 }
 
@@ -208,7 +204,7 @@ function paintEstimationSummary(summary) {
       <div class="listhd"><span class="t-label">Habit to fix</span></div>
       <div class="block tint"><div style="margin-top:6px">${esc(summary.habit_to_fix)}</div></div>
       
-      <button class="btn btn-primary btn-block" data-action="return-focus" style="margin-top:16px">Done</button>
+      <button class="btn-primary btn-block" data-action="return-focus" style="margin-top:16px">Done</button>
     </div>`);
 }
 

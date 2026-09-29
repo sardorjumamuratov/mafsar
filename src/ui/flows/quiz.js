@@ -25,8 +25,14 @@ export function paintQuizQ() {
   if (quizIdx >= quizSet.quiz.length) return paintQuizDone();
   const q = quizSet.quiz[quizIdx];
   setHTML(app, `
-    <div class="rev-top">${XBTN}<div class="bar"><i style="width:${Math.round((quizIdx / quizSet.quiz.length) * 100)}%"></i></div>
-      <span class="rev-count tnum">${quizIdx + 1} / ${quizSet.quiz.length}</span></div>
+    
+      <div class="ahd" style="display:flex;align-items:center;padding:12px;gap:12px">
+        <button class="iconbtn" data-action="return-focus" aria-label="End session"><svg class="ic" viewBox="0 0 24 24" width="20" height="20" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg></button>
+        <div class="focus-track">
+          <div class="focus-fill" style="width:${Math.round((quizIdx / quizSet.quiz.length) * 100)}%"</div>
+        </div>
+        <div style="font-size:13px;color:var(--text-muted);font-variant-numeric:tabular-nums">${quizIdx + 1} / ${quizSet.quiz.length}</div>
+      </div>
     <div class="rev-body">
       <div class="t-label">Multiple choice</div>
       <div style="font-size:16px;font-weight:600;line-height:1.35">${esc(q.q)}</div>
@@ -58,7 +64,7 @@ export function answerQuiz(i) {
   }</b> ${esc(q.explain || "")}`);
   body.appendChild(ex);
   const next = document.createElement("button");
-  next.className = "btn btn-primary btn-block";
+  next.className = "btn-primary btn-block";
   next.textContent = quizIdx + 1 >= quizSet.quiz.length ? "See results" : "Next question";
   next.dataset.action = "quiz-next";
   body.appendChild(next);
@@ -73,7 +79,7 @@ export function paintQuizDone() {
         <div style="font-size:30px;font-weight:750;color:var(--text-primary)" class="tnum">${quizScore}/${quizSet.quiz.length}</div>
         <div style="margin-top:4px">${pct}% correct</div>
       </div>
-      <button class="btn btn-primary btn-block" data-action="return-focus">Done</button>
+      <button class="btn-primary btn-block" data-action="return-focus">Done</button>
     </div>`);
 }
 
