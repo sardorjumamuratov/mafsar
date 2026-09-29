@@ -176,7 +176,7 @@ test('receiving side: lookup, duplicate guard, preview, import', () => {
 });
 
 test('import builds fresh ids and fresh schedules, no sender fields', () => {
-  const fn = fs.readFileSync(join(__dirname, "../src/ui/views/sets.js"), "utf8");
+  const fn = fs.readFileSync(join(__dirname, "../src/ui/views/import.js"), "utf8");
   assert.ok(fn.length > 200, 'import function located');
   assert.ok(fn.includes('...initSchedule(now)'), 'cards start from scratch');
   assert.ok(fn.includes('id: uid()') || fn.includes('id:uid()'), 'new ids');
@@ -275,14 +275,13 @@ test("capture.js does not read a bare r.title", () => {
   assert.ok(!file.includes("r.title"));
 });
 
-test("sets.js renders id='captureAnswerBtn' unconditionally", () => {
-  const file = fs.readFileSync(join(__dirname, "../src/ui/views/sets.js"), "utf8");
+test("panel.html renders id='captureAnswerBtn' unconditionally", () => {
+  const file = fs.readFileSync(join(__dirname, "../src/ui/panel.html"), "utf8");
   assert.ok(file.includes('id="captureAnswerBtn"'));
-  assert.ok(!file.includes('? `<button class="btn btn-ghost btn-block" id="captureAnswerBtn"'));
 });
 
-test("refreshCaptureAnswerButton uses Math.random() token guard", () => {
-  const file = fs.readFileSync(join(__dirname, "../src/ui/views/sets.js"), "utf8");
+test("refreshCaptureDock uses Math.random() token guard", () => {
+  const file = fs.readFileSync(join(__dirname, "../src/ui/capture.js"), "utf8");
   assert.ok(file.includes('const token = Math.random();'));
   assert.ok(file.includes('if (captureAnswerToken !== token) return;'));
 });
@@ -412,11 +411,7 @@ test("each async slot is filled after the paint and is layout-neutral", () => {
   assert.ok(teams.includes("refreshTeamList()"), "Teams must fill its slot after painting");
   assert.ok(teams.includes("teamListToken"), "a stale TEAM_LIST response must not paint into another view");
 
-  const sets = fs.readFileSync(join(__dirname, "../src/ui/views/sets.js"), "utf8");
-  assert.ok(
-    sets.includes("refreshCaptureAnswerButton().catch"),
-    "renderSets must reuse the existing post-paint refresher"
-  );
+  
 });
 
 test("every slot refresher re-checks the slot after awaiting", () => {
@@ -925,8 +920,9 @@ test("YouTube and PDF capture: permission first, and no dead caption endpoint", 
   const yt = swCode.slice(swCode.indexOf("async function extractYouTubeTranscript"));
   assert.ok(/includes\("\/api\/timedtext"\)/.test(yt), "the extractor recognises the player's caption request");
 
-  const sets = read("../src/ui/views/sets.js");
-  assert.ok(sets.includes('id="captureCurrentBtn"') && sets.includes("refreshCaptureCurrentButton"), "the capture button must carry kind/origin");
+  const capFile = read("../src/ui/capture.js");
+  const panelHtml = read("../src/ui/panel.html");
+  assert.ok(panelHtml.includes('id="captureCurrentBtn"') && capFile.includes("refreshCaptureDock"), "the capture button must carry kind/origin");
 
   assert.ok(
     /"content-type": "application\/json",\s*\.\.\.\(opts\.headers \|\| \{\}\)/.test(read("../src/sync/auth.js")),
