@@ -38,10 +38,22 @@ for example: *"Implement docs/prompts/02-abuse-protection.md. Follow AGENTS.md."
 | 29 | [Split the big three](29-split-the-big-three.md) | — | `llm.ts`, `service-worker.js`, `app.ts` (run alone) |
 | 30 | [Usage counts](30-usage-counts.md) | — | `server/src/app.ts`, `privacy.ts` |
 | 31 | [Home is empty until you switch tabs](31-refresh-after-sync.md) | **20**, **21** | `src/ui/nav.js`, `panel.js`, `you.js` (live bug) |
+| 32 | [Edit a card where it is](32-inline-card-edit.md) | — | `set-detail.js`, `panel.js`, `panel.css` (UI only) |
+| 33 | [Capture buttons above the bottom nav](33-capture-dock.md) | — | `panel.html`, `sets.js`, `import.js`, `tab-watch.js`, `panel.css` |
+| 34 | [Every set gets a category (server only)](34-set-categories.md) | — | `db.ts` migration, `llm.ts`, `app.ts`, `privacy.ts` |
+| 35 | [Global library](35-global-library.md) | **33**, **34** | migration, new routes, new Global tab, bottom nav, `privacy.ts` |
+| 36 | [Star ratings on sets](36-set-ratings.md) | **35** | migration, `sync.ts`, `sync-map.js`, Sets, set detail, Global |
+| 37 | [Your stats and feedback](37-stats-and-feedback.md) | **35** | new Stats page, `shared/insights.js`, You, Home |
 
 **24 to 30 in order:** 24 and 25 are the two that matter; 29 rewrites the
 files almost everything else touches, so run it on its own and merge it the same
 day. 24, 29 and 30 all edit `server/src/app.ts` — never two at once.
+
+**32 to 37:** 32 and 34 can run side by side (one is UI only, the other server
+only). 33 edits the panel shell, so run it on its own. Then 35, 36 and 37 in
+that order, merging each before the next. 34, 35 and 36 each append a migration,
+and so does the unmerged `feat/usage-counts` (slot 017): whichever merges later
+takes the next free slot, and never two of them at once.
 
 **Running in parallel:** 02, 03, 05, 06, 07 and 08 all edit
 `server/src/app.ts`, and 03 to 08 all edit `server/src/privacy.ts`. Run those one
@@ -71,3 +83,5 @@ before the next. Like 11–14, these leave implementation choices to the agent.
   - Check OpenRouter's privacy settings, so the new privacy claim is true.
 - **After 06 is deployed:** create the Sentry project and set `SENTRY_DSN` in Railway.
 - **After 07:** check the YouTube selectors on real videos. Nobody has verified them yet.
+- **Before 35 goes live:** the terms page (03) needs a clause on sets users
+  publish to Global, and someone has to check the report queue.
