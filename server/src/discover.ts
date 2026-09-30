@@ -26,7 +26,7 @@ export function createDiscoverApp(db: DB) {
     const set = await one<any>(db, "SELECT * FROM sets WHERE id = ? AND user_id = ? AND deleted = 0", [setId, userId]);
     if (!set) return c.json({ error: "not_found" }, 404);
     
-    if (set.source === "quizlet" || set.source === "anki" || set.source === "shared" || set.is_global) {
+    if (set.source === "quizlet" || set.source === "anki" || set.source === "shared" || set.is_global || set.origin_set_id) {
       return c.json({ error: "invalid_source", message: "Only your own sets can be published." }, 400);
     }
     
@@ -53,6 +53,23 @@ export function createDiscoverApp(db: DB) {
     const setId = c.req.param("id");
     await run(db, "UPDATE sets SET is_global = 0, updated_at = ? WHERE id = ? AND user_id = ?", [new Date().toISOString(), setId, userId]);
     bumpCatalogue();
+    return c.json({ ok: true });
+  });
+
+  
+  app.post("/:id/report", async (c) => {
+    const userId = c.get("userId");
+    const setId = c.req.param("id");
+    const body = await c.req.json();
+    const reason = body.reason || "inappropriate";
+    
+    await run(db, "INSERT OR IGNORE INTO reports (id, user_id, set_id, reason, created_at) VALUES (?, ?, ?, ?, ?)", [randomUUID(), userId, setId, reason, new Date().toISOString()]);
+    
+    const count = await one<{c:number}>(db, "SELECT COUNT(*) as c FROM reports WHERE set_id = ?", [setId]);
+    if (count && count.c >= 3) {
+      await run(db, "UPDATE sets SET is_hidden = 1 WHERE id = ?", [setId]);
+      bumpCatalogue();
+    }
     return c.json({ ok: true });
   });
 

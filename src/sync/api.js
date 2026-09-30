@@ -188,3 +188,17 @@ export function backendGlobalReport(id, reason, note) {
 export function backendGlobalAdd(id) {
   return post("/v1/discover/" + encodeURIComponent(id) + "/add");
 }
+export async function backendLookupRatings(ids) {
+  const req = await authedFetch("/v1/ratings/lookup", { method: "POST", body: JSON.stringify({ ids }) });
+  return await req.json();
+}
+export async function backendSendRating(id, stars) {
+  const req = await authedFetch("/v1/sets/" + encodeURIComponent(id) + "/rating", { method: "PUT", body: JSON.stringify({ stars }) });
+  if (!req.ok) throw new Error("Couldn't save rating");
+  return await req.json();
+}
+export async function backendDeleteRating(id) {
+  const req = await authedFetch("/v1/sets/" + encodeURIComponent(id) + "/rating", { method: "DELETE" });
+  if (!req.ok) throw new Error("Couldn't delete rating");
+  return await req.json();
+}

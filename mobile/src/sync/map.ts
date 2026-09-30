@@ -8,8 +8,13 @@ export interface CardRowDB {
   id: string; set_id: string; front: string; back: string;
   easiness: number; interval: number; repetitions: number;
   due_date: number | string | null; updated_at: string; deleted: number;
+  origin_set_id?: string | null;
+  renamed?: number;
+  description?: string | null;
   stability: number | null; difficulty: number | null; state: string | null;
   lapses: number | null; last_review: number | string | null;
+  origin_card_id?: string | null;
+  detached?: number;
 }
 
 /** Epoch ms from ms, a numeric string, or ISO. null when absent or invalid. */
@@ -31,6 +36,7 @@ export function setToWire(s: any) {
   return {
     id: s.id,
     title: s.title,
+    description: s.description ?? null,
     source: s.source ?? null,
     sourceLabel: s.source_label ?? null,
     mode: s.mode ?? 'general',
@@ -38,6 +44,8 @@ export function setToWire(s: any) {
     createdAt: s.created_at,
     updatedAt: s.updated_at,
     deleted: !!s.deleted,
+    originSetId: s.origin_set_id ?? null,
+    renamed: !!s.renamed,
   };
 }
 
@@ -53,6 +61,8 @@ export function cardToWire(c: CardRowDB) {
     dueDate: toIso(c.due_date),
     updatedAt: c.updated_at,
     deleted: !!c.deleted,
+    originCardId: c.origin_card_id ?? null,
+    detached: !!c.detached,
     stability: c.stability ?? null,
     difficulty: c.difficulty ?? null,
     state: c.state ?? null,

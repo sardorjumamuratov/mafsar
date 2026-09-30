@@ -408,6 +408,10 @@ export const MIGRATIONS: string[] = [
     route TEXT,
     created_at TEXT NOT NULL
   );
+  `,
+  `
+    ALTER TABLE cards ADD COLUMN origin_card_id TEXT;
+    ALTER TABLE cards ADD COLUMN detached INTEGER NOT NULL DEFAULT 0;
   `
 ];
 

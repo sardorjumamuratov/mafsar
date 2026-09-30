@@ -1,4 +1,5 @@
 import { createDiscoverApp } from "./discover.js";
+import { createRatingsApp } from "./ratings.js";
 import { createAdminApp } from "./admin.js";
 import { bumpCatalogue } from "./discover.js";
 import { randomUUID } from "crypto";

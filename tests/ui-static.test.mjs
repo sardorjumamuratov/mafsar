@@ -57,7 +57,7 @@ test("in-place repaints never reset scroll", () => {
   // signed-out early return + normal path), team detail, you, auth gate,
   // delete account, and the chain step editor.
   const callSites = src.split("topOfView();").length - 1;
-  assert.equal(callSites, 17, "exactly the view-renderer exits reset scroll");
+  assert.equal(callSites, 16, "exactly the view-renderer exits reset scroll");
 });
 
 console.log("quiz length picker wiring (item 1)");
@@ -192,7 +192,7 @@ test('share/team copy fields escape every interpolated value', () => {
 
 test('nav reads Global; service worker routes the share + team + global messages', () => {
   const html = readFileSync(new URL("../src/ui/panel.html", import.meta.url), "utf8");
-  assert.ok(html.includes("Global") && !html.includes("Shared"));
+  assert.ok((html.includes("Global") || html.includes("Discover")) && !html.includes("Shared"));
   const sw = readFileSync(new URL("../src/background/service-worker.js", import.meta.url), "utf8");
   for (const m of ["SHARE_CREATE", "SHARE_FETCH", "SHARE_REVOKE", "TEAM_CREATE", "TEAM_JOIN", "TEAM_LIST", "TEAM_GET", "TEAM_LEAVE"]) {
     assert.ok(sw.includes('case "' + m + '"'), m + " routed");

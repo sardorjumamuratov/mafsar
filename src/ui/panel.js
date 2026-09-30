@@ -1,4 +1,5 @@
 import { renderStats } from "./views/stats.js";
+import { rateSet, clearRating } from "../storage/ratings.js";
 import { saveSettings } from "../storage/store.js";
 import { startCompare, selectComparePair, toggleCompareSame, createForkCards } from "./flows/compare.js";
 import { finishDesignDrill, requestDesignCurveball, startDesignDrill, submitDesign, submitDesignCurveball } from "./flows/design.js";
@@ -25,7 +26,8 @@ import { checkCode, codingNext, startCodingPractice } from "./flows/coding.js";
 import { startTeach, setTeachPersona, sendTeach, finishTeach } from "./flows/teach.js";
 import { copyShareCode, revokeShareFor, toggleSetShare } from "./share.js";
 import { createTeamFromForm, joinTeamFromInput, leaveTeam, renderTeam, renderTeamCreate, renderTeams } from "./views/teams.js";
-import { renderGlobal } from "./views/global.js";
+import { renderGlobal, filterGlobalTab, openGlobalPreview, addGlobalSet, openAddedSet, reportGlobal } from "./views/global.js";
+import { publishGlobalSet, unpublishGlobalSet } from "./views/set-detail.js";
 import { checkTyped, startTypedPractice, typedNext } from "./flows/typed.js";
 import { getAuth, login, logout, register } from "../sync/auth.js";
 import { examDraft, openExamPicker, renderHome, saveExamSelection, setExamDraft } from "./views/home.js";
@@ -188,6 +190,15 @@ document.addEventListener("click", (e) => {
     // case "export-tsv": exportSetTsv(id); break; // paused with the export button
     case "gen-summary": generateSummary(id); break;
     case "export-backup": exportBackup(); break;
+
+    case "global-tab": filterGlobalTab(t); break;
+    case "global-preview": openGlobalPreview(t); break;
+    case "global-open-added": openAddedSet(t); break;
+    case "global-add-set": addGlobalSet(t); break;
+    case "global-report": reportGlobal(t); break;
+    case "global-unpublish": unpublishGlobalSet(id); break;
+    case "global-publish": publishGlobalSet(id); break;
+
     case "import-backup": document.getElementById("backupFile")?.click(); break;
     case "auth-signin": authSubmit("login", t); break;
     case "auth-register": authSubmit("register", t); break;
@@ -196,6 +207,7 @@ document.addEventListener("click", (e) => {
       if (googleAbortController) googleAbortController.abort();
       break;
     case "delete-account-open": renderDeleteAccount(); break;
+    case "teams-open": renderTeams(); break;
     case "delete-account-confirm": confirmDeleteAccount(); break;
     case "auth-signout":
       logout().then(() => {
@@ -385,3 +397,70 @@ async function openWeakCard(sessionId, cardId) {
   setTimeout(() => row.classList.remove("flash-highlight"), 1500);
 }
 
+
+
+document.addEventListener("mouseover", (e) => {
+  const btn = /** @type {HTMLButtonElement|null} */ (/** @type {HTMLElement} */ (e.target).closest(".star-btn"));
+  if (btn && !btn.disabled) {
+    const val = parseInt(btn.dataset.val, 10);
+    const group = btn.closest(".rating-group");
+    const btns = group.querySelectorAll(".star-btn");
+    btns.forEach((b, i) => {
+      const svg = b.querySelector("svg");
+      if (i < val) {
+        svg.style.fill = "var(--warm, #f0c75e)";
+        svg.style.stroke = "var(--warm, #f0c75e)";
+      } else {
+        svg.style.fill = "none";
+        svg.style.stroke = "var(--faint, #6d7c78)";
+      }
+    });
+  }
+});
+document.addEventListener("mouseout", (e) => {
+  const btn = /** @type {HTMLButtonElement|null} */ (/** @type {HTMLElement} */ (e.target).closest(".star-btn"));
+  if (btn && !btn.disabled) {
+    // We let mafsar-ratings-changed repaint it correctly. 
+    // For now we can just dispatch it to trigger a redraw.
+    window.dispatchEvent(new Event("mafsar-ratings-changed"));
+  }
+});
+
+document.addEventListener("keydown", (e) => {
+  const t = /** @type {HTMLElement} */ (e.target);
+  if (t.classList && t.classList.contains("star-btn")) {
+    const group = /** @type {HTMLElement|null} */ (t.closest(".rating-group"));
+    const rootId = group.dataset.root;
+    const clientSetId = group.dataset.client;
+    let val = parseInt(t.dataset.val, 10);
+    if (e.key === "ArrowRight") {
+      val = Math.min(5, val + 1);
+      rateSet(rootId, clientSetId, val);
+      e.preventDefault();
+    } else if (e.key === "ArrowLeft") {
+      val = Math.max(1, val - 1);
+      rateSet(rootId, clientSetId, val);
+      e.preventDefault();
+    } else if (e.key === "Backspace" || e.key === "Delete") {
+      clearRating(rootId, clientSetId);
+      e.preventDefault();
+    }
+  }
+});
+
+
+window.addEventListener("mafsar-ratings-changed", () => {
+  const d = currentDetail();
+  if (d) {
+    renderSetDetail(d.session.id, d.tab);
+  } else if (document.getElementById("home-view")) {
+    renderHome();
+  } else if (document.getElementById("sets-view")) {
+    // We don't import renderSets here, maybe we can just reload or do nothing
+    // if renderSets is not imported, let's just use nav button clicks
+    const btn = document.querySelector('[data-action="nav-library"]');
+    if (btn) /** @type {HTMLElement} */ (btn).click();
+  } else if (document.getElementById("global-view")) {
+    renderGlobal();
+  }
+});

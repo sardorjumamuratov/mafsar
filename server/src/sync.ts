@@ -86,14 +86,14 @@ export async function applySync(db: DB, userId: string, body: SyncBody): Promise
     if (!shouldWrite(stored, { updated_at: c.updatedAt })) continue;
     await run(
       db,
-      `INSERT INTO cards (id, set_id, user_id, front, back, easiness, interval, repetitions, due_date, updated_at, deleted, server_updated_at, stability, difficulty, state, lapses, last_review)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      `INSERT INTO cards (id, set_id, user_id, front, back, easiness, interval, repetitions, due_date, updated_at, deleted, server_updated_at, stability, difficulty, state, lapses, last_review, origin_card_id, detached)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
        ON CONFLICT(id) DO UPDATE SET front=excluded.front, back=excluded.back,
          easiness=excluded.easiness, interval=excluded.interval, repetitions=excluded.repetitions,
-         due_date=excluded.due_date, updated_at=excluded.updated_at, deleted=excluded.deleted, server_updated_at=excluded.server_updated_at, stability=excluded.stability, difficulty=excluded.difficulty, state=excluded.state, lapses=excluded.lapses, last_review=excluded.last_review
+         due_date=excluded.due_date, updated_at=excluded.updated_at, deleted=excluded.deleted, server_updated_at=excluded.server_updated_at, stability=excluded.stability, difficulty=excluded.difficulty, state=excluded.state, lapses=excluded.lapses, last_review=excluded.last_review, origin_card_id=COALESCE(excluded.origin_card_id, cards.origin_card_id), detached=COALESCE(excluded.detached, cards.detached)
        WHERE cards.user_id = excluded.user_id`,
       [c.id, c.setId, userId, c.front, c.back, c.easiness ?? 2.5, c.interval ?? 0,
-       c.repetitions ?? 0, c.dueDate ?? null, c.updatedAt, c.deleted ? 1 : 0, now, c.stability ?? null, c.difficulty ?? null, c.state ?? null, c.lapses ?? 0, c.lastReview ?? null]
+       c.repetitions ?? 0, c.dueDate ?? null, c.updatedAt, c.deleted ? 1 : 0, now, c.stability ?? null, c.difficulty ?? null, c.state ?? null, c.lapses ?? 0, c.lastReview ?? null, c.originCardId ?? null, c.detached ? 1 : 0]
     );
   }
 
@@ -203,7 +203,8 @@ export async function changesSince(db: DB, userId: string, since?: string) {
   )).map((r) => ({
     id: r.id, title: r.title, source: r.source, sourceLabel: r.source_label,
     mode: r.mode, examDate: r.exam_date, createdAt: r.created_at,
-    updatedAt: r.updated_at, deleted: !!r.deleted, chainOverrides: r.chain_overrides ? JSON.parse(r.chain_overrides) : undefined,
+    updatedAt: r.updated_at, deleted: !!r.deleted,
+      originCardId: r.origin_card_id, detached: !!r.detached, chainOverrides: r.chain_overrides ? JSON.parse(r.chain_overrides) : undefined,
     originSetId: r.origin_set_id, isGlobal: !!r.is_global,
   }));
   const cards = (await all<any>(

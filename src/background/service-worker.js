@@ -1,4 +1,4 @@
-import { backendGlobalAdd } from "../sync/api.js";
+import { backendGlobalAdd, backendSendFeedback,  } from "../sync/api.js";
 // Background service worker (ES module). Orchestrates capture storage and
 // generation through the Mafsar backend (server-side LLM key), and opens the
 // side panel when the toolbar icon is clicked.
@@ -651,6 +651,11 @@ async function saveAndGenerate(sessionRecord) {
 
 async function handle(msg) {
   switch (msg?.type) {
+    case "SYNC_PULL_SET":
+      return await backendGlobalAdd(msg.id);
+    case "SEND_FEEDBACK":
+      return await backendSendFeedback(msg.text, msg.imageData, msg.route, msg.appVersion, msg.platform);
+
     case "SAVE_SESSION": {
       const session = await addSession(msg.payload);
       return { session };

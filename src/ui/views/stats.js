@@ -1,16 +1,20 @@
-import { app, setHTML, esc, toast, send, bundle } from "../core.js";
+import { app, setHTML, esc, toast, send, bundle, topOfView } from "../core.js";
+import { setNav, showChrome } from "../nav.js";
 import { getReviewLog } from "../../storage/store.js";
 
 // We'll calculate the stats dynamically!
 export async function renderStats() {
+  setNav("stats");
+  showChrome(true);
+  topOfView();
   const logs = await getReviewLog();
   
   if (logs.length < 10) {
     setHTML(app, `
-      <div style="padding:16px;font-size:32px;font-weight:700;letter-spacing:-0.03em;color:var(--text-primary)">Your stats</div>
-      <div style="padding:16px;border-radius:16px;background:var(--bg-surface);border:1px solid var(--border-card);display:flex;flex-direction:column;gap:12px;margin:16px">
-        <div style="font-size:15px;font-weight:600;color:var(--text-primary)">Your stats appear after your first few sessions</div>
-        <div style="font-size:14px;color:var(--text-body2)">Review 10 cards to unlock trends and feedback.</div>
+      <div style="padding:16px;font-size:32px;font-weight:700;letter-spacing:-0.03em;color:var(--ink)">Your stats</div>
+      <div style="padding:16px;border-radius:16px;background:var(--surface);border:1px solid var(--border);display:flex;flex-direction:column;gap:12px;margin:16px">
+        <div style="font-size:15px;font-weight:600;color:var(--ink)">Your stats appear after your first few sessions</div>
+        <div style="font-size:14px;color:var(--muted)">Review 10 cards to unlock trends and feedback.</div>
         <button class="btn btn-primary" style="height:52px;border-radius:14px" onclick="/** @type {any} */ (window).__mafsar_startReview()">Start review</button>
       </div>
       ${renderFeedbackRow()}
@@ -19,11 +23,11 @@ export async function renderStats() {
   }
   
   setHTML(app, `
-    <div style="padding:16px;font-size:32px;font-weight:700;letter-spacing:-0.03em;color:var(--text-primary)">Your stats</div>
+    <div style="padding:16px;font-size:32px;font-weight:700;letter-spacing:-0.03em;color:var(--ink)">Your stats</div>
     <div style="display:flex;gap:8px;padding:0 16px;margin-bottom:16px" id="statsTabs">
-      <button class="stats-tab active" data-tab="week" style="flex:1;height:36px;border-radius:8px;background:var(--bg-surface2);color:var(--text-primary);font-size:14px;font-weight:600;border:none">Week</button>
-      <button class="stats-tab" data-tab="month" style="flex:1;height:36px;border-radius:8px;background:transparent;color:var(--text-muted);font-size:14px;font-weight:600;border:none">Month</button>
-      <button class="stats-tab" data-tab="all" style="flex:1;height:36px;border-radius:8px;background:transparent;color:var(--text-muted);font-size:14px;font-weight:600;border:none">All time</button>
+      <button class="stats-tab active" data-tab="week" style="flex:1;height:36px;border-radius:8px;background:var(--surface-2);color:var(--ink);font-size:14px;font-weight:600;border:none">Week</button>
+      <button class="stats-tab" data-tab="month" style="flex:1;height:36px;border-radius:8px;background:transparent;color:var(--muted);font-size:14px;font-weight:600;border:none">Month</button>
+      <button class="stats-tab" data-tab="all" style="flex:1;height:36px;border-radius:8px;background:transparent;color:var(--muted);font-size:14px;font-weight:600;border:none">All time</button>
     </div>
     
     <div id="statsContent" style="padding:0 16px;display:flex;flex-direction:column;gap:16px;padding-bottom:120px">
@@ -41,12 +45,12 @@ export async function renderStats() {
   tabs.forEach(t => /** @type {HTMLElement} */ (t).onclick = (e) => {
     tabs.forEach(btn => {
       /** @type {HTMLElement} */ (btn).style.background = "transparent";
-      /** @type {HTMLElement} */ (btn).style.color = "var(--text-muted)";
+      /** @type {HTMLElement} */ (btn).style.color = "var(--muted)";
       btn.classList.remove("active");
     });
     const cur = /** @type {HTMLElement} */ (e.target);
-    cur.style.background = "var(--bg-surface2)";
-    cur.style.color = "var(--text-primary)";
+    cur.style.background = "var(--surface-2)";
+    cur.style.color = "var(--ink)";
     cur.classList.add("active");
     renderTab(cur.dataset.tab, logs);
   });
@@ -57,13 +61,13 @@ export async function renderStats() {
 function renderFeedbackRow() {
   return `
     <div style="padding:0 16px;margin-top:24px;margin-bottom:120px">
-      <button onclick="/** @type {any} */ (window).__mafsar_openFeedback()" style="width:100%;padding:14px;border-radius:14px;border:1px solid var(--border-control);background:transparent;display:flex;align-items:center;gap:12px;text-align:left">
-        <div style="font-size:18px;color:var(--accent-text)">??</div>
+      <button onclick="/** @type {any} */ (window).__mafsar_openFeedback()" style="width:100%;padding:14px;border-radius:14px;border:1px solid var(--border);background:transparent;display:flex;align-items:center;gap:12px;text-align:left">
+        <div style="font-size:18px;color:var(--primary)">??</div>
         <div style="flex:1;display:flex;flex-direction:column">
-          <div style="font-size:15px;font-weight:600;color:var(--text-primary)">Send feedback about the app</div>
-          <div style="font-size:13px;color:var(--text-muted)">Bugs, ideas, anything</div>
+          <div style="font-size:15px;font-weight:600;color:var(--ink)">Send feedback about the app</div>
+          <div style="font-size:13px;color:var(--muted)">Bugs, ideas, anything</div>
         </div>
-        <div style="font-size:16px;color:#6d7c78">›</div>
+        <div style="font-size:16px;color:#6d7c78">ï¿½</div>
       </button>
     </div>
   `;
@@ -79,15 +83,15 @@ function getSheetHost() {
   host.innerHTML = `
     <div class="sheet-backdrop" id="fbBackdrop"></div>
     <div class="sheet-box" style="padding:10px 22px 24px;display:flex;flex-direction:column;gap:16px;border-top-left-radius:24px;border-top-right-radius:24px">
-      <div style="font-size:20px;font-weight:650;color:var(--text-primary)">Send feedback</div>
-      <textarea id="feedbackText" placeholder="Tell us more..." rows="5" maxlength="4000" style="width:100%;border-radius:12px;border:1px solid var(--border-control);padding:12px;font-size:14px;background:var(--bg-surface)"></textarea>
+      <div style="font-size:20px;font-weight:650;color:var(--ink)">Send feedback</div>
+      <textarea id="feedbackText" placeholder="Tell us more..." rows="5" maxlength="4000" style="width:100%;border-radius:12px;border:1px solid var(--border);padding:12px;font-size:14px;background:var(--surface)"></textarea>
       
       <div id="screenshotPreview" style="display:none;position:relative;width:64px;height:64px">
         <img id="screenshotImg" style="width:64px;height:64px;object-fit:cover;border-radius:8px">
-        <button id="removeScreenshot" style="position:absolute;top:-6px;right:-6px;background:var(--bg-surface2);border-radius:50%;width:20px;height:20px;border:1px solid var(--border-control);font-size:12px;display:flex;align-items:center;justify-content:center;color:var(--text-primary)">?</button>
+        <button id="removeScreenshot" style="position:absolute;top:-6px;right:-6px;background:var(--surface-2);border-radius:50%;width:20px;height:20px;border:1px solid var(--border);font-size:12px;display:flex;align-items:center;justify-content:center;color:var(--ink)">?</button>
       </div>
       
-      <button class="btn" id="attachScreenshotBtn" style="height:36px;border-radius:12px;border:1px solid var(--border-control);background:transparent;color:var(--text-primary);font-size:14px;font-weight:500">Attach a screenshot</button>
+      <button class="btn" id="attachScreenshotBtn" style="height:36px;border-radius:12px;border:1px solid var(--border);background:transparent;color:var(--ink);font-size:14px;font-weight:500">Attach a screenshot</button>
       <input type="file" id="screenshotInput" accept="image/png,image/jpeg,image/webp" style="display:none">
       
       <button class="btn btn-primary" id="sendFeedbackBtn" disabled style="height:50px;border-radius:12px;font-size:16px;font-weight:650;margin-top:8px">Send</button>
@@ -168,7 +172,7 @@ function getSheetHost() {
       toast("Thanks, feedback sent");
       closeSheet();
     } catch(err) {
-      sendBtn.textContent = "Couldn't send • Retry";
+      sendBtn.textContent = "Couldn't send ï¿½ Retry";
       sendBtn.disabled = false;
     }
   };
@@ -193,25 +197,25 @@ function renderTab(tab, allLogs) {
   // metrics
   const revs = logs.length;
   const retCount = logs.filter(l => l.grade === 4 || l.grade === 5).length;
-  const ret = revs === 0 ? "—" : Math.round((retCount / revs) * 100) + "%";
+  const ret = revs === 0 ? "ï¿½" : Math.round((retCount / revs) * 100) + "%";
   
   const dur = logs.reduce((a, b) => a + (b.durationMs || 0), 0);
   const durMins = Math.floor(dur / 60000);
   const durStr = durMins >= 60 ? `${Math.floor(durMins/60)}h ${durMins%60}m` : `${durMins}m`;
   
   let html = `
-    <div style="display:flex;border-radius:16px;background:var(--bg-surface);border:1px solid var(--border-card);overflow:hidden">
+    <div style="display:flex;border-radius:16px;background:var(--surface);border:1px solid var(--border);overflow:hidden">
       <div style="flex:1;padding:14px;display:flex;flex-direction:column;gap:2px">
-        <div style="font-size:22px;font-weight:700;letter-spacing:-0.02em;color:var(--text-primary)">${revs}</div>
-        <div style="font-size:13px;color:var(--text-muted)">Reviews</div>
+        <div style="font-size:22px;font-weight:700;letter-spacing:-0.02em;color:var(--ink)">${revs}</div>
+        <div style="font-size:13px;color:var(--muted)">Reviews</div>
       </div>
-      <div style="flex:1;padding:14px;display:flex;flex-direction:column;gap:2px;border-left:1px solid var(--border-card)">
-        <div style="font-size:22px;font-weight:700;letter-spacing:-0.02em;color:var(--text-primary)">${ret}</div>
-        <div style="font-size:13px;color:var(--text-muted)">Retention</div>
+      <div style="flex:1;padding:14px;display:flex;flex-direction:column;gap:2px;border-left:1px solid var(--border)">
+        <div style="font-size:22px;font-weight:700;letter-spacing:-0.02em;color:var(--ink)">${ret}</div>
+        <div style="font-size:13px;color:var(--muted)">Retention</div>
       </div>
-      <div style="flex:1;padding:14px;display:flex;flex-direction:column;gap:2px;border-left:1px solid var(--border-card)">
-        <div style="font-size:22px;font-weight:700;letter-spacing:-0.02em;color:var(--text-primary)">${durStr}</div>
-        <div style="font-size:13px;color:var(--text-muted)">Studied</div>
+      <div style="flex:1;padding:14px;display:flex;flex-direction:column;gap:2px;border-left:1px solid var(--border)">
+        <div style="font-size:22px;font-weight:700;letter-spacing:-0.02em;color:var(--ink)">${durStr}</div>
+        <div style="font-size:13px;color:var(--muted)">Studied</div>
       </div>
     </div>
   `;
@@ -308,16 +312,16 @@ export function renderChart(logs, tab) {
   const max = Math.max(1, ...buckets.map(b => b.count));
   
   let html = `
-    <div style="padding:16px;border-radius:16px;background:var(--bg-surface);border:1px solid var(--border-card);display:flex;flex-direction:column;gap:14px">
-      <div style="font-size:12px;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.05em">${title}</div>
+    <div style="padding:16px;border-radius:16px;background:var(--surface);border:1px solid var(--border);display:flex;flex-direction:column;gap:14px">
+      <div style="font-size:12px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:0.05em">${title}</div>
       <div style="height:128px;display:flex;align-items:flex-end;gap:8px" role="img" aria-label="Chart of ${title}">
   `;
   
   for (const b of buckets) {
     const height = Math.max(4, (b.count / max) * 84);
-    const color = b.count === 0 ? "var(--chart-zero, #1e2826)" : b.isCur ? "var(--accent, #34bcad)" : "var(--chart-bar, #2c4a46)";
-    const lblColor = b.isCur ? "var(--accent-text)" : "var(--text-faint, #6d7c78)";
-    const valColor = b.isCur ? "var(--accent-text)" : "var(--text-muted)";
+    const color = b.count === 0 ? "var(--surface-2, #1e2826)" : b.isCur ? "var(--primary, #34bcad)" : "var(--primary, #2c4a46)";
+    const lblColor = b.isCur ? "var(--primary)" : "var(--faint, #6d7c78)";
+    const valColor = b.isCur ? "var(--primary)" : "var(--muted)";
     const valStr = b.count > 0 ? `<div style="font-size:11px;font-weight:600;color:${valColor}">${b.count}</div>` : `<div style="height:14px"></div>`;
     const fw = b.isCur ? "700" : "500";
     
@@ -354,28 +358,28 @@ export function renderAllCards(cards) {
   const pMast = (mast / total) * 100;
   
   return `
-    <div style="padding:16px;border-radius:16px;background:var(--bg-surface);border:1px solid var(--border-card);display:flex;flex-direction:column;gap:10px">
-      <div style="font-size:12px;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.05em">All cards</div>
+    <div style="padding:16px;border-radius:16px;background:var(--surface);border:1px solid var(--border);display:flex;flex-direction:column;gap:10px">
+      <div style="font-size:12px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:0.05em">All cards</div>
       
-      <div style="display:flex;height:8px;border-radius:4px;overflow:hidden;background:var(--bg-surface2)">
-        <div style="width:${pNew}%;background:var(--status-new)"></div>
-        <div style="width:${pLearn}%;background:var(--status-learning)"></div>
-        <div style="width:${pDue}%;background:var(--status-due)"></div>
-        <div style="width:${pMast}%;background:var(--status-mastered)"></div>
+      <div style="display:flex;height:8px;border-radius:4px;overflow:hidden;background:var(--surface-2)">
+        <div style="width:${pNew}%;background:var(--faint)"></div>
+        <div style="width:${pLearn}%;background:var(--warm)"></div>
+        <div style="width:${pDue}%;background:var(--danger)"></div>
+        <div style="width:${pMast}%;background:var(--success)"></div>
       </div>
       
-      <div style="display:flex;flex-wrap:wrap;gap:12px;font-size:13px;color:var(--text-secondary)">
-        <div style="display:flex;align-items:center;gap:6px"><span style="color:var(--status-new)">?</span> New: ${newC}</div>
-        <div style="display:flex;align-items:center;gap:6px"><span style="color:var(--status-learning)">?</span> Learning: ${learn}</div>
-        <div style="display:flex;align-items:center;gap:6px"><span style="color:var(--status-due)">?</span> To review: ${due}</div>
-        <div style="display:flex;align-items:center;gap:6px"><span style="color:var(--status-mastered)">?</span> Mastered: ${mast}</div>
+      <div style="display:flex;flex-wrap:wrap;gap:12px;font-size:13px;color:var(--muted)">
+        <div style="display:flex;align-items:center;gap:6px"><span style="color:var(--faint)">?</span> New: ${newC}</div>
+        <div style="display:flex;align-items:center;gap:6px"><span style="color:var(--warm)">?</span> Learning: ${learn}</div>
+        <div style="display:flex;align-items:center;gap:6px"><span style="color:var(--danger)">?</span> To review: ${due}</div>
+        <div style="display:flex;align-items:center;gap:6px"><span style="color:var(--success)">?</span> Mastered: ${mast}</div>
       </div>
     </div>
   `;
 }
 
 export function renderFeedback(logs, cards, sets, allLogs) {
-  let html = `<div style="font-size:12px;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.05em;margin-top:8px">FEEDBACK</div>`;
+  let html = `<div style="font-size:12px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:0.05em;margin-top:8px">FEEDBACK</div>`;
   
   let insights = [];
   
@@ -388,7 +392,7 @@ export function renderFeedback(logs, cards, sets, allLogs) {
     const k = Math.min(backlogDue, Math.floor(15 * 60 / 22));
     insights.push({
       priority: 1,
-      dot: "var(--status-learning, #ffb300)",
+      dot: "var(--warm, #ffb300)",
       title: "Your backlog is growing",
       body: `${backlogDue} cards are overdue. A 15-minute session today clears ${k}.`,
       action: "Start 15 min"
@@ -428,7 +432,7 @@ export function renderFeedback(logs, cards, sets, allLogs) {
     const modeTip = codeHeuristic ? "Typing answers makes you recall, not just recognise." : "A short review today brings it back.";
     insights.push({
       priority: 2,
-      dot: "var(--status-learning, #ffb300)",
+      dot: "var(--warm, #ffb300)",
       title: `${slipping.name} is slipping`,
       body: `Retention ${Math.round((slipping.ret / slipping.revs) * 100)}%, the lowest of your sets. ${modeTip}`,
       action: `Review with ${modeStr}`
@@ -449,7 +453,7 @@ export function renderFeedback(logs, cards, sets, allLogs) {
   if (streak >= 3 && !studiedToday && now.getHours() >= 18) {
     insights.push({
       priority: 3,
-      dot: "var(--status-learning, #ffb300)",
+      dot: "var(--warm, #ffb300)",
       title: `Keep your ${streak}-day streak`,
       body: "You haven't studied today. A few cards before midnight keeps it going."
     });
@@ -485,7 +489,7 @@ export function renderFeedback(logs, cards, sets, allLogs) {
       const bodies = { morn: "before noon", aft: "in the afternoon", eve: "after 6 pm" };
       insights.push({
         priority: 4,
-        dot: "var(--status-mastered, #4caf50)",
+        dot: "var(--success, #4caf50)",
         title: `${names[bestK]} work for you`,
         body: `You recall ${Math.round(bestRet - otherAvg)}% more in sessions ${bodies[bestK]}.`
       });
@@ -496,13 +500,13 @@ export function renderFeedback(logs, cards, sets, allLogs) {
   insights = insights.slice(0, 3);
   
   for (const i of insights) {
-    let act = i.action ? `<button class="btn" style="height:36px;margin-left:18px;border:1px solid var(--border-control);border-radius:8px;background:transparent;color:var(--accent-text);font-size:14px;font-weight:600">${i.action}</button>` : "";
+    let act = i.action ? `<button class="btn" style="height:36px;margin-left:18px;border:1px solid var(--border);border-radius:8px;background:transparent;color:var(--primary);font-size:14px;font-weight:600">${i.action}</button>` : "";
     html += `
-      <div style="padding:16px;border-radius:16px;background:var(--bg-surface);border:1px solid var(--border-card);display:flex;align-items:flex-start;gap:10px">
+      <div style="padding:16px;border-radius:16px;background:var(--surface);border:1px solid var(--border);display:flex;align-items:flex-start;gap:10px">
         <div style="width:8px;height:8px;border-radius:50%;background:${i.dot};margin-top:6px;flex-shrink:0"></div>
         <div style="display:flex;flex-direction:column;gap:4px;flex:1">
-          <div style="font-size:15px;font-weight:600;color:var(--text-primary)">${i.title}</div>
-          <div style="font-size:14px;line-height:1.45;color:var(--text-body2)">${i.body}</div>
+          <div style="font-size:15px;font-weight:600;color:var(--ink)">${i.title}</div>
+          <div style="font-size:14px;line-height:1.45;color:var(--muted)">${i.body}</div>
           ${act}
         </div>
       </div>

@@ -64,9 +64,9 @@ export async function renderGlobal() {
     setHTML(app, `
       <div class="view">
         ${globalHeader("discover")}
-        <div class="block" style="padding:16px;text-align:center;border-radius:var(--r-md);background:var(--bg-sheet);border:1px solid var(--border-card)">
-          <div style="font-size:20px;font-weight:650;color:var(--text-primary);margin-bottom:4px">Sign in to discover sets</div>
-          <div style="font-size:14px;color:var(--text-secondary);line-height:1.4">See sets other learners made, picked for what you study.</div>
+        <div class="block" style="padding:16px;text-align:center;border-radius:var(--r-md);background:var(--surface);border:1px solid var(--border)">
+          <div style="font-size:20px;font-weight:650;color:var(--ink);margin-bottom:4px">Sign in to discover sets</div>
+          <div style="font-size:14px;color:var(--muted);line-height:1.4">See sets other learners made, picked for what you study.</div>
           <button class="btn btn-outline" style="margin-top:16px" data-action="nav-you">Sign in</button>
         </div>
       </div>`);
@@ -161,7 +161,7 @@ async function loadMore(isFirstPage) {
       if (offlineCache && offlineCache.tab === currentTab) {
         paintGlobal(offlineCache.data, true);
       } else {
-        setHTML(slot, `<div class="empty" style="text-align:center;color:var(--text-muted);font-size:14px;margin-top:20px">Discover needs a connection.</div>`);
+        setHTML(slot, `<div class="empty" style="text-align:center;color:var(--muted);font-size:14px;margin-top:20px">Discover needs a connection.</div>`);
       }
     } else {
       const loader = document.getElementById("globalLoading");
@@ -193,14 +193,14 @@ function paintGlobal(sets, isOffline) {
   
   if (sets.length === 0) {
     if (currentQ) {
-      setHTML(slot, `<div style="text-align:center;font-size:14px;color:var(--text-muted);margin-top:20px">No global sets match "${esc(currentQ)}".</div>`);
+      setHTML(slot, `<div style="text-align:center;font-size:14px;color:var(--muted);margin-top:20px">No global sets match "${esc(currentQ)}".</div>`);
     } else {
-      setHTML(slot, `<div style="text-align:center;font-size:14px;color:var(--text-muted);margin-top:20px">No shared sets yet. Make one of yours global from its \u2022\u2022\u2022 menu.</div>`);
+      setHTML(slot, `<div style="text-align:center;font-size:14px;color:var(--muted);margin-top:20px">No shared sets yet. Make one of yours global from its \u2022\u2022\u2022 menu.</div>`);
     }
     return;
   }
   
-  let html = isOffline ? `<div style="font-size:13px;color:var(--text-muted);margin-bottom:8px">You're offline. Showing sets from earlier.</div>` : "";
+  let html = isOffline ? `<div style="font-size:13px;color:var(--muted);margin-bottom:8px">You're offline. Showing sets from earlier.</div>` : "";
   
   html += sets.map(s => {
     let meta = `by ${esc(s.authorName)} \u2022 ${s.cardCount} cards`;
@@ -211,7 +211,7 @@ function paintGlobal(sets, isOffline) {
     let rightCol = "";
     if (s.added) {
       rightCol = `
-        <div style="display:flex;align-items:center;gap:4px;color:var(--accent-text);font-size:14px">
+        <div style="display:flex;align-items:center;gap:4px;color:var(--primary);font-size:14px">
           <svg class="ic" viewBox="0 0 24 24" style="width:14px;height:14px;stroke:currentColor"><path d="M20 6L9 17l-5-5"/></svg>
           <span style="font-weight:600;font-size:13px">Added</span>
         </div>`;
@@ -219,21 +219,21 @@ function paintGlobal(sets, isOffline) {
       const avgStr = s.ratingAvg.toFixed(1);
       rightCol = `
         <div style="display:flex;flex-direction:column;align-items:flex-end">
-          <div style="display:flex;align-items:center;gap:4px;color:var(--text-primary);font-size:15px;font-weight:700">
+          <div style="display:flex;align-items:center;gap:4px;color:var(--ink);font-size:15px;font-weight:700">
             <svg class="ic" viewBox="0 0 24 24" style="fill:currentColor;stroke:none;width:13px;height:13px"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>
             ${avgStr}
           </div>
-          <div style="font-size:11px;color:var(--text-muted)">${fmtNum(s.ratingCount)}</div>
+          <div style="font-size:11px;color:var(--muted)">${fmtNum(s.ratingCount)}</div>
         </div>`;
     } else {
-      rightCol = `<div style="font-size:13px;font-weight:600;color:var(--text-muted)">New</div>`;
+      rightCol = `<div style="font-size:13px;font-weight:600;color:var(--muted)">New</div>`;
     }
     
     return `
       <div class="block interactive" data-action="global-preview" data-idx="${sets.indexOf(s)}" style="display:flex;justify-content:space-between;align-items:center;padding:12px 14px">
         <div style="display:flex;flex-direction:column;gap:4px">
-          <div style="font-weight:650;color:var(--text-primary);font-size:16px">${esc(s.title)}</div>
-          <div style="font-size:13px;color:var(--text-muted)">${meta}</div>
+          <div style="font-weight:650;color:var(--ink);font-size:16px">${esc(s.title)}</div>
+          <div style="font-size:13px;color:var(--muted)">${meta}</div>
         </div>
         ${rightCol}
       </div>`;
@@ -259,21 +259,21 @@ export async function openGlobalPreview(btn) {
   const starsHtml = Array.from({length: 5}).map((_, i) => {
     const fill = s.ratingCount > 0 && i < Math.round(s.ratingAvg) ? "currentColor" : "none";
     const stroke = fill === "none" ? "currentColor" : "none";
-    return `<svg viewBox="0 0 24 24" style="width:18px;height:18px;fill:${fill};stroke:${stroke};color:var(--text-muted)"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>`;
+    return `<svg viewBox="0 0 24 24" style="width:18px;height:18px;fill:${fill};stroke:${stroke};color:var(--muted)"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>`;
   }).join("");
   
   let ratingRow = `<div style="display:flex;align-items:center;gap:8px">
     <div style="display:flex;gap:2px">${starsHtml}</div>
-    ${s.ratingCount > 0 ? `<div style="font-size:14px;font-weight:600">${avgStr}</div><div style="font-size:13px;color:var(--text-muted)">\u2022 ${s.ratingCount.toLocaleString()} ratings</div>` : `<div style="font-size:13px;color:var(--text-muted)">No ratings yet</div>`}
+    ${s.ratingCount > 0 ? `<div style="font-size:14px;font-weight:600">${avgStr}</div><div style="font-size:13px;color:var(--muted)">\u2022 ${s.ratingCount.toLocaleString()} ratings</div>` : `<div style="font-size:13px;color:var(--muted)">No ratings yet</div>`}
   </div>`;
   
   let reasonCallout = "";
   if (s.reasonSetTitle) {
-    reasonCallout = `<div style="padding:12px 14px;border-radius:12px;background:var(--bg-surface2);font-size:14px;color:var(--text-secondary)">Picked because you study <b>${esc(s.reasonSetTitle)}</b></div>`;
+    reasonCallout = `<div style="padding:12px 14px;border-radius:12px;background:var(--surface-2);font-size:14px;color:var(--muted)">Picked because you study <b>${esc(s.reasonSetTitle)}</b></div>`;
   }
   
   let btnHtml = s.added ? 
-    `<button class="btn" style="height:52px;border-radius:14px;background:var(--bg-surface2);border:1px solid var(--border-hover);color:var(--accent-text);font-size:16px;font-weight:650;width:100%" data-action="global-open-added" data-id="${s.id}">
+    `<button class="btn" style="height:52px;border-radius:14px;background:var(--surface-2);border:1px solid var(--primary);color:var(--primary);font-size:16px;font-weight:650;width:100%" data-action="global-open-added" data-id="${s.id}">
       <svg class="ic" viewBox="0 0 24 24" style="stroke:currentColor"><path d="M20 6L9 17l-5-5"/></svg> Added - Open set
     </button>` :
     `<button class="btn btn-primary" style="height:52px;border-radius:14px;font-size:16px;font-weight:650;width:100%" data-action="global-add-set" data-id="${s.id}" data-idx="${idx}">
@@ -283,22 +283,22 @@ export async function openGlobalPreview(btn) {
   const html = `
     <div style="padding:10px 20px 24px;display:flex;flex-direction:column;gap:16px">
       <div style="display:flex;align-items:center;gap:14px">
-        <div style="width:48px;height:48px;border-radius:12px;background:var(--bg-surface2);display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:700">${srcLbl}</div>
+        <div style="width:48px;height:48px;border-radius:12px;background:var(--surface-2);display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:700">${srcLbl}</div>
         <div style="display:flex;flex-direction:column;gap:4px">
           <div style="font-size:20px;font-weight:650;line-height:1.2">${title}</div>
-          <div style="font-size:13px;color:var(--text-muted)">by ${author} \u2022 ${s.cardCount} cards</div>
+          <div style="font-size:13px;color:var(--muted)">by ${author} \u2022 ${s.cardCount} cards</div>
         </div>
       </div>
       
       ${ratingRow}
       ${reasonCallout}
       
-      <div style="font-size:12px;font-weight:700;color:var(--text-muted);letter-spacing:0.5px">SAMPLE CARDS</div>
+      <div style="font-size:12px;font-weight:700;color:var(--muted);letter-spacing:0.5px">SAMPLE CARDS</div>
       <div id="globalSampleCards"><div class="skeleton" style="height:40px"></div></div>
       
       ${btnHtml}
       
-      <button class="btn btn-text" style="font-size:13px;color:var(--text-muted);height:32px;margin:0 auto" data-action="global-report" data-id="${s.id}">Report this set</button>
+      <button class="btn btn-text" style="font-size:13px;color:var(--muted);height:32px;margin:0 auto" data-action="global-report" data-id="${s.id}">Report this set</button>
     </div>
   `;
   
@@ -310,8 +310,8 @@ export async function openGlobalPreview(btn) {
     const slot = document.getElementById("globalSampleCards");
     if (slot && res.cards) {
       const cards = res.cards.slice(0,3).map(c => `
-        <div style="padding:10px 0;border-bottom:1px solid var(--border-divider);display:flex;align-items:center;gap:8px">
-          <div style="width:8px;height:8px;border-radius:50%;background:var(--status-new)"></div>
+        <div style="padding:10px 0;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:8px">
+          <div style="width:8px;height:8px;border-radius:50%;background:var(--faint)"></div>
           <div style="font-size:15px">${esc(c.front)}</div>
         </div>
       `).join("");
@@ -335,7 +335,7 @@ export async function addGlobalSet(btn) {
     
     globalSets[idx].added = true;
     const s = globalSets[idx];
-    const newBtn = `<button class="btn" style="height:52px;border-radius:14px;background:var(--bg-surface2);border:1px solid var(--border-hover);color:var(--accent-text);font-size:16px;font-weight:650;width:100%" data-action="global-open-added" data-id="${addRes.id || s.id}">
+    const newBtn = `<button class="btn" style="height:52px;border-radius:14px;background:var(--surface-2);border:1px solid var(--primary);color:var(--primary);font-size:16px;font-weight:650;width:100%" data-action="global-open-added" data-id="${addRes.id || s.id}">
       <svg class="ic" viewBox="0 0 24 24" style="stroke:currentColor"><path d="M20 6L9 17l-5-5"/></svg> Added - Open set
     </button>`;
     btn.outerHTML = newBtn;

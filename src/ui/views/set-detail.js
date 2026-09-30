@@ -6,6 +6,7 @@ import { isDue, masteryOf, review } from "../../../shared/srs.js";
 import { quizLengths } from ".././quiz-lengths.js";
 import { shuffled, startQuiz } from "../flows/quiz.js";
 import { shareBlockHtml } from "../share.js";
+import { getRating, renderStarsGroup } from "../../storage/ratings.js";
 import { syncNow } from "../../sync/sync.js";
 import { addCard, updateCard } from "../../storage/store.js";
 import { confirmSheet } from "../confirm.js";
@@ -93,16 +94,25 @@ export function paintDetail() {
         <div class="m mast"><div class="v tnum">${s.mastered}</div><div class="k">Mastered</div></div>
       </div>
       <div class="help" style="margin:0">New → <b>Learning</b> after one correct review → <b>Mastered</b> once it is on a 6+ day interval (about a week of good grades). <i>Again</i> brings a card back later in this session and resets its schedule.</div>
-      ${editForm}
+      
       <div class="block" style="padding:6px 14px">
         ${
           studySet.flashcards.length
             ? studySet.flashcards
                 .map((c) => {
-                  // Link cards belong to a chain: editing one here would be
-                  // overwritten on the next regeneration, so they're read-only.
+                  if (c.id === editingCardId) {
+                    return `<div class="block editcard" style="margin: 8px 0;">
+                       <div class="field"><label>Front</label><textarea id="editFront" rows="2">${esc(c.front || "")}</textarea></div>
+                       <div class="field"><label>Back</label><textarea id="editBack" rows="3">${esc(c.back || "")}</textarea></div>
+                       <div style="display:flex;gap:10px">
+                         <button class="btn btn-ghost" style="flex:1" data-action="edit-cancel">Cancel</button>
+                         <button class="btn btn-primary" id="editSaveBtn" style="flex:1" data-action="edit-save" data-id="${esc(c.id)}">Save</button>
+                       </div>
+                     </div>`;
+                  }
                   const fromChain = isLinkCard(c);
-                  return `<div class="cardrow" data-card-id="${esc(c.id)}"><span class="sdot ${masteryOf(c)}"></span><span class="q">${esc(c.front)}</span><span class="due">${
+                  const opacity = editingCardId ? "0.4" : "1";
+                  return `<div class="cardrow" style="opacity: ${opacity}" data-card-id="${esc(c.id)}"><span class="sdot ${masteryOf(c)}"></span><span class="q">${esc(c.front)}</span><span class="due">${
                       isDue(c) ? "Due now" : timeUntil(c.dueDate)
                     }</span>
                      <span class="rowbtns">${
@@ -261,6 +271,7 @@ export function paintDetail() {
         }
       </div>
       <div><div class="h-title" style="line-height:1.25">${esc(session.title || "Untitled")}</div>
+        ${renderStarsGroup(studySet.originSetId || session.id, session.id, getRating(studySet.originSetId || session.id), false)}
         <div style="display:flex;gap:6px;margin-top:8px"><span class="tag dot" style="color:var(--primary)">${esc(sourceLabel(session))}</span></div>
       </div>
       <div id="shareOut">${shareOpenFor === session.id ? shareBlockHtml(studySet) : ""}</div>
@@ -374,7 +385,14 @@ export async function generateSummary(sessionId) {
 export function openDetailTab(tab) { renderSetDetail(detail.session.id, tab); }
 export function startQuizForCurrentSet(n) { startQuiz(detail.studySet, "set:" + detail.session.id, n); }
 export function currentDetail() { return detail; }
-export function setEditingCardId(v) { editingCardId = v; }
+export function setEditingCardId(v) { 
+  editingCardId = v;
+  const dock = document.getElementById("captureDock");
+  if (dock) {
+    if (v) dock.classList.add("hidden");
+    else dock.classList.remove("hidden");
+  }
+}
 
 /** Open or close the set's "More" menu (Regenerate, Delete set). */
 export function toggleSetMenu(btn) {
@@ -476,11 +494,11 @@ function getGlobalMenuItem(session, studySet, auth) {
   }
   
   if (!auth || !auth.accessToken) {
-    return `<button type="button" class="menu-item" role="menuitem" data-action="nav-you" style="color:var(--muted)">Publish (needs sign-in)</button>`;
+    return `<button type="button" class="menu-item" role="menuitem" data-action="nav-you" style="color:var(--muted)">Make it global (needs sign-in)</button>`;
   }
   
   const src = session.source;
-  if (src === "quizlet" || src === "anki" || src === "shared" || src === "global") {
+  if (src === "quizlet" || src === "anki" || src === "shared" || src === "global" || studySet.originSetId) {
     return `<button type="button" class="menu-item" role="menuitem" disabled style="color:var(--muted)" title="Only sets you created can be published">Publish (not author)</button>`;
   }
   
@@ -490,4 +508,24 @@ function getGlobalMenuItem(session, studySet, auth) {
   }
   
   return `<button type="button" class="menu-item" role="menuitem" data-action="global-publish" data-id="${esc(session.id)}">Make it global</button>`;
+}
+
+export async function publishGlobalSet(id) {
+  try {
+    const res = await send({ type: "GLOBAL_PUBLISH", setId: id });
+    if (res.error) throw new Error(res.error);
+    await renderSetDetail(id, detail.tab);
+  } catch (e) {
+    alert(e.message);
+  }
+}
+
+export async function unpublishGlobalSet(id) {
+  try {
+    const res = await send({ type: "GLOBAL_UNPUBLISH", setId: id });
+    if (res.error) throw new Error(res.error);
+    await renderSetDetail(id, detail.tab);
+  } catch (e) {
+    alert(e.message);
+  }
 }
