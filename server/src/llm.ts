@@ -29,7 +29,7 @@ interface Req {
 }
 interface Provider {
   defaultModel: string;
-  buildRequest(o: { apiKey: string; model: string; system: string; user: string }): Req;
+  buildRequest(o: { apiKey: string; model: string; system: string; user: string; maxTokens?: number }): Req;
   extractText(d: any): string;
   extractError(d: any, status: number): string;
 }
@@ -53,7 +53,7 @@ const MAX_ITEMS = Number(process.env.LLM_MAX_ITEMS) || 15;
 const PROVIDERS: Record<string, Provider> = {
   gemini: {
     defaultModel: "gemini-2.0-flash",
-    buildRequest({ apiKey, model, system, user }) {
+    buildRequest({ apiKey, model, system, user, maxTokens }) {
       return {
         url: `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent`,
         headers: { "content-type": "application/json", "x-goog-api-key": apiKey },
@@ -63,7 +63,7 @@ const PROVIDERS: Record<string, Provider> = {
           generationConfig: {
             temperature: 0.4,
             responseMimeType: "application/json",
-            maxOutputTokens: MAX_OUTPUT_TOKENS,
+            maxOutputTokens: maxTokens ?? MAX_OUTPUT_TOKENS,
           },
         },
       };
@@ -75,7 +75,7 @@ const PROVIDERS: Record<string, Provider> = {
     // llama-3.3-70b-versatile was decommissioned 2026-08-16; Groq's stated
     // replacement. Override per-deployment with LLM_MODEL.
     defaultModel: "openai/gpt-oss-120b",
-    buildRequest({ apiKey, model, system, user }) {
+    buildRequest({ apiKey, model, system, user, maxTokens }) {
       return {
         url: "https://api.groq.com/openai/v1/chat/completions",
         headers: { "content-type": "application/json", authorization: `Bearer ${apiKey}` },
@@ -106,7 +106,7 @@ const PROVIDERS: Record<string, Provider> = {
     // response_format stays on regardless: several candidates prefix a
     // "Thinking Process:" monologue without it and never close the JSON.
     defaultModel: "google/gemini-3.5-flash-lite",
-    buildRequest({ apiKey, model, system, user }) {
+    buildRequest({ apiKey, model, system, user, maxTokens }) {
       return {
         url: "https://openrouter.ai/api/v1/chat/completions",
         headers: {
@@ -119,7 +119,7 @@ const PROVIDERS: Record<string, Provider> = {
         body: {
           model,
           temperature: 0.4,
-          max_tokens: MAX_OUTPUT_TOKENS,
+          max_tokens: maxTokens ?? MAX_OUTPUT_TOKENS,
           response_format: { type: "json_object" },
           messages: [
             { role: "system", content: system },
@@ -133,7 +133,7 @@ const PROVIDERS: Record<string, Provider> = {
   },
   anthropic: {
     defaultModel: "claude-sonnet-5",
-    buildRequest({ apiKey, model, system, user }) {
+    buildRequest({ apiKey, model, system, user, maxTokens }) {
       return {
         url: "https://api.anthropic.com/v1/messages",
         headers: {
@@ -141,7 +141,7 @@ const PROVIDERS: Record<string, Provider> = {
           "x-api-key": apiKey,
           "anthropic-version": "2023-06-01",
         },
-        body: { model, max_tokens: MAX_OUTPUT_TOKENS, system, messages: [{ role: "user", content: user }] },
+        body: { model, max_tokens: maxTokens ?? MAX_OUTPUT_TOKENS, system, messages: [{ role: "user", content: user }] },
       };
     },
     extractText: (d) => (d?.content || []).filter((b: any) => b.type === "text").map((b: any) => b.text).join(""),
@@ -149,13 +149,13 @@ const PROVIDERS: Record<string, Provider> = {
   },
 };
 
-async function callLLM(system: string, user: string): Promise<string> {
+async function callLLM(system: string, user: string, maxTokens?: number): Promise<string> {
   const providerName = process.env.LLM_PROVIDER || "gemini";
   const provider = PROVIDERS[providerName] || PROVIDERS.gemini;
   const apiKey = process.env.LLM_API_KEY;
   if (!apiKey) throw new LLMError("Server LLM key not configured (set LLM_API_KEY).", 503);
   const model = process.env.LLM_MODEL || provider.defaultModel;
-  const req = provider.buildRequest({ apiKey, model, system, user });
+  const req = provider.buildRequest({ apiKey, model, system, user, maxTokens });
   const res = await fetch(req.url, {
     method: "POST",
     headers: req.headers,
@@ -310,10 +310,10 @@ export function extractJson(raw: string): any {
   return JSON.parse(candidate.slice(start, end + 1));
 }
 
-export async function callJson(system: string, user: string): Promise<any> {
+export async function callJson(system: string, user: string, maxTokens?: number): Promise<any> {
   let lastErr: unknown;
   for (let attempt = 0; attempt < 2; attempt++) {
-    const raw = await callLLM(system, user);
+    const raw = await callLLM(system, user, maxTokens);
     try {
       return extractJson(raw);
     } catch (e) {
@@ -902,4 +902,14 @@ export async function gradeBottleneckAnswer(state: string, answer: string, usedH
     why_it_fails: s.why_it_fails,
     model_solution: s.model_solution,
   };
+}
+
+export async function cleanSetTitle(title: string): Promise<string> {
+  try {
+    const res = await callJson("Review this flashcard set title for safety and clarity. If it contains PII, extreme profanity, or spam, return { \"safe\": false, \"clean\": \"\" }. Otherwise, return { \"safe\": true, \"clean\": \"<a clean, readable version of the title, fixing ALL CAPS, removing emojis and 'my set'>\" }.", title);
+    if (!res.safe) return "UNSAFE";
+    return res.clean;
+  } catch(e) {
+    throw e;
+  }
 }

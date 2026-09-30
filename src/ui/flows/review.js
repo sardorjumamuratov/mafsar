@@ -1,3 +1,4 @@
+let cardStartMs = 0;
 import { showChrome } from "../nav.js";
 import { byDue, isDue, review } from "../../../shared/srs.js";
 import { XBTN, app, bundle, esc, replaceHTML, setFor, setHTML, toast } from "../core.js";
@@ -35,6 +36,7 @@ export function gradePreview(card, g, examDate) {
 }
 
 export function paintReviewCard() {
+  cardStartMs = Date.now();
   if (qIdx >= queue.length) return paintReviewDone();
   const { card } = queue[qIdx];
   setHTML(app, `
@@ -76,6 +78,7 @@ export async function gradeCard(g) {
     appendReviewLog({ kind: "flashcard", stability: upd.stability, difficulty: upd.difficulty, 
       id: uid(), cardId: item.card.id, sessionId: item.sessionId, grade: g,
       prevInterval, newInterval: upd.interval, reviewedAt: new Date().toISOString(),
+      durationMs: Math.min(10 * 60 * 1000, Date.now() - cardStartMs)
     }),
   ]);
   reviewedIds.add(item.card.id);

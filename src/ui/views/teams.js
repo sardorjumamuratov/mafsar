@@ -1,3 +1,4 @@
+import { globalHeader } from "./global.js";
 import { setNav, showChrome } from "../nav.js";
 import { getAuth } from "../../sync/auth.js";
 import { app, esc, nav, send, setHTML, toast, topOfView } from "../core.js";
@@ -24,7 +25,7 @@ export async function renderTeams() {
   if (!auth?.accessToken) {
     setHTML(app, `
       <div class="view">
-        <div class="ahd"><div class="h-title">Teams</div></div>
+        ${globalHeader("teams")}
         <div class="block tint" style="text-align:center">
           <div style="font-size:26px">👥</div>
           <div style="font-weight:650;margin-top:6px">Teams need an account</div>
@@ -50,7 +51,7 @@ export async function renderTeams() {
 
   setHTML(app, `
     <div class="view teams-view">
-      <div class="ahd"><div class="h-title">Teams</div></div>
+      ${globalHeader("teams")}
       <div class="help" style="margin:0">A team is a study group with a shared code: everyone joins, then the leaderboard compares mastered cards.</div>
       <div id="teamsSlot">${teamsSkeleton()}</div>
 ${teamActionsBlock}

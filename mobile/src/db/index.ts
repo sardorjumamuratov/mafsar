@@ -88,6 +88,21 @@ export async function initDB() {
       dirty INTEGER NOT NULL DEFAULT 0
     );
   `);
+  
+  const dbVersion = await db.getFirstAsync<{ value: string }>("SELECT value FROM meta WHERE key = 'version'");
+  const currentVersion = parseInt(dbVersion?.value || "1", 10);
+  if (currentVersion < 2) {
+    await db.execAsync(`
+      ALTER TABLE sets ADD COLUMN description TEXT;
+      ALTER TABLE sets ADD COLUMN origin_set_id TEXT;
+      ALTER TABLE sets ADD COLUMN renamed INTEGER NOT NULL DEFAULT 0;
+      ALTER TABLE cards ADD COLUMN origin_card_id TEXT;
+      ALTER TABLE cards ADD COLUMN detached INTEGER NOT NULL DEFAULT 0;
+      ALTER TABLE review_log ADD COLUMN duration_ms INTEGER;
+    `);
+    await db.execAsync("INSERT OR REPLACE INTO meta (key, value) VALUES ('version', '2')");
+  }
+
   return db;
 }
 

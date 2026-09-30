@@ -1,3 +1,9 @@
+import { createDiscoverApp } from "./discover.js";
+import { createRatingsApp } from "./ratings.js";
+import { createAdminApp } from "./admin.js";
+import { bumpCatalogue } from "./discover.js";
+import { randomUUID } from "crypto";
+
 import { bodyLimit } from "hono/body-limit";
 import { MAX_PDF_BYTES, extractPdfText } from "./pdf.js";
 import { Hono } from "hono";
@@ -62,6 +68,39 @@ export function createApp(db: DB) {
   };
 
   // Public — required by the Chrome Web Store / Firefox Add-ons listings.
+  
+  app.route("/v1", createRatingsApp(db));
+  app.route("/v1/discover", createDiscoverApp(db));
+  app.route("/v1/admin", createAdminApp(db));
+  
+
+
+const unauthFeedbackLimiter = limitByIp(slidingWindow({ limit: 5, windowMs: 60 * 60 * 1000 }), (c) => clientIp(c.req.raw.headers));
+const authFeedbackLimiter = limitByUser(slidingWindow({ limit: 20, windowMs: 24 * 60 * 60 * 1000 }));
+
+app.post("/v1/feedback", async (c, next) => {
+  const userId = c.get("userId");
+  if (userId) return authFeedbackLimiter(c, next);
+  return unauthFeedbackLimiter(c, next);
+}, async (c) => {
+  const body = await c.req.json().catch(() => null);
+  if (!body) return c.json({ error: "invalid_body" }, 400);
+  
+  if (c.req.header("content-length") && parseInt(c.req.header("content-length")!) > 2 * 1024 * 1024) {
+    return c.json({ error: "too_large" }, 413);
+  }
+
+  const { text, image, appVersion, platform, route } = body;
+  if (!text || typeof text !== "string") return c.json({ error: "missing_text" }, 400);
+  
+  const userId = c.get("userId");
+    
+  await run(db, 
+    "INSERT INTO feedback (id, user_id, text, image_data, app_version, platform, route, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+    [randomUUID(), userId || null, text, image || null, appVersion || null, platform || null, route || null, new Date().toISOString()]
+  );
+  return c.json({ ok: true });
+});
   app.get("/privacy", (c) => c.html(PRIVACY_HTML));
 
   // Serve landing page and its assets
@@ -799,6 +838,33 @@ export function createApp(db: DB) {
   });
 
   // --- Phase 5: payments + notifications — TODO ---
+
+  
+const reportLimiter = limitByUser(slidingWindow({ limit: 10, windowMs: 24 * 3600 * 1000 }));
+app.post("/v1/sets/:rootId/report", reportLimiter, async (c) => {
+  const userId = c.get("userId");
+  const rootId = c.req.param("rootId");
+  const { reason, note } = await c.req.json();
+  
+  
+  
+  
+  
+  
+  try {
+    await run(db, "INSERT INTO reports (id, set_id, user_id, reason, note, created_at) VALUES (?, ?, ?, ?, ?, ?)", [randomUUID(), rootId, userId, reason, note || null, new Date().toISOString()]);
+  } catch(e) {
+    // Unique constraint on (set_id, user_id)
+  }
+  
+  const count = await all<{ c: number }>(db, "SELECT COUNT(*) as c FROM reports WHERE set_id = ?", [rootId]);
+  if (count[0] && count[0].c >= 3) {
+    await run(db, "UPDATE sets SET is_hidden = 1 WHERE id = ?", [rootId]);
+    bumpCatalogue();
+  }
+  
+  return c.json({ ok: true });
+});
 
   app.get("/healthz", (c) => c.json({ ok: true }));
 

@@ -73,7 +73,7 @@ export async function renderSets() {
   setHTML(app, `
     <div class="view">
       <div class="ahd"><div class="h-title">Your sets</div>
-        <button class="btn btn-ghost" style="padding:8px 12px" data-action="open-import">⇪ Import</button></div>
+        </div>
       ${
         sessions.length
           ? sessions.map((s) => setRow(s, summarize(setFor(s.id, studySets)))).join("")

@@ -164,3 +164,41 @@ export async function backendExtractPdf(bytes) {
   if (!res.ok) throw new Error(data.message || data.error || `Couldn't read this PDF (${res.status}).`);
   return data;
 }
+
+export function backendGlobalPublish(setId) {
+  return post("/v1/global/publish", { setId });
+}
+export function backendGlobalUnpublish(setId) {
+  return post("/v1/global/unpublish", { setId });
+}
+export function backendGlobalList(tab, q, cursor) {
+  return get("/v1/discover?tab=" + encodeURIComponent(tab || "for") + "&q=" + encodeURIComponent(q || "") + "&cursor=" + encodeURIComponent(cursor || "0"));
+}
+export function backendGlobalFetch(id) {
+  return get("/v1/discover/" + encodeURIComponent(id) + "/preview");
+}
+export function backendSendFeedback(text, image, route, appVersion, platform) {
+  return post("/v1/feedback", { text, image, route, appVersion, platform });
+}
+
+export function backendGlobalReport(id, reason, note) {
+  return post("/v1/sets/" + encodeURIComponent(id) + "/report", { reason, note });
+}
+
+export function backendGlobalAdd(id) {
+  return post("/v1/discover/" + encodeURIComponent(id) + "/add");
+}
+export async function backendLookupRatings(ids) {
+  const req = await authedFetch("/v1/ratings/lookup", { method: "POST", body: JSON.stringify({ ids }) });
+  return await req.json();
+}
+export async function backendSendRating(id, stars) {
+  const req = await authedFetch("/v1/sets/" + encodeURIComponent(id) + "/rating", { method: "PUT", body: JSON.stringify({ stars }) });
+  if (!req.ok) throw new Error("Couldn't save rating");
+  return await req.json();
+}
+export async function backendDeleteRating(id) {
+  const req = await authedFetch("/v1/sets/" + encodeURIComponent(id) + "/rating", { method: "DELETE" });
+  if (!req.ok) throw new Error("Couldn't delete rating");
+  return await req.json();
+}

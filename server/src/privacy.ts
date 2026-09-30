@@ -51,6 +51,8 @@ underlying model provider, such as Google) solely to generate study material. We
 configure that service not to allow your text to be used for model training, and
 we do not share it for advertising or analytics.</p>
 
+<p>We classify each study set's subject matter with the same AI provider to build your interest profile, driving what you see in the Global library.</p>
+
 <p>The same applies to what you write in practice modes (typed answers, coding
 exercises, Teach it back conversations, and system design drills): it is sent
 to the AI service only to grade or reply, and is not stored on our servers.
