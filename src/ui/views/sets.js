@@ -3,7 +3,7 @@ import { setNav, showChrome } from "../nav.js";
 import { renderSetDetail } from "./set-detail.js";
 import { ICONS } from "../icons.js";
 import { SectionLabel, PrimaryButton, IconButton } from "../components.js";
-import { SetRowHtml as SetRow } from "../set-row.js";
+import { SetRowHtml as SetRow, setViewModels } from "../set-row.js";
 import { openSheet, closeSheet } from "../sheet.js";
 import { cleanTitle } from "../../../shared/titles.js";
 import { saveSettings } from "../../storage/store.js";
@@ -34,10 +34,15 @@ export async function renderSets(opts = {}) {
   const sortOrder = b.settings.sortOrder || "Most due";
   const ratings = await readRatings();
   
-  let sets = [...b.studySets];
+  // View models, not raw study sets: those have no id to open, no due count
+  // and no source.
+  const allSets = setViewModels(b.sessions, b.studySets);
+  const totalDue = allSets.reduce((acc, s) => acc + s.due, 0);
+  let sets = [...allSets];
   refreshRatings(sets.map(s => s.originSetId || s.id)).catch(() => {});
-  
-  const hasGlobal = sets.some(s => s.mode === "global");
+  const isGlobalSet = (s) => s.isGlobal || !!ratings[s.originSetId || s.id]?.isGlobal;
+
+  const hasGlobal = sets.some(isGlobalSet);
   const showOptions = ["All sets", "Due now"];
   if (hasGlobal) {
     showOptions.push("Global");
@@ -47,9 +52,9 @@ export async function renderSets(opts = {}) {
   if (state.filterShow === "Due now") {
     sets = sets.filter(s => s.due > 0);
   } else if (state.filterShow === "Global") {
-    sets = sets.filter(s => s.mode === "global");
+    sets = sets.filter(isGlobalSet);
   } else if (state.filterShow === "Private") {
-    sets = sets.filter(s => s.mode !== "global");
+    sets = sets.filter(s => !isGlobalSet(s));
   }
 
   let q = normalize(state.query.trim());
@@ -82,8 +87,8 @@ export async function renderSets(opts = {}) {
       <div style="display: flex; flex-direction: column; gap: 2px; padding: 0 4px">
         <h1 style="font-size: 24px; font-weight: 650; letter-spacing: -0.02em; margin: 0">Sets</h1>
         <div style="font-size: 13px; color: var(--text-muted)">
-          ${b.studySets.length === 1 ? "1 set" : `${b.studySets.length} sets`} &middot; 
-          ${b.studySets.reduce((acc, s) => acc + (s.due || 0), 0) === 1 ? "1 card due" : `${b.studySets.reduce((acc, s) => acc + (s.due || 0), 0)} cards due`}
+          ${allSets.length === 1 ? "1 set" : `${allSets.length} sets`} &middot;
+          ${totalDue === 1 ? "1 card due" : `${totalDue} cards due`}
         </div>
       </div>
       
@@ -117,7 +122,7 @@ export async function renderSets(opts = {}) {
       </div>
       
       <div style="display: flex; flex-direction: column; gap: 8px">
-        ${b.studySets.length === 0 ? `
+        ${allSets.length === 0 ? `
           <div style="text-align: center; padding: 28px 12px; font-size: 14px; color: var(--text-muted)">No sets yet. Capture a page or an AI answer with the buttons below.</div>
         ` : sets.length === 0 ? `
           <div style="text-align: center; padding: 28px 12px; font-size: 14px; color: var(--text-muted)">${q ? `No sets match "${esc(state.query)}"` : `No sets match this filter.`}</div>
@@ -175,12 +180,8 @@ export async function renderSets(opts = {}) {
       renderSets({ updateInPlace: true });
     });
     
-    app.querySelectorAll('.setrow').forEach(row => {
-      row.addEventListener("click", (e) => {
-        const id = e.currentTarget["dataset"].id;
-        renderSetDetail(id);
-      });
-    });
+    // Rows open through the panel's data-action="open-set" router; a second
+    // listener here opened every set twice.
   }
 }
 

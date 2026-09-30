@@ -1,188 +1,203 @@
 import { setNav, showChrome } from "../nav.js";
-import { FLAME, app, bundle, dateInputValue, esc, examDaysLeft, greeting, nav, send, setFor, setHTML, summarize, toast, topOfView } from "../core.js";
-import { computeStreak, dayKey, getLastSync, setExamDate, weekActivity } from "../../storage/store.js";
-import { examReadiness, weakTopics } from "../../../shared/readiness.js";
-import { review } from "../../../shared/srs.js";
-import { SetRowHtml as setRow } from "../set-row.js";
-import { detail } from "../views/set-detail.js";
-import { LANDING_BASE } from "../../config.js";
+import { app, bundle, dateInputValue, esc, greeting, setHTML, topOfView } from "../core.js";
+import { getLastSync } from "../../storage/store.js";
+import { computeStreak, weekActivity } from "../../../shared/streak.js";
+import { computeDailyGoal, fadingSoon } from "../../../shared/daily-goal.js";
+import { SetRowHtml, setViewModels } from "../set-row.js";
+import { readRatings } from "../../storage/ratings.js";
 import { updateBannerHtml } from "../update-banner.js";
 
-// ================================================================ HOME
+// ================================================================ HOME (redesign 01)
+
+// Which set's share block is open. Lives here because share.js and set
+// detail both read it.
+export let shareOpenFor = null;
+export function setShareOpenFor(v) { shareOpenFor = v; }
+
+// The exam card turns into an inline date editor in place; Home never sends
+// the learner to another screen for it.
+let homeExamEditing = false;
+export function setHomeExamEditing(v) {
+  homeExamEditing = !!v;
+  return renderHome();
+}
+
+// The cards behind "Fading soon", so "Review n" can start exactly them.
+let fadingRefs = [];
+export function getFadingRefs() { return fadingRefs; }
+
+const CAL_ICON = `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg>`;
+const LABEL = "font-size:13px;font-weight:600;text-transform:uppercase;letter-spacing:0.04em;color:var(--text-muted)";
+const LINK = "font-size:14px;font-weight:600;color:var(--accent-text);background:transparent;border:none;padding:0;cursor:pointer";
+const CARD = "padding:16px;border-radius:16px;background:var(--bg-surface);border:1px solid var(--border-card)";
+const WEEKDAY = ["S", "M", "T", "W", "T", "F", "S"];
+const fmtExam = (ms) => new Date(ms).toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" });
+const fmtShort = (ms) => new Date(ms).toLocaleDateString("en-US", { month: "short", day: "numeric" });
+
+function sectionHeader(title, actionLabel, action, extra = "") {
+  return `<div style="display:flex;justify-content:space-between;align-items:center;padding:0 4px">
+      <span style="${LABEL}">${esc(title)}</span>
+      ${actionLabel ? `<button type="button" style="${LINK}" data-action="${action}" ${extra}>${esc(actionLabel)}</button>` : ""}
+    </div>`;
+}
+
+function skeleton() {
+  return `<div class="skel" role="status" aria-label="Loading your sets" style="display:flex;flex-direction:column;gap:20px">
+      <div class="sk" style="height:196px;border-radius:20px"></div>
+      <div class="sk" style="height:120px;border-radius:16px"></div>
+    </div>`;
+}
+
 export async function renderHome() {
   setNav("home");
   showChrome(true);
-  const { sessions, studySets, activity, settings, reviewLog } = await bundle();
-  const d = new Date(); d.setMonth(d.getMonth() + 1);
-  const nextMonthStr = dateInputValue(d.getTime());
+  const { sessions, studySets, activity, settings } = await bundle();
+  const live = studySets.filter((s) => !s.deleted);
+  const now = Date.now();
+  const updateBanner = await updateBannerHtml();
 
-  let due = 0,
-    mastered = 0,
-    total = 0;
-  for (const set of studySets) {
-    const s = summarize(set);
-    due += s.due;
-    mastered += s.mastered;
-    total += s.total;
+  const greet = `<div style="padding:0 4px;display:flex;flex-direction:column;gap:2px">
+      <div style="font-size:14px;color:var(--text-muted)">${esc(greeting())}</div>
+      <h1 style="margin:0;font-size:24px;font-weight:650;letter-spacing:-0.02em;color:var(--text-primary)">Today's review</h1>
+    </div>`;
+
+  // Nothing stored and nothing ever synced: the first sync is still running,
+  // so show that, not "you have nothing" (prompt 31).
+  if (!live.length) {
+    const first = !(await getLastSync());
+    setHTML(app, `<div style="padding:18px 16px 28px;display:flex;flex-direction:column;gap:20px">
+        ${updateBanner}${greet}
+        ${first ? skeleton() : `<div style="${CARD};display:flex;flex-direction:column;gap:6px">
+          <div style="font-size:15px;font-weight:600;color:var(--text-primary)">Make your first set</div>
+          <div style="font-size:14px;line-height:1.45;color:var(--text-body2)">Open an AI chat, a web page or a YouTube video, then tap Capture below.</div>
+        </div>`}
+      </div>`);
+    topOfView();
+    return;
   }
-  const progress = total ? Math.round((mastered / total) * 100) : 0;
-  const reviewedToday = activity[dayKey()] || 0;
+
+  // --- Block 2: today's goal ---
+  const goal = computeDailyGoal(live, now);
+  const hero = `<div style="padding:20px;border-radius:20px;background:var(--accent);color:var(--accent-on);display:flex;flex-direction:column;gap:14px">
+      <div style="display:flex;flex-direction:column;gap:4px">
+        <div style="font-size:12px;font-weight:700;letter-spacing:0.08em;text-transform:uppercase;opacity:0.75">Today's goal</div>
+        <div style="display:flex;align-items:baseline;gap:8px">
+          <span style="font-size:52px;font-weight:700;line-height:1;letter-spacing:-0.03em">${goal.goalCount}</span>
+          <span style="font-size:18px;font-weight:600">${goal.goalCount === 1 ? "card" : "cards"}</span>
+        </div>
+        <div style="font-size:14px;font-weight:500">${
+          goal.totalDue === 0 ? "You're all caught up"
+          : goal.nearestExam ? `~${goal.goalMinutes} min · keeps you on pace for ${esc(fmtShort(goal.nearestExam))}`
+          : `~${goal.goalMinutes} min · a steady daily amount`
+        }</div>
+      </div>
+      ${goal.totalDue ? `
+      <button type="button" class="home-hero-btn" data-action="home-start-goal" data-n="${goal.goalCount}" style="width:100%;height:50px;border-radius:14px;border:none;background:var(--hero-btn);color:var(--accent-on-white);font-size:16px;font-weight:650;font-family:inherit;cursor:pointer">Start review</button>
+      <div style="display:flex;justify-content:space-between;font-size:13px;font-weight:500">
+        <span>${goal.totalDue} due across ${goal.setCount} ${goal.setCount === 1 ? "set" : "sets"}</span>
+        <button type="button" data-action="start-review" style="font:inherit;font-weight:650;color:inherit;background:transparent;border:none;padding:0;text-decoration:underline;text-underline-offset:3px;cursor:pointer">Review all</button>
+      </div>` : ""}
+    </div>`;
+
+  // --- Block 3: this week ---
   const streak = computeStreak(activity);
   const week = weekActivity(activity);
-  const est = Math.max(1, Math.round(due * 0.4));
+  const weekCard = `<div style="${CARD};display:flex;flex-direction:column;gap:14px">
+      <div style="display:flex;justify-content:space-between;align-items:center">
+        <span style="${LABEL}">This week</span>
+        <span style="font-size:13px;color:var(--text-body2)">${streak ? `${streak}-day streak` : "Start a streak today"}</span>
+      </div>
+      <div style="display:grid;grid-template-columns:repeat(7,1fr);gap:6px">
+        ${week.map((d) => {
+          const studied = d.count > 0;
+          const border = studied || d.isToday ? "var(--accent)" : "var(--track)";
+          const fill = studied ? "var(--accent)" : "transparent";
+          const day = new Date(d.key + "T12:00:00");
+          const label = d.isToday ? "Today" : WEEKDAY[day.getDay()];
+          const a11y = `${d.isToday ? "Today" : day.toLocaleDateString("en-US", { weekday: "long" })}, ${studied ? "studied" : d.isToday ? "not studied yet" : "not studied"}`;
+          return `<div style="display:flex;flex-direction:column;align-items:center;gap:6px" aria-label="${esc(a11y)}" role="img">
+              <span style="width:32px;height:32px;border-radius:16px;border:2px solid ${border};background:${fill};box-sizing:border-box"></span>
+              <span style="font-size:12px;${d.isToday ? "font-weight:700;color:var(--accent-text)" : "font-weight:500;color:var(--text-faint)"}">${label}</span>
+            </div>`;
+        }).join("")}
+      </div>
+    </div>`;
 
-  const withSets = sessions.filter((s) => setFor(s.id, studySets));
-  const topSets = withSets.slice(0, 4);
-
-  // --- Exam section: one date on Home, applied to the sets the user picks ---
-  const examSets = studySets.filter((s) => s.examDate && s.examDate > Date.now());
-  const examDate = examSets.length ? Math.min(...examSets.map((s) => s.examDate)) : null;
-  let totals = { total: 0, mastered: 0, due: 0 };
-  for (const s of examSets) {
-    const x = summarize(s);
-    totals.total += x.total;
-    totals.mastered += x.mastered;
-    totals.due += x.due;
-  }
-  
-  const exam = examDate
-    ? examReadiness({ examDate, total: totals.total, mastered: totals.mastered, due: totals.due })
-    : null;
-    
-  let examCard = "";
+  // --- Block 4: exam ---
+  const examSets = live.filter((s) => s.examDate && s.examDate === goal.nearestExam);
+  let examCard;
   if (homeExamEditing) {
-    const val = examDate ? dateInputValue(examDate) : nextMonthStr;
-    examCard = `<div class="block tint" style="display: flex; align-items: center; gap: 12px; padding: 12px 14px;">
-        <div style="width: 36px; height: 36px; border-radius: 10px; background: var(--bg-surface2); display: flex; align-items: center; justify-content: center; color: var(--accent-text); flex-shrink: 0">
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect><line x1="16" y1="2" x2="16" y2="6"></line><line x1="8" y1="2" x2="8" y2="6"></line><line x1="3" y1="10" x2="21" y2="10"></line></svg>
-        </div>
-        <div style="flex: 1; display: flex; flex-direction: column; gap: 2px">
-          <input type="date" id="home-exam-input" style="font-family: inherit; font-size: 15px; border: none; background: transparent; color: var(--text-primary); outline: none" value="${val}" />
-        </div>
-        <button class="btn" data-action="exam-save-home" style="color: var(--status-mastered); font-weight: 600; font-size: 14px; padding: 0 8px; background: transparent; border: none">Save</button>
+    examCard = `<div style="${CARD};display:flex;align-items:center;gap:12px">
+        <div style="width:36px;height:36px;border-radius:10px;background:var(--bg-surface2);display:flex;align-items:center;justify-content:center;color:var(--accent-text);flex-shrink:0">${CAL_ICON}</div>
+        <input type="date" id="home-exam-input" aria-label="Exam date" value="${esc(dateInputValue(goal.nearestExam || now + 30 * 86_400_000))}" min="${esc(dateInputValue(now))}" style="flex:1;min-width:0;font:inherit;font-size:15px;border:none;background:transparent;color:var(--text-primary);outline:none" />
+        <button type="button" data-action="exam-save-home" style="${LINK};font-size:13px">Save</button>
       </div>`;
-  } else if (!exam) {
-    examCard = `<button class="btn" data-action="exam-edit-home" style="width: 100%; display: flex; align-items: center; gap: 12px; padding: 12px 14px; border-radius: 14px; border: 1px solid var(--border-control); background: var(--bg-surface); text-align: left; cursor: pointer; color: var(--text-primary); margin-bottom: 24px">
-        <div style="width: 36px; height: 36px; border-radius: 10px; background: var(--bg-surface2); display: flex; align-items: center; justify-content: center; color: var(--accent-text); flex-shrink: 0">
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect><line x1="16" y1="2" x2="16" y2="6"></line><line x1="8" y1="2" x2="8" y2="6"></line><line x1="3" y1="10" x2="21" y2="10"></line></svg>
+  } else if (!goal.nearestExam) {
+    examCard = `<button type="button" data-action="exam-edit-home" style="${CARD};display:flex;align-items:center;gap:12px;text-align:left;cursor:pointer;width:100%;font:inherit;color:var(--text-primary)">
+        <div style="width:36px;height:36px;border-radius:10px;background:var(--bg-surface2);display:flex;align-items:center;justify-content:center;color:var(--accent-text);flex-shrink:0">${CAL_ICON}</div>
+        <div style="flex:1;display:flex;flex-direction:column;gap:2px">
+          <div style="font-size:15px;font-weight:600">Add an exam date</div>
+          <div style="font-size:13px;color:var(--text-muted)">Get a countdown and a daily target</div>
         </div>
-        <div style="flex: 1; display: flex; flex-direction: column; gap: 2px">
-          <div style="font-size: 14px; font-weight: 600">Add an exam date</div>
-          <div style="font-size: 13px; color: var(--text-muted)">Get a countdown and a daily target</div>
-        </div>
-        <div style="font-size: 13px; font-weight: 600; color: var(--accent-text)">Add</div>
+        <span style="font-size:13px;font-weight:600;color:var(--accent-text)">Add</span>
       </button>`;
   } else {
-    const ed = new Date(examDate);
-    const today = new Date();
-    const edDate = new Date(ed.getFullYear(), ed.getMonth(), ed.getDate());
-    const todayDate = new Date(today.getFullYear(), today.getMonth(), today.getDate());
-    const diffD = Math.round((edDate.getTime() - todayDate.getTime()) / (1000 * 60 * 60 * 24));
-    
-    let title = `Exam &middot; ${ed.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })}`;
-    let sub = `${diffD} ${diffD === 1 ? 'day' : 'days'} left &middot; ${exam.dailyTarget} new ${exam.dailyTarget === 1 ? 'card' : 'cards'} a day`;
-    
-    if (diffD === 0) {
-      title = "Exam &middot; Today";
-      sub = `0 days left &middot; ${exam.dailyTarget} new ${exam.dailyTarget === 1 ? 'card' : 'cards'} a day`;
-    } else if (diffD < 0) {
-      title = "Exam passed";
-      sub = "Pick a new date";
-    }
-    
-    examCard = `<button class="btn block tint" data-action="exam-edit-home" style="width: 100%; display: flex; align-items: center; gap: 12px; padding: 12px 14px; text-align: left; cursor: pointer; color: var(--text-primary); margin-bottom: 24px; border: none">
-        <div style="width: 36px; height: 36px; border-radius: 10px; background: var(--bg-surface2); display: flex; align-items: center; justify-content: center; color: var(--accent-text); flex-shrink: 0">
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect><line x1="16" y1="2" x2="16" y2="6"></line><line x1="8" y1="2" x2="8" y2="6"></line><line x1="3" y1="10" x2="21" y2="10"></line></svg>
+    let total = 0, mastered = 0;
+    for (const s of setViewModels(sessions, examSets)) { total += s.total; mastered += s.mastered; }
+    const readiness = total ? Math.round((mastered / total) * 100) : 0;
+    const d = goal.daysUntilExam;
+    const left = d === 0 ? "Exam today" : `${d} ${d === 1 ? "day" : "days"} left`;
+    examCard = `<button type="button" data-action="exam-edit-home" style="${CARD};display:flex;flex-direction:column;gap:12px;text-align:left;cursor:pointer;width:100%;font:inherit;color:var(--text-primary)">
+        <div style="display:flex;align-items:center;gap:12px;width:100%">
+          <div style="width:36px;height:36px;border-radius:10px;background:var(--bg-surface2);display:flex;align-items:center;justify-content:center;color:var(--accent-text);flex-shrink:0">${CAL_ICON}</div>
+          <div style="flex:1;display:flex;flex-direction:column;gap:2px">
+            <div style="font-size:15px;font-weight:600">Exam · ${esc(fmtExam(goal.nearestExam))}</div>
+            <div style="font-size:13px;color:var(--text-muted)">${left} · ${examSets.length} ${examSets.length === 1 ? "set" : "sets"} included</div>
+          </div>
+          <span style="font-size:13px;font-weight:600;color:var(--accent-text)">Edit</span>
         </div>
-        <div style="flex: 1; display: flex; flex-direction: column; gap: 2px">
-          <div style="font-size: 14px; font-weight: 600">${title}</div>
-          <div style="font-size: 13px; color: var(--text-muted)">${sub}</div>
+        <div style="display:flex;flex-direction:column;gap:6px;width:100%">
+          <div style="display:flex;justify-content:space-between;font-size:13px;color:var(--text-body2)"><span>Ready</span><span style="color:var(--text-primary);font-weight:600">${readiness}%</span></div>
+          <div style="height:6px;border-radius:3px;background:var(--track);overflow:hidden"><div style="height:100%;width:${readiness}%;background:var(--accent)"></div></div>
         </div>
       </button>`;
   }
 
+  // --- Block 5: fading soon ---
+  const fading = fadingSoon(live, now);
+  fadingRefs = fading.map((f) => ({ sessionId: f.sessionId, cardId: f.card.id }));
+  const fadingBlock = fading.length ? `<div style="display:flex;flex-direction:column;gap:8px">
+      ${sectionHeader("Fading soon", `Review ${fading.length}`, "home-fading-review")}
+      <div style="border-radius:16px;background:var(--bg-surface);border:1px solid var(--border-card);padding:0 14px">
+        ${fading.slice(0, 3).map((f, i, arr) => `
+          <button type="button" data-action="open-weak" data-id="${esc(f.sessionId)}" data-card="${esc(f.card.id)}" style="display:flex;gap:12px;align-items:flex-start;padding:13px 0;width:100%;background:transparent;border:none;${i < arr.length - 1 ? "border-bottom:1px solid var(--border-divider);" : ""}text-align:left;cursor:pointer;font:inherit;color:var(--text-primary)">
+            <span style="width:8px;height:8px;border-radius:50%;background:var(--status-learning);margin-top:7px;flex-shrink:0" aria-hidden="true"></span>
+            <span style="font-size:15px;line-height:1.4;text-wrap:pretty;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden">${esc(f.card.front)}</span>
+          </button>`).join("")}
+      </div>
+    </div>` : "";
 
-  const allCards = studySets.flatMap((s) => (s.flashcards || []).map((c) => ({ ...c, sessionId: s.sessionId })));
-  const weak = weakTopics(reviewLog, allCards);
-  const insightsCard = weak.length
-    ? `<div class="listhd"><span class="t-label">Needs work</span></div>
-       <div class="block insight" style="display:flex;flex-direction:column;gap:9px">
-         ${weak
-           .slice(0, 3)
-           .map(
-             (w) =>
-               `<button type="button" class="insight-row" data-action="open-weak" data-id="${esc(w.sessionId)}" data-card="${esc(w.cardId)}">
-                   <span class="q">${esc(w.front)}</span>
-                   ${w.forgetRisk ? `<span class="tag dot" style="color:var(--status-learning)">Forget soon</span>` : w.misses > 0 ? `<span class="tag">Missed ${w.misses}×</span>` : `<span class="tag">Felt hard</span>`}
-                   <svg class="ic chev" viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"/></svg>
-                 </button>`
-           )
-           .join("")}
-       </div>`
-    : "";
+  // --- Block 6: continue ---
+  const ratings = await readRatings();
+  const lastOpened = settings.lastOpened || {};
+  const all = setViewModels(sessions, live);
+  const recent = [...all]
+    .sort((a, b) => (lastOpened[b.id] || 0) - (lastOpened[a.id] || 0) || Number(b.createdAt || 0) - Number(a.createdAt || 0))
+    .slice(0, 3);
+  const continueBlock = `<div style="display:flex;flex-direction:column;gap:8px">
+      ${sectionHeader("Continue", `All ${all.length} ${all.length === 1 ? "set" : "sets"}`, "nav-sets")}
+      ${recent.map((s) => SetRowHtml(s, ratings)).join("")}
+    </div>`;
 
-  // Nothing stored and nothing ever synced: the first sync is still in flight,
-  // so show that rather than telling a new learner they have no cards.
-  const isInitialSync = studySets.length === 0 && !(await getLastSync());
-  const heroHtml = isInitialSync ? homeSkeleton() : due
-    ? `<div class="due-hero">
-         <div><div class="t-label">Due today</div><div class="n tnum">${due}</div>
-         <div class="sub">across ${withSets.length} set${withSets.length === 1 ? "" : "s"} · ~${est} min</div></div>
-         <button class="btn btn-primary btn-block" data-action="start-review">Start review</button>
-       </div>`
-    : `<div class="block tint" style="text-align:center">
-         <div style="font-size:26px">✅</div>
-         <div style="font-weight:650;margin-top:6px">You're all caught up</div>
-         <div style="font-size:12.5px;color:var(--text-muted);margin-top:4px">No cards due right now. Capture a chat or import a set.</div>
-       </div>`;
-
-  const updateBanner = await updateBannerHtml();
-  setHTML(app, `
-    <div class="view">
+  setHTML(app, `<div id="home-view" style="padding:18px 16px 28px;display:flex;flex-direction:column;gap:20px">
       ${updateBanner}
-      <div class="ahd">
-        <div><div class="h-sub">${greeting()}</div><div class="h-title">Ready to review</div></div>
-        <div style="display:flex;gap:8px;align-items:center">
-          <span class="streak">${FLAME}${streak}</span>
-                  </div>
-      </div>
-
-      ${heroHtml}
+      ${greet}
+      ${hero}
+      ${weekCard}
       ${examCard}
-
-      <div class="block" style="display:flex;flex-direction:column;gap:11px">
-        <div class="listhd"><span class="t-label">This week</span>
-          <span class="tag">${week.filter((d) => d.count).length} of 7 days</span></div>
-        <div class="week">
-          ${week
-            .map(
-              (d) =>
-                `<div class="d"><span class="dot ${d.isToday ? "today" : d.count ? "on" : ""}"></span><span class="lbl">${d.label}</span></div>`
-            )
-            .join("")}
-        </div>
-      </div>
-
-      <div class="stats">
-        <div class="stat"><div class="v tnum">${mastered}</div><div class="k">Mastered</div></div>
-        <div class="stat"><div class="v tnum">${progress}%</div><div class="k">Progress</div></div>
-        <div class="stat"><div class="v tnum">${studySets.length}</div><div class="k">Sets</div></div>
-      </div>
-
-      ${insightsCard}
-
-      <div class="listhd"><span class="t-label">Your sets</span>
-        <button class="linkbtn" data-action="open-import">＋ Import</button></div>
-      ${
-        topSets.length
-          ? topSets.map((s) => setRow(s, summarize(setFor(s.id, studySets)))).join("")
-          : `<div class="empty">No study sets yet.<br>Open ChatGPT, Claude, or Gemini and click <b>Save to Mafsar</b>.</div>`
-      }
-      ${withSets.length > 4 ? `<button class="btn btn-ghost btn-block" data-action="nav-sets">View all ${withSets.length} sets</button>` : ""}
-      ${reviewedToday ? `<div style="text-align:center;font-size:12px;color:var(--text-faint)">${reviewedToday} cards reviewed today</div>` : ""}
+      ${fadingBlock}
+      ${continueBlock}
     </div>`);
   topOfView();
-  
-  
+  if (homeExamEditing) /** @type {HTMLInputElement|null} */ (document.getElementById("home-exam-input"))?.focus();
 }
-

@@ -1,11 +1,14 @@
 import { showChrome } from "../nav.js";
-import { app, bundle, esc, send, setFor, setHTML, insertHTMLBefore, sourceLabel, summarize, timeUntil, toast, topOfView } from "../core.js";
+import { app, bundle, esc, isMac, send, setFor, setHTML, insertHTMLBefore, sourceLabel, summarize, timeUntil, toast, topOfView } from "../core.js";
+
+// Inputs and buttons by id, typed loosely (this file reads .value/.disabled).
+const byId = (id) => /** @type {any} */ (byId(id));
 import { renderHome, shareOpenFor, setShareOpenFor } from "../views/home.js";
 import { examReadiness } from "../../../shared/readiness.js";
 import { isDue, masteryOf, review } from "../../../shared/srs.js";
 import { startQuiz } from "../flows/quiz.js";
 import { syncNow } from "../../sync/sync.js";
-import { addCard, updateCard, saveStudySet, saveSettings } from "../../storage/store.js";
+import { addCard, updateCard, updateStudySet, setExamDate, saveSettings } from "../../storage/store.js";
 import { chainCoverage, liveChains, orderedSteps } from "../../storage/chains.js";
 import { isLinkCard, linkId } from "../../storage/chain-links.js";
 import { cleanTitle } from "../../../shared/titles.js";
@@ -329,7 +332,7 @@ export async function paintDetail(updateInPlace = false, force = false) {
               </div>
               <div style="display: flex; align-items: center; gap: 8px">
                 <div class="edit-hint" id="edit-hint-${id}" style="flex: 1; font-size: 12px; color: var(--text-faint)">
-                  ${!frontText.trim() || !backText.trim() ? "Both fields are required" : "<span class=\"edit-hint-kbd\">" + (navigator.platform.includes('Mac') ? "&#x23ce; Enter to save" : "Ctrl Enter to save") + "</span>"}
+                  ${!frontText.trim() || !backText.trim() ? "Both fields are required" : (isMac() ? "⌘ Enter to save" : "Ctrl Enter to save")}
                 </div>
                 <button class="btn" data-action="${isAdd ? 'add-cancel' : 'edit-cancel'}" style="height: 40px; padding: 0 14px; border-radius: 10px; border: 1px solid var(--border-control); background: transparent; color: var(--text-primary); font-size: 14px; font-weight: 600">Cancel</button>
                 <button class="btn btn-primary" id="edit-done-${id}" data-action="${isAdd ? 'add-done' : 'edit-done'}" data-id="${id}" ${!frontText.trim() || !backText.trim() ? 'disabled aria-disabled="true" style="opacity: 0.45; pointer-events: none;' : 'style="'} height: 40px; padding: 0 18px; border-radius: 10px; border: none; background: var(--accent); color: var(--accent-on); font-size: 14px; font-weight: 650">Done</button>
@@ -354,11 +357,23 @@ export async function paintDetail(updateInPlace = false, force = false) {
         `;
         
         if (items.length === 0) {
-          return header + `<div style="margin: 8px 12px 24px; font-size: 14px; color: var(--text-muted); padding: 0 8px">No cards yet.</div>`;
+          const adding = isFirstVisible && detail.addingCard ? `<div style="margin: 8px 12px 0">${renderEditor("new", "", "")}</div>` : "";
+          return header + adding + `<div style="margin: 8px 12px 24px; font-size: 14px; color: var(--text-muted); padding: 0 8px">No cards yet.</div>`;
         }
         
         let listHTML = `<div style="margin: 8px 12px 24px; display: flex; flex-direction: column">`;
+        // "Add card" opens its editor at the top of the first list.
+        if (isFirstVisible && detail.addingCard) listHTML += renderEditor("new", "", "");
+        const anyEditing = !!(editingCardId || detail.addingCard);
         for (const c of items) {
+          // The card being edited becomes its editor, in place (prompt 06).
+          if (editingCardId === c.id) {
+            listHTML += renderEditor(c.id, c.front, c.back);
+            continue;
+          }
+          // While one card is being edited the rest dim and ignore taps.
+          const inertAttr = anyEditing ? "inert" : "";
+          const styleExtra = anyEditing ? "opacity: 0.4;" : "";
           const expanded = state.expandedCardId === c.id;
           const isLink = isLinkCard(c);
           
@@ -593,10 +608,10 @@ export async function paintDetail(updateInPlace = false, force = false) {
 }
 
 function bindEditorEvents(id, oldFront) {
-    const fF = document.getElementById("edit-front-" + id);
-    const fB = document.getElementById("edit-back-" + id);
-    const btn = document.getElementById("edit-done-" + id);
-    const hint = document.getElementById("edit-hint-" + id);
+    const fF = byId("edit-front-" + id);
+    const fB = byId("edit-back-" + id);
+    const btn = byId("edit-done-" + id);
+    const hint = byId("edit-hint-" + id);
     if (!fF || !fB || !btn) return;
     
     const autoGrow = (el) => {
@@ -615,7 +630,7 @@ function bindEditorEvents(id, oldFront) {
       else if (vB.length > 2000) { tooLong = true; hint.textContent = `Too long: ${vB.length} / 2000`; }
       
       if (empty) hint.textContent = "Both fields are required";
-      else if (!tooLong) hint.textContent = /Mac/.test(navigator.userAgentData?.platform || navigator.platform) ? "⌘ Enter to save" : "Ctrl Enter to save";
+      else if (!tooLong) hint.textContent = isMac() ? "⌘ Enter to save" : "Ctrl Enter to save";
       
       if (empty || tooLong) {
         btn.disabled = true;
@@ -639,7 +654,7 @@ function bindEditorEvents(id, oldFront) {
       if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) {
         if (!btn.disabled) btn.click();
       } else if (e.key === "Escape") {
-        document.querySelector(`[data-action="${id === 'new' ? 'add-cancel' : 'edit-cancel'}"]`)?.click();
+        /** @type {HTMLElement|null} */ (document.querySelector(`[data-action="${id === 'new' ? 'add-cancel' : 'edit-cancel'}"]`))?.click();
       }
     };
     fF.addEventListener("keydown", onKeyDown);
@@ -649,7 +664,7 @@ function bindEditorEvents(id, oldFront) {
   function bindEvents() {
     const ratingGroup = app.querySelector('[role="radiogroup"]');
     if (ratingGroup) {
-      const btns = Array.from(ratingGroup.querySelectorAll('.rating-star-btn'));
+      const btns = /** @type {HTMLElement[]} */ (Array.from(ratingGroup.querySelectorAll('.rating-star-btn')));
       
       const updateHover = (val) => {
         btns.forEach(b => {
@@ -731,43 +746,31 @@ function bindEditorEvents(id, oldFront) {
       });
     }
 
-    app.querySelector('#save-exam')?.addEventListener("click", async () => {
-      const v = document.getElementById("exam-input").value;
-      if (v) {
-        const ms = new Date(v + "T12:00:00").getTime();
-        detail.studySet.examDate = ms;
-      } else {
-        detail.studySet.examDate = null;
-      }
-      await saveStudySet(detail.studySet);
-      state.editingExam = false;
-      paintDetail(true);
-    });
   app.querySelectorAll('.card-row-btn').forEach(btn => {
     btn.addEventListener("click", (e) => {
       const id = (/** @type {HTMLElement} */ (e.currentTarget)).dataset.id;
       
       const isAnyEditing = editingCardId || detail.addingCard;
       if (isAnyEditing) {
-        document.getElementById("captureDock")?.classList.add("hidden");
+        byId("captureDock")?.classList.add("hidden");
         app.querySelectorAll(".tab-btn, .iconbtn, .nav-action").forEach(el => el.setAttribute("inert", ""));
-        const splitBtn = app.querySelector(".split-wrapper .btn-primary");
+        const splitBtn = /** @type {HTMLButtonElement|null} */ (app.querySelector(".split-wrapper .btn-primary"));
         if (splitBtn) splitBtn.disabled = true;
       } else {
-        document.getElementById("captureDock")?.classList.remove("hidden");
+        byId("captureDock")?.classList.remove("hidden");
       }
       
-      const newTA = document.getElementById("edit-front-new");
+      const newTA = byId("edit-front-new");
       if (newTA) {
         newTA.focus();
         newTA.setSelectionRange(newTA.value.length, newTA.value.length);
         bindEditorEvents("new", "");
       }
-      const editTA = document.getElementById("edit-front-" + editingCardId);
+      const editTA = byId("edit-front-" + editingCardId);
       if (editTA && editingCardId) {
         editTA.focus();
         editTA.setSelectionRange(editTA.value.length, editTA.value.length);
-        const card = studySet.flashcards.find(x => x.id === editingCardId);
+        const card = detail.studySet.flashcards.find(x => x.id === editingCardId);
         bindEditorEvents(editingCardId, card ? card.front : "");
       }
 
@@ -786,15 +789,18 @@ function bindEditorEvents(id, oldFront) {
   });
   
   app.querySelector('#hiw-btn')?.addEventListener("click", openHowItWorks);
+  // Patch the stored record rather than saving this (possibly stale) copy
+  // back whole: saving a filtered read erases tombstones (prompt 25), and the
+  // old "Not now" saved the session record into the study sets.
   app.querySelector('#dismiss-med')?.addEventListener("click", async () => {
-    detail.session.dismissedMedicine = true;
-    await saveStudySet(detail.session);
-    paintDetail(true);
+    await updateStudySet(detail.session.id, { dismissedMedicine: true });
+    detail.studySet.dismissedMedicine = true;
+    paintDetail(true, true);
   });
   app.querySelector('#use-med')?.addEventListener("click", async () => {
+    await updateStudySet(detail.session.id, { mode: "medicine" });
     detail.studySet.mode = "medicine";
-    await saveStudySet(detail.studySet);
-    paintDetail(true);
+    paintDetail(true, true);
   });
   app.querySelector('#share-btn')?.addEventListener("click", () => toggleSetShare(detail.session.id));
     app.querySelector('[data-action="set-menu"]')?.addEventListener("click", openMoreMenu);
@@ -856,7 +862,7 @@ function renderStudyMenu() {
   setHTML(container, html);
   wrapper.appendChild(container);
   
-  const menu = document.getElementById("study-menu");
+  const menu = byId("study-menu");
   const items = [...menu.querySelectorAll('.menu-item:not([disabled])')];
   
   if (items.length > 0) (/** @type {HTMLElement} */ (items[0])).focus();
@@ -871,7 +877,7 @@ function renderStudyMenu() {
     }, 100);
   };
   
-  document.getElementById("study-menu-catcher").addEventListener("click", close);
+  byId("study-menu-catcher").addEventListener("click", close);
   
   let scrollY = window.scrollY;
   const onScroll = () => {
@@ -988,22 +994,25 @@ export async function makeSet(sessionId) {
   }
 }
 
-export async function promptAddCard(sessionId) {
+export async function promptAddCard() {
   editingCardId = null;
   detail.addingCard = true;
-  paintAddCard();
+  await paintDetail(true, true);
 }
-export async function saveNewCard(sessionId) {
-  const front = /** @type {HTMLInputElement} */ (document.getElementById("newFront"))?.value.trim();
-  const back = /** @type {HTMLInputElement} */ (document.getElementById("newBack"))?.value.trim();
-  if (!front) return toast("Add a question first.");
-  await addCard(sessionId, front, back || "");
+/** Done on the new-card editor. Its fields are edit-front-new / edit-back-new. */
+export async function saveNewCard() {
+  const sessionId = detail.session.id;
+  const front = /** @type {HTMLTextAreaElement} */ (byId("edit-front-new"))?.value.trim();
+  const back = /** @type {HTMLTextAreaElement} */ (byId("edit-back-new"))?.value.trim();
+  if (!front || !back) return;
+  await addCard(sessionId, front, back);
+  detail.addingCard = false;
   toast("Card added");
   renderSetDetail(sessionId, "cards");
 }
 export async function saveCardEdit(sessionId, cardId) {
-  const fF = document.getElementById("edit-front-" + cardId);
-  const fB = document.getElementById("edit-back-" + cardId);
+  const fF = byId("edit-front-" + cardId);
+  const fB = byId("edit-back-" + cardId);
   if (!fF || !fB) return;
   const front = fF.value.trim();
   const back = fB.value.trim();
@@ -1045,14 +1054,13 @@ export async function saveCardEdit(sessionId, cardId) {
     const ratio = maxLen === 0 ? 0 : levenshtein(oldBack, back) / maxLen;
     
     if (ratio > 0.5) {
-      toast("Card saved &middot; Reset progress?", 5000, "Reset", async () => {
+      toast("Card saved · Reset progress?", 5000, "Reset", async () => {
+        // Back to New with a fresh schedule (the real FSRS fields, not the
+        // due/ease names this used to set, which the scheduler ignores).
         const { initSchedule } = await import("../../../shared/srs.js");
-        const s = initSchedule();
-        card.state = s.state;
-        card.due = s.due;
-        card.interval = s.interval;
-        card.ease = s.ease;
-        await updateCard(sessionId, cardId, card);
+        const fresh = initSchedule();
+        Object.assign(card, fresh);
+        await updateCard(sessionId, cardId, fresh);
         paintDetail(true, true);
       });
     } else {
@@ -1061,7 +1069,7 @@ export async function saveCardEdit(sessionId, cardId) {
   } catch (e) {
     card.front = card.front;
     card.back = oldBack;
-    toast("Couldn't save &middot; Retry", 4000, "Retry", () => { saveCardEdit(sessionId, cardId); });
+    toast("Couldn't save · Retry", 4000, "Retry", () => { saveCardEdit(sessionId, cardId); });
     paintDetail(true, true);
   }
 }
@@ -1204,10 +1212,10 @@ function openMoreMenu() {
   openSheet("", html, false);
   
   // Attach listeners to the sheet rows
-  const sheet = document.getElementById("sheet");
+  const sheet = byId("sheet");
   sheet.querySelectorAll(".sheet-row").forEach(btn => {
     btn.addEventListener("click", (e) => {
-      const act = e.currentTarget.dataset.action;
+      const act = /** @type {HTMLElement} */ (e.currentTarget).dataset.action;
       closeSheet();
       if (act === "more-regenerate") {
         setTimeout(() => makeSet(d.session.id), 200); // reuse existing regenerate logic which calls confirmSheet
@@ -1230,6 +1238,34 @@ function openMoreMenu() {
       }
     });
   });
+}
+
+/** The exam row: pick or clear this set's exam date in a sheet, in place. */
+export function openSetExamEditor() {
+  const d = detail;
+  if (!d?.studySet) return;
+  const pad = (n) => String(n).padStart(2, "0");
+  const toInput = (ms) => { const x = new Date(ms); return `${x.getFullYear()}-${pad(x.getMonth() + 1)}-${pad(x.getDate())}`; };
+  const today = toInput(Date.now());
+  const value = d.studySet.examDate ? toInput(d.studySet.examDate) : toInput(Date.now() + 30 * 86_400_000);
+  openSheet("Exam date", `
+    <div style="display:flex;flex-direction:column;gap:14px">
+      <input type="date" id="set-exam-input" aria-label="Exam date" value="${esc(value)}" min="${esc(today)}" style="height:44px;padding:0 14px;border-radius:12px;background:var(--bg-surface);border:1px solid var(--border-card);color:var(--text-primary);font:inherit;font-size:15px" />
+      <button type="button" id="set-exam-save" class="btn btn-primary" style="height:50px;border-radius:12px;font-size:15px;font-weight:650">Save exam</button>
+      ${d.studySet.examDate ? `<button type="button" id="set-exam-clear" style="height:40px;background:transparent;border:none;color:var(--danger-text);font:inherit;font-size:14px;font-weight:600;cursor:pointer">Remove exam</button>` : ""}
+    </div>`, false);
+  const apply = async (ms) => {
+    await setExamDate(d.session.id, ms);
+    d.studySet.examDate = ms;
+    closeSheet();
+    toast(ms ? "Exam date saved" : "Exam removed");
+    paintDetail(true, true);
+  };
+  byId("set-exam-save")?.addEventListener("click", () => {
+    const v = /** @type {HTMLInputElement} */ (byId("set-exam-input"))?.value;
+    apply(v ? new Date(v + "T23:59:59").getTime() : null).catch((e) => toast(e.message));
+  });
+  byId("set-exam-clear")?.addEventListener("click", () => apply(null).catch((e) => toast(e.message)));
 }
 
 let ratingsSnapshot = {};
@@ -1299,10 +1335,10 @@ function openTypeMenu() {
   html += `</div>`;
   
   openSheet("Set type", html, false);
-  const sheet = document.getElementById("sheet");
+  const sheet = byId("sheet");
   sheet.querySelectorAll(".sheet-row").forEach(btn => {
     btn.addEventListener("click", (e) => {
-      const mode = e.currentTarget.dataset.id;
+      const mode = /** @type {HTMLElement} */ (e.currentTarget).dataset.id;
       closeSheet();
       // Send set-mode action to panel.js
       setTimeout(() => {

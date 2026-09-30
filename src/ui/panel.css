@@ -53,7 +53,10 @@
   --src-q-bg: #e3e9fb;
   --src-q-fg: #3552b0;
   --track: #d3ddd9;
+  --hero-btn: #ffffff;
+  --hero-btn-hover: #f0fbf9;
 
+  /* 00 ALIASES START */
   /* Legacy names, still used by the Discover and Stats views (built on the old
      UI before the redesign landed). They point at tokens, so both themes
      follow; delete them once those views are rebuilt on the components. */
@@ -67,6 +70,7 @@
   --warm: var(--status-learning-text);
   --success: var(--status-mastered);
   --danger: var(--danger-text);
+  /* 00 ALIASES END */
 
   --shadow: 0 1px 2px rgba(20, 32, 30, 0.05), 0 14px 34px -18px rgba(20, 32, 30, 0.22);
   --shadow-sm: 0 1px 2px rgba(20, 32, 30, 0.06);
@@ -2043,6 +2047,8 @@ button.insight-row:focus-visible { outline: 2px solid var(--accent); outline-off
   background: var(--bg-surface); border: 1px solid var(--border-card); text-align: left;
 }
 .set-row:hover { border-color: var(--border-hover); }
+.home-hero-btn:hover { background: var(--hero-btn-hover) !important; }
+.btn-text { border: none; background: transparent; color: var(--text-muted); cursor: pointer; font: inherit; }
 .sr-tile {
   width: 40px; height: 40px; border-radius: 10px; background: var(--bg-surface2); color: var(--text-primary);
   font-size: 12px; font-weight: 700; display: flex; align-items: center; justify-content: center; flex-shrink: 0;
@@ -2168,6 +2174,8 @@ button.insight-row:focus-visible { outline: 2px solid var(--accent); outline-off
   --src-q-bg: #1c2540;
   --src-q-fg: #8fa8f0;
   --track: #27322f;
+  --hero-btn: #ffffff;
+  --hero-btn-hover: #f0fbf9;
 
   }
 }
@@ -2323,7 +2331,7 @@ button.insight-row:focus-visible { outline: 2px solid var(--accent); outline-off
 .setting-row .chev {
   width: 16px;
   height: 16px;
-  color: #6d7c78;
+  color: var(--status-new);
 }
 
 /* Switch styling for checkboxes/toggles */
@@ -2393,7 +2401,7 @@ input[type="checkbox"].switch:checked::after, .toggle-switch:checked::after {
 .bar {
   height: 6px;
   border-radius: 3px;
-  background: #27322f;
+  background: var(--track);
   width: 100%;
   overflow: hidden;
 }
@@ -2420,20 +2428,21 @@ input[type="checkbox"].switch:checked::after, .toggle-switch:checked::after {
   color: var(--text-muted);
 }
 
+/* Light: white on the danger colour; dark: the app background, as specified. */
 .btn-danger, .btn-primary.btn-danger {
   background: var(--danger-text) !important;
   color: var(--bg-surface) !important;
 }
 @media (prefers-color-scheme: dark) {
   .btn-danger, .btn-primary.btn-danger {
-    color: #0e1513 !important;
+    color: var(--bg-app) !important;
   }
 }
 
 .focus-track {
   flex: 1;
   height: 4px;
-  background: #27322f;
+  background: var(--track);
   border-radius: 2px;
   overflow: hidden;
 }

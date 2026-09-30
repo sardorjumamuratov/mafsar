@@ -2,20 +2,25 @@
 import { renderSetDetail } from "./views/set-detail.js";
 import { classifyUrl } from "../storage/sources.js";
 import { addSession, saveStudySet, uid } from "../storage/store.js";
-import { lookupShare, paintSharePreview, setSharedPreview, importSharedSet, sharedPreview } from "./views/import.js";
+import { lookupShare, importSharedSet } from "./views/import.js";
+import { sharedPreview } from "./views/teams.js";
 import { isAIChatTab } from "./core.js";
 import { renderYou } from "./views/you.js";
 import { openSheet, closeSheet } from "./sheet.js";
 import { renderImport } from "./views/import.js";
+
+// Buttons, inputs and text areas by id, typed loosely: this file reads
+// .disabled and .value off several element kinds.
+const byId = (id) => /** @type {any} */ (document.getElementById(id));
 
 // Keep track of original text to restore it after capturing
 let currentOriginalText = "Capture page";
 let answerOriginalText = "Capture answer";
 
 function setCapturingState(isCapturing, btnElement) {
-  const cBtn = document.getElementById("captureCurrentBtn");
-  const aBtn = document.getElementById("captureAnswerBtn");
-  const addBtn = document.getElementById("dockAddBtn");
+  const cBtn = byId("captureCurrentBtn");
+  const aBtn = byId("captureAnswerBtn");
+  const addBtn = byId("dockAddBtn");
   
   if (isCapturing) {
     if (cBtn) {
@@ -51,26 +56,26 @@ function setCapturingState(isCapturing, btnElement) {
 
 function handleCaptureResponse(r, kind, origin) {
   if (r.generated) {
-    let msg = "New set from page В· " + r.cards + " cards";
-    if (kind === "youtube") msg = "New set from video В· " + r.cards + " cards";
-    else if (kind === "pdf") msg = "New set from PDF В· " + r.cards + " cards";
-    else if (kind === "answer") msg = "New set from answer В· " + r.cards + " cards";
-    else if (kind === "text") msg = "New set В· " + r.cards + " cards";
+    let msg = "New set from page · " + r.cards + " cards";
+    if (kind === "youtube") msg = "New set from video · " + r.cards + " cards";
+    else if (kind === "pdf") msg = "New set from PDF · " + r.cards + " cards";
+    else if (kind === "answer") msg = "New set from answer · " + r.cards + " cards";
+    else if (kind === "text") msg = "New set · " + r.cards + " cards";
     
     toast(msg, 3000, "Open", () => {
       renderSetDetail(r.session.id);
     });
   } else {
     if (r.reason && r.reason.includes("signed in")) {
-      toast("Saved В· sign in to make cards", 3000, "Sign in", () => { renderYou(); });
+      toast("Saved · sign in to make cards", 3000, "Sign in", () => { renderYou(); });
     } else if (r.reason && (r.reason.includes("quota") || r.reason.includes("limit"))) {
-      toast("Saved В· you've used this month's sets", 3000, "Plans", () => { renderYou(); });
+      toast("Saved · you've used this month's sets", 3000, "Plans", () => { renderYou(); });
     } else if (r.reason) {
-      toast("Saved В· couldn't make cards", 3000, "Open", () => { renderSetDetail(r.session.id); });
+      toast("Saved · couldn't make cards", 3000, "Open", () => { renderSetDetail(r.session.id); });
     } else {
       toast("Couldn't capture this page", 3000, "Retry", () => {
-        if (kind === "answer") captureLastAnswer(document.getElementById("captureAnswerBtn"));
-        else captureCurrent(document.getElementById("captureCurrentBtn"));
+        if (kind === "answer") captureLastAnswer(byId("captureAnswerBtn"));
+        else captureCurrent(byId("captureCurrentBtn"));
       });
     }
   }
@@ -152,9 +157,9 @@ export async function captureLastAnswer(btnElement) {
 }
 
 export async function refreshCaptureDock() {
-  const dock = document.getElementById("captureDock");
-  const answerBtn = document.getElementById("captureAnswerBtn");
-  const currentBtn = document.getElementById("captureCurrentBtn");
+  const dock = byId("captureDock");
+  const answerBtn = byId("captureAnswerBtn");
+  const currentBtn = byId("captureCurrentBtn");
   if (!dock || !answerBtn || !currentBtn) return;
 
   const tab = await queryActiveTab();
@@ -210,10 +215,10 @@ export function openAddMenu() {
   
   openSheet("Add a set", html, true);
   
-  const sheet = document.getElementById("sheet");
+  const sheet = byId("sheet");
   sheet.querySelectorAll(".sheet-row").forEach(btn => {
     btn.addEventListener("click", (e) => {
-      const act = e.currentTarget.dataset.action;
+      const act = /** @type {HTMLElement} */ (e.currentTarget).dataset.action;
       closeSheet();
       if (act === "add-import") {
         renderImport();
@@ -238,9 +243,9 @@ function openPasteMenu() {
   '</div>';
   openSheet("Paste text", html, false);
   
-  const ta = document.getElementById("pasteText");
-  const count = document.getElementById("pasteCount");
-  const btn = document.getElementById("pasteSubmit");
+  const ta = byId("pasteText");
+  const count = byId("pasteCount");
+  const btn = byId("pasteSubmit");
   
   ta.addEventListener("input", () => {
     const len = ta.value.length;
@@ -288,8 +293,8 @@ function openCreateEmptyMenu() {
   '</div>';
   openSheet("Create empty set", html, false);
   
-  const inp = document.getElementById("emptyTitle");
-  const btn = document.getElementById("emptySubmit");
+  const inp = byId("emptyTitle");
+  const btn = byId("emptySubmit");
   
   inp.addEventListener("input", () => { btn.disabled = !inp.value.trim(); });
   inp.addEventListener("keydown", (e) => { if (e.key === "Enter" && !btn.disabled) btn.click(); });
@@ -317,8 +322,8 @@ function openShareCodeMenu() {
   '</div>';
   openSheet("Enter a share code", html, false);
   
-  const inp = document.getElementById("shareCodeInput");
-  const btn = document.getElementById("shareCodeSubmit");
+  const inp = byId("shareCodeInput");
+  const btn = byId("shareCodeSubmit");
   
   inp.addEventListener("input", () => { btn.disabled = !inp.value.trim(); });
   inp.addEventListener("keydown", (e) => { if (e.key === "Enter" && !btn.disabled) btn.click(); });
@@ -342,7 +347,7 @@ function openShareCodeMenu() {
       try {
         await lookupShare();
         if (sharedPreview) {
-          const t = document.getElementById("toast");
+          const t = byId("toast");
           if (t && t.textContent.includes("already added")) {
              // already shown
           } else {

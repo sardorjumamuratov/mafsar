@@ -1,4 +1,4 @@
-import { app, appendHTML, setHTML, esc, toast, send, bundle, topOfView } from "../core.js";
+import { app, appendHTML, platformName, setHTML, esc, toast, send, bundle, topOfView } from "../core.js";
 import { openSheet, closeSheet as closeSharedSheet } from "../sheet.js";
 import { setNav, showChrome } from "../nav.js";
 import { getReviewLog } from "../../storage/store.js";
@@ -163,7 +163,7 @@ export function openFeedback() {
       await send({
         type: "SEND_FEEDBACK", text: textEl.value.trim(), imageData, route: "Stats",
         appVersion: chrome.runtime.getManifest().version,
-        platform: (navigator.userAgentData?.platform || navigator.platform || "") + (navigator.userAgent.includes("Firefox") ? " Firefox" : " Chrome"),
+        platform: platformName() + (navigator.userAgent.includes("Firefox") ? " Firefox" : " Chrome"),
       });
       toast("Thanks, feedback sent");
       closeSheet();

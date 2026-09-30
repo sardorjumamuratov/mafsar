@@ -11,11 +11,11 @@ import { app, bundle, nav, send, setFor, toast } from "./core.js";
 import { goToActiveTab, inFocusView, registerTabs } from "./nav.js";
 import { renderSets } from "./views/sets.js";
 import { onActiveTabChange } from "./tab-watch.js";
-import { currentDetail, makeSet, openDetailTab, paintDetail, promptAddCard, renderSetDetail, saveCardEdit, saveNewCard, setEditingCardId, editingCardId, startQuizForCurrentSet, } from "./views/set-detail.js";
+import { currentDetail, makeSet, openDetailTab, openSetExamEditor, paintDetail, promptAddCard, renderSetDetail, saveCardEdit, saveNewCard, setEditingCardId, editingCardId, startQuizForCurrentSet, } from "./views/set-detail.js";
 import { captureCurrent, captureLastAnswer, refreshCaptureDock, openAddMenu } from "./capture.js";
 import { deleteCard, restoreCard, deleteSession, updateStudySet, setExamDate } from "../storage/store.js";
 import { review } from "../../shared/srs.js";
-import { applyNext, goReturn, gradeCard, revealCard, startGlobalReview, startSetReview } from "./flows/review.js";
+import { applyNext, goReturn, gradeCard, revealCard, startCardListReview, startGlobalReview, startSetReview } from "./flows/review.js";
 import { startChainDrill } from "./flows/chain-drill.js";
 import { confirmSheet } from "./confirm.js";
 import { dismissUpdateBanner } from "./update-banner.js";
@@ -28,7 +28,7 @@ import { createTeamFromForm, joinTeamFromInput, leaveTeam, renderTeam, renderTea
 import { renderGlobal, filterGlobalTab, openGlobalPreview, addGlobalSet, openAddedSet, reportGlobal } from "./views/global.js";
 import { checkTyped, startTypedPractice, typedNext } from "./flows/typed.js";
 import { getAuth, login, logout, register } from "../sync/auth.js";
-import { renderHome, setHomeExamEditing } from "./views/home.js";
+import { getFadingRefs, renderHome, setHomeExamEditing } from "./views/home.js";
 import { answerQuiz, quickQuizLen, quizNext, startQuiz } from "./flows/quiz.js";
 import { SYNC_PULLED_EVENT, syncNow } from "../sync/sync.js";
 
@@ -49,6 +49,7 @@ document.addEventListener("click", (e) => {
       case "more-regenerate":
       case "more-type":
       case "more-delete":
+      case "more-global":
         /* Handled locally in set-detail.js */ break;
     case "nav-back": goToActiveTab(); break;
     case "nav-sets": renderSets(); break;
@@ -64,6 +65,8 @@ document.addEventListener("click", (e) => {
       confirmDeleteSet(id);
       break;
     case "start-review": startGlobalReview(); break;
+    case "home-start-goal": startGlobalReview(Number((/** @type {any} */ (t)).dataset.n) || 0); break;
+    case "home-fading-review": startCardListReview(getFadingRefs()); break;
     case "set-review": startSetReview(id); break;
     case "start-chain-drill": startChainDrill(id); break;
     case "start-compare": startCompare(id); break;
@@ -177,31 +180,25 @@ document.addEventListener("click", (e) => {
     case "typed-check": checkTyped(); break;
     case "typed-next": typedNext(); break;
     case "clear-exam": setExamDate(id, null).then(() => renderSetDetail(id, "cards")).catch(e => toast(e.message)); break;
-    case "add-card": promptAddCard(id); break;
+    case "add-card": promptAddCard(); break;
     case "card-edit": setEditingCardId(id); paintDetail(true, true); break;
-    case "edit-cancel":
+    case "edit-cancel": {
         const oldId = editingCardId;
         setEditingCardId(null);
         paintDetail(true, true).then(() => {
-          document.querySelector(`button[data-action="card-edit"][data-id="${oldId}"]`)?.focus();
+          /** @type {HTMLElement|null} */ (document.querySelector(`button[data-action="card-edit"][data-id="${CSS.escape(String(oldId))}"]`))?.focus();
         });
         break;
+    }
+    // The editor's Done button says "edit-done"; nothing handled it, so edits
+    // never saved. saveCardEdit leaves edit mode and repaints itself.
+    case "edit-done":
     case "edit-save":
-      saveCardEdit(currentDetail().session.id, id).then(() => {
-        setEditingCardId(null);
-        openDetailTab("cards");
-      }).catch(e => toast(e.message));
+      saveCardEdit(currentDetail().session.id, id).catch(e => toast(e.message));
       break;
-    case "card-del": {
-        const sessionId = currentDetail().session.id;
-        deleteCard(sessionId, id).then(() => {
-          paintDetail();
-          toast("Card deleted", 2600, "Undo", () => {
-            restoreCard(sessionId, id).then(() => paintDetail());
-          });
-        });
-        break;
-      }
+    // Delete right away with Undo; the tombstone is only written when the
+    // toast runs out (or the panel closes), so Undo writes nothing.
+    case "card-del": confirmDeleteCard(currentDetail().session.id, id); break;
     // case "export-tsv": exportSetTsv(id); break; // paused with the export button
     case "gen-summary": generateSummary(id); break;
     case "export-backup": exportBackup(); break;
@@ -233,7 +230,7 @@ document.addEventListener("click", (e) => {
       case "exam-save-home":
         (async () => {
           const { studySets } = await bundle();
-          const v = document.getElementById("home-exam-input").value;
+          const v = /** @type {HTMLInputElement} */ (document.getElementById("home-exam-input")).value;
           const ms = v ? new Date(v + "T12:00:00").getTime() : null;
           for (const s of studySets) {
             await updateStudySet(s.sessionId, { examDate: ms });
@@ -242,10 +239,7 @@ document.addEventListener("click", (e) => {
           toast(ms ? "Exam date saved for all sets" : "Exam date cleared");
         })().catch(e => toast(e.message));
         break;
-      case "exam-edit-set":
-        
-        if (detail) { detailState.editingExam = true; paintDetail(true); }
-        break;
+    case "exam-edit-set": openSetExamEditor(); break;
     case "exam-clear":
       (async () => {
         const { studySets } = await bundle();
@@ -292,26 +286,6 @@ document.addEventListener("change", (e) => {
       toast(ms ? "Exam date set. Cards will resurface before it." : "Exam date cleared");
       renderSetDetail((/** @type {any} */ (t)).dataset.session, "cards");
     }).catch(e => toast(e.message));
-  } else if ((/** @type {any} */ (t)).id === "homeExamDate") {
-    // Date changed on Home: if an exam already exists, move it for every
-    // selected set; otherwise draft it and go pick sets.
-    const ms = (/** @type {any} */ (t)).value ? new Date(`${(/** @type {any} */ (t)).value}T23:59:59`).getTime() : null;
-    (async () => {
-      const { studySets } = await bundle();
-      const selected = studySets.filter((s) => s.examDate);
-      if (selected.length && ms) {
-        for (const s of selected) await setExamDate(s.sessionId, ms);
-        toast("Exam date updated");
-        renderHome();
-      } else {
-        setExamDraft({ date: ms, picked: new Set() });
-        openExamPicker();
-      }
-    })().catch(e => toast(e.message));
-  } else if ((/** @type {any} */ (t)).id === "pickerDate") {
-    if (examDraft) examDraft.date = (/** @type {any} */ (t)).value ? new Date(`${(/** @type {any} */ (t)).value}T23:59:59`).getTime() : null;
-  } else if ((/** @type {any} */ (t)).classList?.contains("picker-check")) {
-    if (examDraft) (/** @type {any} */ (t)).checked ? examDraft.picked.add((/** @type {any} */ (t)).dataset.id) : examDraft.picked.delete((/** @type {any} */ (t)).dataset.id);
   } else if ((/** @type {any} */ (t)).id === "openInTabCheck") {
       const openInTab = !!(/** @type {any} */ (t)).checked;
       saveSettings({ openInTab }).then(() => {
@@ -349,15 +323,15 @@ document.addEventListener("click", (e) => {
   if (!t) return;
   if ((/** @type {any} */ (t)).dataset.action === "add-cancel") {
       currentDetail().addingCard = false;
-      paintDetail(true, true).then(() => document.querySelector('button[data-action="add-card"]')?.focus());
+      paintDetail(true, true).then(() => /** @type {HTMLElement|null} */ (document.querySelector('button[data-action="add-card"]'))?.focus());
     }
-  if ((/** @type {any} */ (t)).dataset.action === "add-done") saveNewCard((/** @type {any} */ (t)).dataset.id);
+  if ((/** @type {any} */ (t)).dataset.action === "add-done") saveNewCard().catch((err) => toast(err.message));
 });
 // bottom nav
 nav.addEventListener("click", async (e) => {
     const { editingCardId, currentDetail } = await import("./views/set-detail.js");
     if (editingCardId || currentDetail()?.addingCard) {
-      const ok = await confirmSheet({ title: "Discard your edit?", confirmLabel: "Discard", cancelLabel: "Keep editing", destructive: true });
+      const ok = await confirmSheet({ title: "Discard your edit?", body: "Your changes to this card will be lost.", confirmLabel: "Discard", cancelLabel: "Keep editing", destructive: true });
       if (!ok) return;
       setEditingCardId(null);
       if (currentDetail()) currentDetail().addingCard = false;

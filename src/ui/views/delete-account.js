@@ -46,8 +46,8 @@ export async function renderDeleteAccount() {
       </div>
 
       <div class="del-actions">
-        <button type="button" class="btn-ghost" data-action="nav-back">Cancel</button>
-        <button type="button" class="btn-primary btn-danger" data-action="delete-account-confirm" disabled>Delete account</button>
+        <button type="button" class="btn btn-ghost" data-action="nav-back">Cancel</button>
+        <button type="button" class="btn btn-primary btn-danger" data-action="delete-account-confirm" disabled>Delete account</button>
       </div>
     </div>`);
   topOfView();

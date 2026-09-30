@@ -49,6 +49,11 @@ export function replaceHTML(el, html) {
 export function insertHTMLBefore(el, html) {
   el.parentNode.insertBefore(fragment(html), el);
 }
+/** The platform name (userAgentData where the browser has it). */
+export function platformName() {
+  return /** @type {any} */ (navigator).userAgentData?.platform || navigator.platform || "";
+}
+export const isMac = () => /Mac/.test(platformName());
 /** Append parsed HTML to the end of an element. */
 export function appendHTML(el, html) {
   el.append(fragment(html));

@@ -145,14 +145,29 @@ export function goReturn() {
   else renderHome();
 }
 
-export async function startGlobalReview() {
+/** Every due card, most overdue first; `limit` caps it (Home's daily goal). */
+export async function startGlobalReview(limit = 0) {
   const { studySets } = await bundle();
-  const items = [];
+  let items = [];
   studySets.forEach((set) =>
-    (set.flashcards || []).forEach((card) => isDue(card) && items.push({ sessionId: set.sessionId, card, examDate: set.examDate }))
+    (set.flashcards || []).forEach((card) => !card.deleted && isDue(card) && items.push({ sessionId: set.sessionId, card, examDate: set.examDate }))
   );
   items.sort((a, b) => byDue(a.card, b.card));
+  if (limit > 0) items = items.slice(0, limit);
   if (!items.length) return toast("Nothing due right now — you're all caught up");
+  startReview(items, "home");
+}
+
+/** A session over exactly these cards, due or not (Home's "Fading soon"). */
+export async function startCardListReview(refs) {
+  const { studySets } = await bundle();
+  const items = [];
+  for (const { sessionId, cardId } of refs) {
+    const set = setFor(sessionId, studySets);
+    const card = set?.flashcards?.find((c) => c.id === cardId && !c.deleted);
+    if (card) items.push({ sessionId, card, examDate: set.examDate });
+  }
+  if (!items.length) return toast("Those cards aren't here any more.");
   startReview(items, "home");
 }
 export async function startSetReview(sessionId) {

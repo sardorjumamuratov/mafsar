@@ -56,7 +56,7 @@ export async function renderGlobal() {
   if (!auth?.accessToken) {
     setHTML(app, `
       <div class="view">
-        ${globalHeader("discover")}
+        ${globalHeader()}
         <div class="block" style="padding:16px;text-align:center;border-radius:var(--r-md);background:var(--surface);border:1px solid var(--border)">
           <div style="font-size:20px;font-weight:650;color:var(--ink);margin-bottom:4px">Sign in to discover sets</div>
           <div style="font-size:14px;color:var(--muted);line-height:1.4">See sets other learners made, picked for what you study.</div>
@@ -69,7 +69,7 @@ export async function renderGlobal() {
 
   setHTML(app, `
     <div class="view">
-      ${globalHeader("discover")}
+      ${globalHeader()}
       <div class="field" style="margin:0 0 12px 0">
         <input type="search" id="globalSearch" placeholder="Search sets..." autocomplete="off" value="${esc(currentQ)}" />
       </div>
