@@ -85,7 +85,7 @@ function paintError(message) {
     <div class="rev-body teach">
       <div class="t-label">${esc(flow)}</div>
       <div class="block tint">${esc(message)}</div>
-      <button class="btn btn-ghost btn-block" data-action="return-focus">Back to the set</button>
+      <button class="btn-ghost btn-block" data-action="return-focus">Back to the set</button>
     </div>`);
 }
 
@@ -113,7 +113,7 @@ function paintForm() {
           </details>`).join("")}
       </div>
       <div class="design-count" id="designCount" aria-live="polite">${counter(len)}</div>
-      <button class="btn btn-primary btn-block" data-action="design-submit">${esc(COPY[s.mode].submit)}</button>
+      <button class="btn-primary btn-block" data-action="design-submit">${esc(COPY[s.mode].submit)}</button>
     </div>`);
   app.querySelectorAll(".design-section textarea").forEach((ta) => {
     const box = /** @type {HTMLTextAreaElement} */ (ta);
@@ -175,7 +175,7 @@ function paintFeedback() {
             x.note ? `<div class="idea-note">${esc(x.note)}</div>` : ""}</div>`;
         }).join("")}</div>` : ""}
       <div class="block tint"><div class="t-label">Next time</div><div style="margin-top:6px">${esc(g.next_time)}</div></div>
-      ${canCurve ? `<button class="btn btn-primary btn-block" data-action="design-curveball">${esc(COPY[s.mode].turnBtn)}</button>` : ""}
+      ${canCurve ? `<button class="btn-primary btn-block" data-action="design-curveball">${esc(COPY[s.mode].turnBtn)}</button>` : ""}
       <button class="btn ${canCurve ? "btn-ghost" : "btn-primary"} btn-block" data-action="design-finish">Finish</button>
     </div>`);
 }
@@ -213,7 +213,7 @@ function paintCurveballForm() {
       <div class="t-label">${esc(COPY[s.mode].turn)}${s.mode === "clinical" ? "" : ` ${s.curveballs.length} of ${MAX_CURVEBALLS}`}</div>
       <p class="teach-lead">${esc(cb.question)}</p>
       <textarea id="curveballInput" class="sa-input" rows="6" aria-label="${esc(COPY[s.mode].turnAsk)}" placeholder="${esc(COPY[s.mode].turnHint)}">${esc(cb.answer)}</textarea>
-      <button class="btn btn-primary btn-block" data-action="design-submit-curveball">Submit</button>
+      <button class="btn-primary btn-block" data-action="design-submit-curveball">Submit</button>
     </div>`);
   document.getElementById("curveballInput")?.focus();
 }
@@ -273,6 +273,6 @@ export async function finishDesignDrill() {
       ${s.curveballs.filter((c) => c.grading).map((c, i) => `
         <div class="block"><div class="t-label">${esc(COPY[s.mode].turn)}${s.mode === "clinical" ? "" : ` ${i + 1}`}</div><div style="margin-top:6px">${esc(c.question)}</div></div>`).join("")}
       <div class="block tint"><div class="t-label">Keep in mind</div><div style="margin-top:6px">${esc((s.curveballs.at(-1)?.grading || s.grading).next_time)}</div></div>
-      <button class="btn btn-primary btn-block" data-action="return-focus">Done</button>
+      <button class="btn-primary btn-block" data-action="return-focus">Done</button>
     </div>`);
 }

@@ -3,7 +3,7 @@ import { FLAME, app, bundle, dateInputValue, esc, examDaysLeft, greeting, nav, s
 import { computeStreak, dayKey, getLastSync, setExamDate, weekActivity } from "../../storage/store.js";
 import { examReadiness, weakTopics } from "../../../shared/readiness.js";
 import { review } from "../../../shared/srs.js";
-import { setRow } from "../views/sets.js";
+import { SetRowHtml as setRow } from "../set-row.js";
 import { detail } from "../views/set-detail.js";
 import { LANDING_BASE } from "../../config.js";
 import { updateBannerHtml } from "../update-banner.js";
@@ -44,50 +44,63 @@ export async function renderHome() {
     totals.mastered += x.mastered;
     totals.due += x.due;
   }
+  
   const exam = examDate
     ? examReadiness({ examDate, total: totals.total, mastered: totals.mastered, due: totals.due })
     : null;
-  const behind = exam?.status === "behind" || exam?.status === "today";
-  // The date input gets its own labeled row rather than competing with the
-  // heading in a flex row — a native date field can't be shrunk gracefully.
-  const examCard = exam
-    ? `<div class="block exam-live">
-         <div class="exam-head">
-           <span class="exam-ic">🎯</span>
-           <div class="exam-head-txt">
-             <div class="t-label">${examDaysLeft(examDate)}</div>
-             <div class="sub">${totals.total} card${totals.total === 1 ? "" : "s"} · ${examSets.length} set${examSets.length === 1 ? "" : "s"}</div>
-           </div>
-           <span class="pill ${behind ? "warn" : "ok"}">${behind ? "Behind" : "On track"}</span>
-         </div>
-         <div class="bar ${exam.progress === 100 ? "ok" : ""}"><i style="width:${totals.total ? exam.progress : 0}%"></i></div>
-         <div class="prog-line" style="font-size:12px">
-           <span style="font-weight:600;color:var(--ink)">${exam.progress}% mastered</span>
-           <span>${exam.dailyTarget}/day to finish</span>
-         </div>
-         <label class="date-field">
-           <span>Exam date</span>
-           <input type="text" placeholder="YYYY-MM-DD" id="homeExamDate" class="date-input" value="${examDate ? dateInputValue(examDate) : nextMonthStr}" />
-         </label>
-         <div class="exam-actions">
-           <button class="btn btn-ghost btn-sm" data-action="exam-pick">Choose sets</button>
-           <button class="btn btn-ghost btn-sm" data-action="exam-clear">Clear</button>
-         </div>
-       </div>`
-    : `<div class="block exam-live">
-         <div class="exam-head" data-action="exam-pick" role="button" tabindex="0">
-           <span class="exam-ic">🎯</span>
-           <div class="exam-head-txt">
-             <div class="t-label">Exam prep</div>
-             <div class="sub">Set a date and pick which sets count</div>
-           </div>
-           <svg class="ic chev" viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"/></svg>
-         </div>
-         <label class="date-field">
-           <span>Exam date</span>
-           <input type="text" placeholder="YYYY-MM-DD" id="homeExamDate" class="date-input" value="${nextMonthStr}" />
-         </label>
-       </div>`;
+    
+  let examCard = "";
+  if (homeExamEditing) {
+    const val = examDate ? dateInputValue(examDate) : nextMonthStr;
+    examCard = `<div class="block tint" style="display: flex; align-items: center; gap: 12px; padding: 12px 14px;">
+        <div style="width: 36px; height: 36px; border-radius: 10px; background: var(--bg-surface2); display: flex; align-items: center; justify-content: center; color: var(--accent-text); flex-shrink: 0">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect><line x1="16" y1="2" x2="16" y2="6"></line><line x1="8" y1="2" x2="8" y2="6"></line><line x1="3" y1="10" x2="21" y2="10"></line></svg>
+        </div>
+        <div style="flex: 1; display: flex; flex-direction: column; gap: 2px">
+          <input type="date" id="home-exam-input" style="font-family: inherit; font-size: 15px; border: none; background: transparent; color: var(--text-primary); outline: none" value="${val}" />
+        </div>
+        <button class="btn" data-action="exam-save-home" style="color: var(--status-mastered); font-weight: 600; font-size: 14px; padding: 0 8px; background: transparent; border: none">Save</button>
+      </div>`;
+  } else if (!exam) {
+    examCard = `<button class="btn" data-action="exam-edit-home" style="width: 100%; display: flex; align-items: center; gap: 12px; padding: 12px 14px; border-radius: 14px; border: 1px solid var(--border-control); background: var(--bg-surface); text-align: left; cursor: pointer; color: var(--text-primary); margin-bottom: 24px">
+        <div style="width: 36px; height: 36px; border-radius: 10px; background: var(--bg-surface2); display: flex; align-items: center; justify-content: center; color: var(--accent-text); flex-shrink: 0">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect><line x1="16" y1="2" x2="16" y2="6"></line><line x1="8" y1="2" x2="8" y2="6"></line><line x1="3" y1="10" x2="21" y2="10"></line></svg>
+        </div>
+        <div style="flex: 1; display: flex; flex-direction: column; gap: 2px">
+          <div style="font-size: 14px; font-weight: 600">Add an exam date</div>
+          <div style="font-size: 13px; color: var(--text-muted)">Get a countdown and a daily target</div>
+        </div>
+        <div style="font-size: 13px; font-weight: 600; color: var(--accent-text)">Add</div>
+      </button>`;
+  } else {
+    const ed = new Date(examDate);
+    const today = new Date();
+    const edDate = new Date(ed.getFullYear(), ed.getMonth(), ed.getDate());
+    const todayDate = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+    const diffD = Math.round((edDate.getTime() - todayDate.getTime()) / (1000 * 60 * 60 * 24));
+    
+    let title = `Exam &middot; ${ed.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })}`;
+    let sub = `${diffD} ${diffD === 1 ? 'day' : 'days'} left &middot; ${exam.dailyTarget} new ${exam.dailyTarget === 1 ? 'card' : 'cards'} a day`;
+    
+    if (diffD === 0) {
+      title = "Exam &middot; Today";
+      sub = `0 days left &middot; ${exam.dailyTarget} new ${exam.dailyTarget === 1 ? 'card' : 'cards'} a day`;
+    } else if (diffD < 0) {
+      title = "Exam passed";
+      sub = "Pick a new date";
+    }
+    
+    examCard = `<button class="btn block tint" data-action="exam-edit-home" style="width: 100%; display: flex; align-items: center; gap: 12px; padding: 12px 14px; text-align: left; cursor: pointer; color: var(--text-primary); margin-bottom: 24px; border: none">
+        <div style="width: 36px; height: 36px; border-radius: 10px; background: var(--bg-surface2); display: flex; align-items: center; justify-content: center; color: var(--accent-text); flex-shrink: 0">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect><line x1="16" y1="2" x2="16" y2="6"></line><line x1="8" y1="2" x2="8" y2="6"></line><line x1="3" y1="10" x2="21" y2="10"></line></svg>
+        </div>
+        <div style="flex: 1; display: flex; flex-direction: column; gap: 2px">
+          <div style="font-size: 14px; font-weight: 600">${title}</div>
+          <div style="font-size: 13px; color: var(--text-muted)">${sub}</div>
+        </div>
+      </button>`;
+  }
+
 
   const allCards = studySets.flatMap((s) => (s.flashcards || []).map((c) => ({ ...c, sessionId: s.sessionId })));
   const weak = weakTopics(reviewLog, allCards);
@@ -100,7 +113,7 @@ export async function renderHome() {
              (w) =>
                `<button type="button" class="insight-row" data-action="open-weak" data-id="${esc(w.sessionId)}" data-card="${esc(w.cardId)}">
                    <span class="q">${esc(w.front)}</span>
-                   ${w.forgetRisk ? `<span class="tag dot" style="color:var(--warm)">Forget soon</span>` : w.misses > 0 ? `<span class="tag">Missed ${w.misses}×</span>` : `<span class="tag">Felt hard</span>`}
+                   ${w.forgetRisk ? `<span class="tag dot" style="color:var(--status-learning)">Forget soon</span>` : w.misses > 0 ? `<span class="tag">Missed ${w.misses}×</span>` : `<span class="tag">Felt hard</span>`}
                    <svg class="ic chev" viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"/></svg>
                  </button>`
            )
@@ -120,7 +133,7 @@ export async function renderHome() {
     : `<div class="block tint" style="text-align:center">
          <div style="font-size:26px">✅</div>
          <div style="font-weight:650;margin-top:6px">You're all caught up</div>
-         <div style="font-size:12.5px;color:var(--muted);margin-top:4px">No cards due right now. Capture a chat or import a set.</div>
+         <div style="font-size:12.5px;color:var(--text-muted);margin-top:4px">No cards due right now. Capture a chat or import a set.</div>
        </div>`;
 
   const updateBanner = await updateBannerHtml();
@@ -166,117 +179,10 @@ export async function renderHome() {
           : `<div class="empty">No study sets yet.<br>Open ChatGPT, Claude, or Gemini and click <b>Save to Mafsar</b>.</div>`
       }
       ${withSets.length > 4 ? `<button class="btn btn-ghost btn-block" data-action="nav-sets">View all ${withSets.length} sets</button>` : ""}
-      ${reviewedToday ? `<div style="text-align:center;font-size:12px;color:var(--faint)">${reviewedToday} cards reviewed today</div>` : ""}
+      ${reviewedToday ? `<div style="text-align:center;font-size:12px;color:var(--text-faint)">${reviewedToday} cards reviewed today</div>` : ""}
     </div>`);
   topOfView();
   
-  const hDate = document.getElementById("homeExamDate");
-  if (hDate && window.flatpickr) {
-    window.flatpickr(hDate, { disableMobile: true, allowInput: true });
-  }
-}
-
-// --- Exam set picker (focus view): choose which sets count toward the exam ---
-export let examDraft = null; // { date: ms|null, picked: Set<sessionId> }
-
-export async function openExamPicker() {
-  const { sessions, studySets } = await bundle();
-  const d = new Date(); d.setMonth(d.getMonth() + 1);
-  const nextMonthStr = dateInputValue(d.getTime());
-  const withSets = sessions.filter((s) => setFor(s.id, studySets));
-  const examSets = studySets.filter((s) => s.examDate && s.examDate > Date.now());
-  examDraft = {
-    date: examSets.length ? Math.min(...examSets.map((s) => s.examDate)) : examDraft?.date || null,
-    picked: new Set(examSets.map((s) => s.sessionId)),
-  };
-  showChrome(false);
-  setHTML(app, `
-    <div class="view">
-      <div class="ahd">
-        <button class="iconbtn" data-action="nav-back" aria-label="Back"><svg class="ic" viewBox="0 0 24 24"><path d="M15 6l-6 6 6 6"/></svg></button>
-        <div class="h-title" style="font-size:16px">Exam sets</div><span style="width:32px"></span>
-      </div>
-      <div class="field"><label>Exam date</label>
-        <input type="text" placeholder="YYYY-MM-DD" id="pickerDate" class="date-input" value="${examDraft.date ? dateInputValue(examDraft.date) : nextMonthStr}" style="width:auto" /></div>
-      <div class="help" style="margin:0">Pick the sets this exam covers. Selected sets resurface cards before the date and count toward readiness.</div>
-      <div class="block pick-block">
-        ${
-          withSets.length
-            ? withSets
-                .map((session) => {
-                  const set = setFor(session.id, studySets);
-                  const s = summarize(set);
-                  return `<label class="pick-row">
-                    <input type="checkbox" class="picker-check" data-id="${esc(session.id)}" ${examDraft.picked.has(session.id) ? "checked" : ""} />
-                    <span style="flex:1;min-width:0">
-                      <span class="name">${esc(session.title || "Untitled")}</span>
-                      <span class="blurb" id="blurb-${esc(session.id)}">${esc(set?.blurb || `${s.total} cards`)}</span>
-                    </span>
-                    <span class="tag">${s.total}</span>
-                  </label>`;
-                })
-                .join("")
-            : `<div class="empty">No sets yet — capture or import something first.</div>`
-        }
-      </div>
-      <button class="btn btn-primary btn-block" data-action="picker-save" ${withSets.length ? "" : "disabled"}>Save exam</button>
-    </div>`);
-  topOfView();
-  fillMissingBlurbs(withSets, studySets);
   
-  const pDate = document.getElementById("pickerDate");
-  if (pDate && window.flatpickr) {
-    window.flatpickr(pDate, { disableMobile: true, allowInput: true });
-  }
-}
-
-/** Fetch tiny AI blurbs for sets that don't have one; patch rows as they land. */
-export async function fillMissingBlurbs(sessions, studySets) {
-  for (const session of sessions) {
-    const set = setFor(session.id, studySets);
-    if (!set || set.blurb || !set.flashcards?.length) continue;
-    const cell = document.getElementById(`blurb-${session.id}`);
-    if (!cell) continue;
-    try {
-      const r = await send({ type: "GET_BLURB", sessionId: session.id });
-      if (r.blurb && document.getElementById(`blurb-${session.id}`)) {
-        document.getElementById(`blurb-${session.id}`).textContent = r.blurb;
-      }
-    } catch {
-      /* offline or LLM error — the card count stays as the label */
-    }
-  }
-}
-
-export async function saveExamSelection() {
-  const dateStr = /** @type {HTMLInputElement} */ (document.getElementById("pickerDate"))?.value;
-  const date = dateStr ? new Date(`${dateStr}T23:59:59`).getTime() : null;
-  if (!date) return toast("Pick an exam date first.");
-  const { studySets } = await bundle();
-  for (const set of studySets) {
-    const picked = examDraft?.picked.has(set.sessionId);
-    if (picked && set.examDate !== date) await setExamDate(set.sessionId, date);
-    if (!picked && set.examDate) await setExamDate(set.sessionId, null);
-  }
-  toast("Exam date set. Cards will resurface before it.");
-  renderHome();
-}
-
-// --- Sharing: the share link lives at the top of every set detail ----------
-// The code is cached on the set (local-only); the link is ${LANDING_BASE}/s/{code}.
-export let shareOpenFor = null; // sessionId whose share block is revealed (survives tab switches)
-
-
-export function setExamDraft(v) { examDraft = v; }
-export function setShareOpenFor(v) { shareOpenFor = v; }
-
-/** Stands in for the hero while the first sync is still fetching this account's sets. */
-function homeSkeleton() {
-  return `<div class="skel" role="status" aria-label="Loading your sets">
-    <div class="sk-row" aria-hidden="true" style="height:90px">
-      <div class="sk" style="height:15px;width:40%;margin:10px auto"></div>
-      <div class="sk" style="height:12px;width:60%;margin:10px auto"></div>
-    </div>
-  </div>`;
 }
 

@@ -67,14 +67,8 @@ export function createApp(db: DB) {
     llmPerUser: slidingWindow(DEFAULT_LIMITS.llmPerUser),
   };
 
-  // Public — required by the Chrome Web Store / Firefox Add-ons listings.
-  
-  app.route("/v1", createRatingsApp(db));
-  app.route("/v1/discover", createDiscoverApp(db));
-  app.route("/v1/admin", createAdminApp(db));
-  
-
-
+  // Feedback works signed out too, so it's registered before the /v1 auth
+  // middleware below (routes registered earlier answer before later middleware).
 const unauthFeedbackLimiter = limitByIp(slidingWindow({ limit: 5, windowMs: 60 * 60 * 1000 }), (c) => clientIp(c.req.raw.headers));
 const authFeedbackLimiter = limitByUser(slidingWindow({ limit: 20, windowMs: 24 * 60 * 60 * 1000 }));
 
@@ -101,6 +95,7 @@ app.post("/v1/feedback", async (c, next) => {
   );
   return c.json({ ok: true });
 });
+  // Public — required by the Chrome Web Store / Firefox Add-ons listings.
   app.get("/privacy", (c) => c.html(PRIVACY_HTML));
 
   // Serve landing page and its assets
@@ -138,6 +133,13 @@ app.post("/v1/feedback", async (c, next) => {
     if (!live) return c.json({ error: "unauthorized" }, 401);
     return next();
   });
+
+  // Mounted AFTER the auth middleware on purpose: a route registered before a
+  // middleware answers without running it, which left Discover and the admin
+  // routes open to anyone without a token.
+  app.route("/v1", createRatingsApp(db));
+  app.route("/v1/discover", createDiscoverApp(db));
+  app.route("/v1/admin", createAdminApp(db));
 
   app.onError((err, c) => {
     const e = err as Error & { issues?: unknown; status?: number };

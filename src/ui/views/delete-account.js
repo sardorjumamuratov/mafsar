@@ -29,7 +29,7 @@ export async function renderDeleteAccount() {
 
       <div class="block tint del-export">
         <span>Want a copy first?</span>
-        <button type="button" class="btn btn-ghost btn-sm" data-action="export-backup">Export your data</button>
+        <button type="button" class="btn-ghost btn-sm" data-action="export-backup">Export your data</button>
       </div>
 
       ${auth?.user?.email ? `<div class="del-who">Signed in as ${esc(auth.user.email)}</div>` : ""}
@@ -46,8 +46,8 @@ export async function renderDeleteAccount() {
       </div>
 
       <div class="del-actions">
-        <button type="button" class="btn btn-ghost" data-action="nav-back">Cancel</button>
-        <button type="button" class="btn btn-primary btn-danger" data-action="delete-account-confirm" disabled>Delete account</button>
+        <button type="button" class="btn-ghost" data-action="nav-back">Cancel</button>
+        <button type="button" class="btn-primary btn-danger" data-action="delete-account-confirm" disabled>Delete account</button>
       </div>
     </div>`);
   topOfView();

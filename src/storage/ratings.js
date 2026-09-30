@@ -1,14 +1,20 @@
 import { readRaw, saveRaw } from "./store.js";
 import { backendLookupRatings, backendSendRating, backendDeleteRating } from "../sync/api.js";
-import { syncNow } from "../sync/sync.js";
+import { formatCount as sharedFormatCount } from "../../shared/format.js";
 
-// { [rootId]: { yourStars, ratingAvg, ratingCount, isGlobal, fetchedAt, pendingStars: null|number|"delete" } }
+// One store for every screen, keyed by the ROOT set id (a copy's rating
+// belongs to the set it was copied from):
+//   { [rootId]: { yourStars, ratingAvg, ratingCount, isGlobal, fetchedAt,
+//                 pendingStars?: number | "delete", clientSetId? } }
+// `clientSetId` is the learner's own set id, which the rating API needs (it
+// resolves the root itself); it's kept so an offline change can be sent later.
 let cache = {};
+const CHANGED = "mafsar-ratings-changed";
+const notify = () => { try { window.dispatchEvent(new Event(CHANGED)); } catch {} };
 
 export async function loadRatingsStore() {
   const res = await readRaw(["ratings"]);
-  const data = res.ratings;
-  if (data) cache = data;
+  if (res.ratings) cache = res.ratings;
 }
 
 async function saveRatingsStore() {
@@ -19,176 +25,99 @@ export function getRating(rootId) {
   return cache[rootId] || { yourStars: null, ratingAvg: null, ratingCount: 0, isGlobal: false, fetchedAt: 0 };
 }
 
-let lookupTimeout = null;
-export function requestRatingsLookup(ids) {
-  if (ids.length === 0) return;
-  const now = Date.now();
-  const toFetch = ids.filter(id => !cache[id] || (now - cache[id].fetchedAt > 60000));
-  if (toFetch.length === 0) return;
-
-  if (lookupTimeout) clearTimeout(lookupTimeout);
-  lookupTimeout = setTimeout(async () => {
-    try {
-      const results = await backendLookupRatings(toFetch);
-      const t = Date.now();
-      for (const id in results) {
-        if (!cache[id]) cache[id] = {};
-        const r = results[id];
-        cache[id].yourStars = r.yourStars;
-        cache[id].ratingAvg = r.ratingAvg;
-        cache[id].ratingCount = r.ratingCount;
-        cache[id].isGlobal = r.isGlobal;
-        cache[id].fetchedAt = t;
-      }
-      await saveRatingsStore();
-      window.dispatchEvent(new Event("mafsar-ratings-changed"));
-    } catch (e) {
-      console.error("Lookup ratings failed", e);
-    }
-  }, 100); // debounce slightly
+/** The whole store, loaded from storage. Views index it by root id. */
+export async function readRatings() {
+  await loadRatingsStore();
+  return cache;
 }
 
-export async function rateSet(rootId, clientSetId, stars) {
-  if (!cache[rootId]) cache[rootId] = { ratingAvg: null, ratingCount: 0, isGlobal: false, fetchedAt: 0 };
-  
+const isOffline = (e) => e?.message === "Offline" || e?.message === "Failed to fetch" || (typeof navigator !== "undefined" && navigator.onLine === false);
+
+async function write(rootId, clientSetId, stars) {
+  if (!cache[rootId]) cache[rootId] = { yourStars: null, ratingAvg: null, ratingCount: 0, isGlobal: false, fetchedAt: 0 };
   const prev = { ...cache[rootId] };
-  
   cache[rootId].yourStars = stars;
-  cache[rootId].pendingStars = stars;
+  cache[rootId].pendingStars = stars ?? "delete";
+  cache[rootId].clientSetId = clientSetId;
   await saveRatingsStore();
-  window.dispatchEvent(new Event("mafsar-ratings-changed"));
+  notify();
 
   try {
-    const res = await backendSendRating(clientSetId, stars);
-    cache[rootId].yourStars = res.yourStars;
-    cache[rootId].ratingAvg = res.avg;
-    cache[rootId].ratingCount = res.count;
+    const res = stars == null ? await backendDeleteRating(clientSetId) : await backendSendRating(clientSetId, stars);
+    Object.assign(cache[rootId], { yourStars: res.yourStars ?? null, ratingAvg: res.avg ?? null, ratingCount: res.count ?? 0, fetchedAt: Date.now() });
     delete cache[rootId].pendingStars;
-    cache[rootId].fetchedAt = Date.now();
     await saveRatingsStore();
-    window.dispatchEvent(new Event("mafsar-ratings-changed"));
+    notify();
   } catch (e) {
-    if (e.message !== "Offline") {
-      // rollback if not offline
-      cache[rootId] = prev;
-      await saveRatingsStore();
-      window.dispatchEvent(new Event("mafsar-ratings-changed"));
-      throw e;
-    }
+    // Offline: keep it pending, shown as saved, and send it on the next sync.
+    if (isOffline(e)) return;
+    cache[rootId] = prev;
+    await saveRatingsStore();
+    notify();
+    throw e;
   }
 }
 
-export async function clearRating(rootId, clientSetId) {
-  if (!cache[rootId]) return;
-  
-  const prev = { ...cache[rootId] };
-  cache[rootId].yourStars = null;
-  cache[rootId].pendingStars = "delete";
-  await saveRatingsStore();
-  window.dispatchEvent(new Event("mafsar-ratings-changed"));
-
-  try {
-    const res = await backendDeleteRating(clientSetId);
-    cache[rootId].yourStars = res.yourStars;
-    cache[rootId].ratingAvg = res.avg;
-    cache[rootId].ratingCount = res.count;
-    delete cache[rootId].pendingStars;
-    cache[rootId].fetchedAt = Date.now();
-    await saveRatingsStore();
-    window.dispatchEvent(new Event("mafsar-ratings-changed"));
-  } catch (e) {
-    if (e.message !== "Offline") {
-      // rollback
-      cache[rootId] = prev;
-      await saveRatingsStore();
-      window.dispatchEvent(new Event("mafsar-ratings-changed"));
-      throw e;
-    }
-  }
+export function rateSet(rootId, clientSetId, stars) {
+  return write(rootId, clientSetId, stars);
 }
 
+export function clearRating(rootId, clientSetId = rootId) {
+  return write(rootId, clientSetId, null);
+}
+
+/** Send ratings changed while offline. Called by syncNow and on `online`. */
 export async function flushPendingRatings() {
-  for (const rootId in cache) {
-    const pending = cache[rootId].pendingStars;
-    if (pending) {
-      try {
-        if (pending === "delete") {
-          const res = await backendDeleteRating(rootId);
-          cache[rootId].yourStars = res.yourStars;
-          cache[rootId].ratingAvg = res.avg;
-          cache[rootId].ratingCount = res.count;
-        } else {
-          const res = await backendSendRating(rootId, pending);
-          cache[rootId].yourStars = res.yourStars;
-          cache[rootId].ratingAvg = res.avg;
-          cache[rootId].ratingCount = res.count;
-        }
-        delete cache[rootId].pendingStars;
-        cache[rootId].fetchedAt = Date.now();
-      } catch (e) {
-        if (e.message === "Offline") return;
-        if (e.status === 404) {
-          delete cache[rootId].pendingStars;
-        }
-      }
+  await loadRatingsStore();
+  for (const rootId of Object.keys(cache)) {
+    const entry = cache[rootId];
+    const pending = entry.pendingStars;
+    if (pending == null) continue;
+    const clientSetId = entry.clientSetId || rootId;
+    try {
+      const res = pending === "delete" ? await backendDeleteRating(clientSetId) : await backendSendRating(clientSetId, pending);
+      Object.assign(entry, { yourStars: res.yourStars ?? null, ratingAvg: res.avg ?? null, ratingCount: res.count ?? 0, fetchedAt: Date.now() });
+      delete entry.pendingStars;
+    } catch (e) {
+      if (isOffline(e)) break;
+      // The set is gone (404) or the value was refused: drop the change.
+      delete entry.pendingStars;
     }
   }
   await saveRatingsStore();
-  window.dispatchEvent(new Event("mafsar-ratings-changed"));
+  notify();
 }
 
-if (typeof window !== "undefined" && window.addEventListener) window.addEventListener("online", flushPendingRatings);
+if (typeof window !== "undefined" && window.addEventListener) window.addEventListener("online", () => { flushPendingRatings().catch(() => {}); });
+
+// Other people's ratings don't change the learner's own rows, so a sync never
+// brings them; the lookup does. At most once a minute per set.
+let lookupTimer = null;
+export function refreshRatings(rootIds) {
+  const now = Date.now();
+  const due = [...new Set(rootIds || [])].filter((id) => id && (!cache[id] || now - (cache[id].fetchedAt || 0) > 60_000)).slice(0, 200);
+  if (!due.length) return Promise.resolve();
+  clearTimeout(lookupTimer);
+  return new Promise((resolve) => {
+    lookupTimer = setTimeout(async () => {
+      try {
+        const results = await backendLookupRatings(due);
+        const t = Date.now();
+        for (const [id, r] of Object.entries(results || {})) {
+          const entry = cache[id] || (cache[id] = { yourStars: null, ratingAvg: null, ratingCount: 0, isGlobal: false, fetchedAt: 0 });
+          // A pending local change wins over what the server knew before it.
+          if (entry.pendingStars == null) entry.yourStars = r.yourStars ?? null;
+          Object.assign(entry, { ratingAvg: r.ratingAvg ?? null, ratingCount: r.ratingCount ?? 0, isGlobal: !!r.isGlobal, fetchedAt: t });
+        }
+        await saveRatingsStore();
+        notify();
+      } catch {}
+      resolve();
+    }, 100);
+  });
+}
+export const requestRatingsLookup = refreshRatings;
+
 export function formatCount(count) {
-  if (count < 1000) return count.toString();
-  if (count < 1000000) return (count / 1000).toFixed(1).replace(/\.0$/, '') + 'k';
-  return (count / 1000000).toFixed(1).replace(/\.0$/, '') + 'M';
-}
-
-export function renderStarsGroup(rootId, clientSetId, cacheData, isDisplayOnly) {
-  const yourStars = cacheData.yourStars;
-  const avg = cacheData.ratingAvg;
-  const count = cacheData.ratingCount;
-  const global = cacheData.isGlobal;
-  
-  let html = `<div style="display:flex;gap:8px;align-items:center;margin-left:-6px">`;
-  html += `<div class="rating-group" role="radiogroup" aria-label="Rate this set" data-root="${rootId}" data-client="${clientSetId}" style="display:flex">`;
-  
-  for (let i = 1; i <= 5; i++) {
-    const filled = yourStars && i <= yourStars;
-    const color = filled ? "var(--warm, #f0c75e)" : "var(--faint, #6d7c78)";
-    const path = `M12 3.5l2.6 5.3 5.9.9-4.3 4.1 1 5.8L12 16.9l-5.2 2.7 1-5.8L3.5 9.7l5.9-.9z`;
-    const svg = `<svg class="ic" viewBox="0 0 24 24" style="width:22px;height:22px;stroke:${color};stroke-width:1.7;stroke-linejoin:round;fill:${filled ? color : 'none'}"><path d="${path}" /></svg>`;
-    
-    html += `<button type="button" class="star-btn" role="radio" aria-checked="${yourStars === i}" aria-label="${i} star${i>1?'s':''}" data-val="${i}" style="width:34px;height:34px;display:flex;align-items:center;justify-content:center;background:none;border:none;padding:0;cursor:pointer"${isDisplayOnly ? ' disabled' : ''}>${svg}</button>`;
-  }
-  html += `</div>`;
-  
-  let text = "";
-  if (!global && !yourStars) text = "Tap to rate";
-  else if (!global && yourStars) text = `Your rating � ${yourStars}`;
-  else if (global && count === 0) text = "No ratings yet";
-  else text = `Avg ${avg ? avg.toFixed(1) : ''} � ${formatCount(count)} rating(s)`;
-  
-  html += `<div style="font-size:13px;color:var(--muted)">${text}</div></div>`;
-  return html;
-}
-
-export function renderMetaSuffix(cacheData) {
-  if (!cacheData || cacheData.ratingCount === 0 && !cacheData.yourStars) return cacheData?.isGlobal ? ` � ?? Global` : "";
-  
-  const avg = cacheData.ratingAvg ? cacheData.ratingAvg.toFixed(1) : (cacheData.yourStars ? cacheData.yourStars.toFixed(1) : "");
-  let suffix = "";
-  if (!cacheData.isGlobal) {
-    if (cacheData.yourStars) suffix = " yours";
-  } else {
-    suffix = ` (${formatCount(cacheData.ratingCount)})`;
-  }
-  
-  const star = `<svg viewBox="0 0 24 24" style="width:12px;height:12px;display:inline-block;vertical-align:-2px;fill:#f0c75e"><path d="M12 3.5l2.6 5.3 5.9.9-4.3 4.1 1 5.8L12 16.9l-5.2 2.7 1-5.8L3.5 9.7l5.9-.9z"/></svg>`;
-  
-  let res = ` � ${star} ${avg}${suffix}`;
-  if (cacheData.isGlobal) {
-    res += ` � <svg viewBox="0 0 24 24" style="width:12px;height:12px;display:inline-block;vertical-align:-2px;stroke:currentColor;stroke-width:2.2;fill:none"><circle cx="12" cy="12" r="10"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg> Global`;
-  }
-  return res;
+  return sharedFormatCount(count);
 }

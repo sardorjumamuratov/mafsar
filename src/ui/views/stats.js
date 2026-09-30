@@ -1,4 +1,5 @@
-import { app, setHTML, esc, toast, send, bundle, topOfView } from "../core.js";
+import { app, appendHTML, setHTML, esc, toast, send, bundle, topOfView } from "../core.js";
+import { openSheet, closeSheet as closeSharedSheet } from "../sheet.js";
 import { setNav, showChrome } from "../nav.js";
 import { getReviewLog } from "../../storage/store.js";
 
@@ -15,7 +16,7 @@ export async function renderStats() {
       <div style="padding:16px;border-radius:16px;background:var(--surface);border:1px solid var(--border);display:flex;flex-direction:column;gap:12px;margin:16px">
         <div style="font-size:15px;font-weight:600;color:var(--ink)">Your stats appear after your first few sessions</div>
         <div style="font-size:14px;color:var(--muted)">Review 10 cards to unlock trends and feedback.</div>
-        <button class="btn btn-primary" style="height:52px;border-radius:14px" onclick="/** @type {any} */ (window).__mafsar_startReview()">Start review</button>
+        <button class="btn btn-primary" style="height:52px;border-radius:14px" data-action="start-review">Start review</button>
       </div>
       ${renderFeedbackRow()}
     `);
@@ -61,13 +62,13 @@ export async function renderStats() {
 function renderFeedbackRow() {
   return `
     <div style="padding:0 16px;margin-top:24px;margin-bottom:120px">
-      <button onclick="/** @type {any} */ (window).__mafsar_openFeedback()" style="width:100%;padding:14px;border-radius:14px;border:1px solid var(--border);background:transparent;display:flex;align-items:center;gap:12px;text-align:left">
-        <div style="font-size:18px;color:var(--primary)">??</div>
+      <button type="button" data-action="open-feedback" style="width:100%;padding:14px;border-radius:14px;border:1px solid var(--border-control);background:transparent;display:flex;align-items:center;gap:12px;text-align:left;cursor:pointer">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color:var(--accent-text);flex-shrink:0" aria-hidden="true"><path d="M21 12a8 8 0 0 1-11.6 7.1L4 20l1-4.6A8 8 0 1 1 21 12z"/></svg>
         <div style="flex:1;display:flex;flex-direction:column">
           <div style="font-size:15px;font-weight:600;color:var(--ink)">Send feedback about the app</div>
           <div style="font-size:13px;color:var(--muted)">Bugs, ideas, anything</div>
         </div>
-        <div style="font-size:16px;color:#6d7c78">�</div>
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--status-new)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 6l6 6-6 6"/></svg>
       </button>
     </div>
   `;
@@ -77,18 +78,15 @@ function getSheetHost() {
   return document.getElementById("sheet");
 }
 
-/** @type {any} */ (window).__mafsar_openFeedback = () => {
+export function openFeedback() {
   const host = getSheetHost();
-  if(!host) return;
-  host.innerHTML = `
-    <div class="sheet-backdrop" id="fbBackdrop"></div>
-    <div class="sheet-box" style="padding:10px 22px 24px;display:flex;flex-direction:column;gap:16px;border-top-left-radius:24px;border-top-right-radius:24px">
-      <div style="font-size:20px;font-weight:650;color:var(--ink)">Send feedback</div>
+  openSheet("Send feedback", `
+    <div style="display:flex;flex-direction:column;gap:16px">
       <textarea id="feedbackText" placeholder="Tell us more..." rows="5" maxlength="4000" style="width:100%;border-radius:12px;border:1px solid var(--border);padding:12px;font-size:14px;background:var(--surface)"></textarea>
       
       <div id="screenshotPreview" style="display:none;position:relative;width:64px;height:64px">
         <img id="screenshotImg" style="width:64px;height:64px;object-fit:cover;border-radius:8px">
-        <button id="removeScreenshot" style="position:absolute;top:-6px;right:-6px;background:var(--surface-2);border-radius:50%;width:20px;height:20px;border:1px solid var(--border);font-size:12px;display:flex;align-items:center;justify-content:center;color:var(--ink)">?</button>
+        <button id="removeScreenshot" aria-label="Remove screenshot" style="position:absolute;top:-6px;right:-6px;background:var(--surface-2);border-radius:50%;width:20px;height:20px;border:1px solid var(--border);font-size:12px;display:flex;align-items:center;justify-content:center;color:var(--ink)">×</button>
       </div>
       
       <button class="btn" id="attachScreenshotBtn" style="height:36px;border-radius:12px;border:1px solid var(--border);background:transparent;color:var(--ink);font-size:14px;font-weight:500">Attach a screenshot</button>
@@ -96,16 +94,9 @@ function getSheetHost() {
       
       <button class="btn btn-primary" id="sendFeedbackBtn" disabled style="height:50px;border-radius:12px;font-size:16px;font-weight:650;margin-top:8px">Send</button>
     </div>
-  `;
-  host.classList.remove("hidden");
-  
-  const closeSheet = () => {
-    host.classList.add("hidden");
-    host.innerHTML = "";
-  };
-  
-  const bd = document.getElementById("fbBackdrop");
-  if(bd) bd.onclick = closeSheet;
+  `);
+  const closeSheet = closeSharedSheet;
+  if (!host) return;
   
   const textEl = /** @type {HTMLTextAreaElement} */ (document.getElementById("feedbackText"));
   const sendBtn = /** @type {HTMLButtonElement} */ (document.getElementById("sendFeedbackBtn"));
@@ -168,15 +159,20 @@ function getSheetHost() {
     sendBtn.disabled = true;
     sendBtn.textContent = "Sending...";
     try {
-      await send({ type: "SEND_FEEDBACK", text: textEl.value.trim(), image: imageData, route: "Stats" });
+      // The worker reads `imageData` (a plain `image` field was silently dropped).
+      await send({
+        type: "SEND_FEEDBACK", text: textEl.value.trim(), imageData, route: "Stats",
+        appVersion: chrome.runtime.getManifest().version,
+        platform: (navigator.userAgentData?.platform || navigator.platform || "") + (navigator.userAgent.includes("Firefox") ? " Firefox" : " Chrome"),
+      });
       toast("Thanks, feedback sent");
       closeSheet();
     } catch(err) {
-      sendBtn.textContent = "Couldn't send � Retry";
+      sendBtn.textContent = "Couldn't send · Retry";
       sendBtn.disabled = false;
     }
   };
-};
+}
 
 export function getRangeLogs(logs, tab) {
   const now = new Date();
@@ -197,7 +193,7 @@ function renderTab(tab, allLogs) {
   // metrics
   const revs = logs.length;
   const retCount = logs.filter(l => l.grade === 4 || l.grade === 5).length;
-  const ret = revs === 0 ? "�" : Math.round((retCount / revs) * 100) + "%";
+  const ret = revs === 0 ? "—" : Math.round((retCount / revs) * 100) + "%";
   
   const dur = logs.reduce((a, b) => a + (b.durationMs || 0), 0);
   const durMins = Math.floor(dur / 60000);
@@ -222,7 +218,7 @@ function renderTab(tab, allLogs) {
   
   html += renderChart(logs, tab);
   
-  cont.innerHTML = html;
+  setHTML(cont, html);
   
   renderAllCardsAndFeedback(allLogs, tab);
 }
@@ -237,7 +233,7 @@ async function renderAllCardsAndFeedback(allLogs, tab) {
   html += renderFeedbackRow();
   
   const c = document.getElementById("statsContent");
-  if(c) c.insertAdjacentHTML('beforeend', html);
+  if(c) appendHTML(c, html);
 }
 
 export function renderChart(logs, tab) {

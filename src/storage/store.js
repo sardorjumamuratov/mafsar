@@ -414,6 +414,18 @@ export async function deleteCard(sessionId, cardId) {
   await set(KEYS.STUDY_SETS, sets);
   return true;
 }
+export async function restoreCard(sessionId, cardId) {
+  const sets = await get(KEYS.STUDY_SETS, []);
+  const setRec = sets.find((s) => s.sessionId === sessionId);
+  if (!setRec) return false;
+  const card = setRec.flashcards.find((c) => c.id === cardId);
+  if (!card) return false;
+  delete card.deleted; // remove tombstone
+  card.updatedAt = nowISO();
+  setRec.updatedAt = nowISO();
+  await set(KEYS.STUDY_SETS, sets);
+  return true;
+}
 
 // --- Review log (insights + forgetting predictions) --------------------------
 // reviewLog -> [{ id, cardId, sessionId?, grade, prevInterval, newInterval,

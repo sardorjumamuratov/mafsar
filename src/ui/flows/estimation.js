@@ -39,8 +39,8 @@ function paintEstimationLoader(msg) {
     <div class="rev-body teach">
       <div class="t-label">Estimation drill</div>
       <div style="display:flex;align-items:center;gap:10px;margin-top:8px">
-        <span class="spinner" style="border-color:var(--border);border-top-color:var(--primary)"></span>
-        <span style="font-size:13px;color:var(--muted)">${esc(msg)}</span>
+        <span class="spinner" style="border-color:var(--border-control);border-top-color:var(--accent)"></span>
+        <span style="font-size:13px;color:var(--text-muted)">${esc(msg)}</span>
       </div>
     </div>`);
 }
@@ -68,9 +68,7 @@ export function paintEstimationQuestion() {
   const q = s.task.questions[s.idx];
   
   setHTML(app, `
-    <div class="rev-top">${XBTN}<div class="bar"><i style="width:${esc(((s.idx) / s.task.questions.length) * 100)}%"></i></div>
-      <span class="rev-count tnum">${esc(s.idx + 1)} / ${esc(s.task.questions.length)}</span>
-    </div>
+    <div class="ahd" style="display:flex;align-items:center;padding:12px;gap:12px"><button class="iconbtn" data-action="return-focus" aria-label="End session"><svg class="ic" viewBox="0 0 24 24" width="20" height="20" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg></button><div class="focus-track"><div class="focus-fill" style="width:${Math.max(2, esc(((s.idx) / s.task.questions.length) * 100))}%"></div></div><div style="font-size:13px;color:var(--text-muted);font-variant-numeric:tabular-nums">${esc(s.idx + 1)} / ${esc(s.task.questions.length)}</div></div>
     <div class="rev-body teach">
       <div class="t-label">Question ${esc(s.idx + 1)}</div>
       <p class="teach-lead" style="margin-bottom:12px;font-size:18px">${esc(q.question)}</p>
@@ -78,7 +76,7 @@ export function paintEstimationQuestion() {
       <div style="display:flex;flex-direction:column;gap:8px">
         <input type="text" id="estimationValue" class="sa-input" inputmode="text" placeholder="e.g. 300 TB, 12k QPS, 2.5 GB/s" aria-label="Your estimate, with a unit" style="font-size:18px;padding:12px" autofocus />
       </div>
-      <button class="btn btn-primary btn-block" data-action="estimation-submit" style="margin-top:16px">Check</button>
+      <button class="btn-primary btn-block" data-action="estimation-submit" style="margin-top:16px">Check</button>
     </div>`);
     
   // Allow enter to submit
@@ -119,27 +117,25 @@ function paintEstimationGrade() {
   const label = labels[r.grade];
   
   setHTML(app, `
-    <div class="rev-top">${XBTN}<div class="bar"><i style="width:${esc(((s.idx + 1) / s.task.questions.length) * 100)}%"></i></div>
-      <span class="rev-count tnum">${esc(s.idx + 1)} / ${esc(s.task.questions.length)}</span>
-    </div>
+    <div class="ahd" style="display:flex;align-items:center;padding:12px;gap:12px"><button class="iconbtn" data-action="return-focus" aria-label="End session"><svg class="ic" viewBox="0 0 24 24" width="20" height="20" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg></button><div class="focus-track"><div class="focus-fill" style="width:${Math.max(2, esc(((s.idx + 1) / s.task.questions.length) * 100))}%"></div></div><div style="font-size:13px;color:var(--text-muted);font-variant-numeric:tabular-nums">${esc(s.idx + 1)} / ${esc(s.task.questions.length)}</div></div>
     <div class="rev-body teach">
       <div class="t-label">Question ${esc(s.idx + 1)}</div>
       <p class="teach-lead" style="margin-bottom:12px;font-size:18px">${esc(q.question)}</p>
       
-      <div style="background:var(--surface-2);border-radius:8px;padding:12px;margin-bottom:12px">
+      <div style="background:var(--bg-surface2);border-radius:8px;padding:12px;margin-bottom:12px">
         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
           <span style="font-weight:600">Your answer</span>
           <span class="idea-chip ${cl}">${esc(label)}</span>
         </div>
         <div style="font-size:20px;font-weight:700">${esc(r.answer.original)}</div>
-        <div style="font-size:13px;color:var(--muted);margin-top:4px">Reference: ${esc(q.reference_value)} ${esc(q.reference_unit)}</div>
-        ${r.note ? `<div style="font-size:13px;color:var(--danger);margin-top:4px">${esc(r.note)}</div>` : ""}
+        <div style="font-size:13px;color:var(--text-muted);margin-top:4px">Reference: ${esc(q.reference_value)} ${esc(q.reference_unit)}</div>
+        ${r.note ? `<div style="font-size:13px;color:var(--danger-text);margin-top:4px">${esc(r.note)}</div>` : ""}
       </div>
       
       <div class="t-label">Solution</div>
       <div class="block tint" style="font-size:14px;line-height:1.5">${esc(q.worked_solution)}</div>
       
-      <button class="btn btn-primary btn-block" data-action="estimation-next" style="margin-top:16px">Next</button>
+      <button class="btn-primary btn-block" data-action="estimation-next" style="margin-top:16px">Next</button>
     </div>`);
 }
 
@@ -191,24 +187,24 @@ function paintEstimationSummary(summary) {
       <div class="ahd"><div class="h-title">Drill complete</div></div>
       
       <div style="display:flex;gap:8px;margin-bottom:16px;text-align:center">
-        <div style="flex:1;background:var(--surface-2);border-radius:8px;padding:12px">
-          <div style="font-size:24px;font-weight:700;color:var(--success)">${spotOn}</div>
-          <div style="font-size:12px;color:var(--muted)">Spot on</div>
+        <div style="flex:1;background:var(--bg-surface2);border-radius:8px;padding:12px">
+          <div style="font-size:24px;font-weight:700;color:var(--status-mastered)">${spotOn}</div>
+          <div style="font-size:12px;color:var(--text-muted)">Spot on</div>
         </div>
-        <div style="flex:1;background:var(--surface-2);border-radius:8px;padding:12px">
-          <div style="font-size:24px;font-weight:700;color:var(--warm)">${ballpark}</div>
-          <div style="font-size:12px;color:var(--muted)">Ballpark</div>
+        <div style="flex:1;background:var(--bg-surface2);border-radius:8px;padding:12px">
+          <div style="font-size:24px;font-weight:700;color:var(--status-learning)">${ballpark}</div>
+          <div style="font-size:12px;color:var(--text-muted)">Ballpark</div>
         </div>
-        <div style="flex:1;background:var(--surface-2);border-radius:8px;padding:12px">
-          <div style="font-size:24px;font-weight:700;color:var(--danger)">${off}</div>
-          <div style="font-size:12px;color:var(--muted)">Off</div>
+        <div style="flex:1;background:var(--bg-surface2);border-radius:8px;padding:12px">
+          <div style="font-size:24px;font-weight:700;color:var(--danger-text)">${off}</div>
+          <div style="font-size:12px;color:var(--text-muted)">Off</div>
         </div>
       </div>
       
       <div class="listhd"><span class="t-label">Habit to fix</span></div>
       <div class="block tint"><div style="margin-top:6px">${esc(summary.habit_to_fix)}</div></div>
       
-      <button class="btn btn-primary btn-block" data-action="return-focus" style="margin-top:16px">Done</button>
+      <button class="btn-primary btn-block" data-action="return-focus" style="margin-top:16px">Done</button>
     </div>`);
 }
 

@@ -26,19 +26,20 @@ export async function renderYou() {
   const accountHtml = auth?.user
     ? `<div id="billingSlot">${billingSkeleton()}</div><div class="block" style="display:flex;flex-direction:column;gap:10px">
          <div style="display:flex;align-items:center;gap:10px">
-           <span class="tag dot" style="color:var(--success)"></span>
+           <span class="tag dot" style="color:var(--status-mastered)"></span>
            <div style="min-width:0">
              <div style="font-size:13px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(auth.user.email)}</div>
-             <div style="font-size:11.5px;color:var(--muted)">${
+             <div style="font-size:11.5px;color:var(--text-muted)">${
                auth.lastSync ? "Last synced " + new Date(auth.lastSync).toLocaleString() : "Not backed up yet"
              }</div>
            </div>
          </div>
-         <button class="btn btn-ghost btn-block" data-action="auth-signout">Sign out</button>
+         
+          <button class="btn btn-ghost btn-block" data-action="auth-signout">Sign out</button>
        </div>`
     : `<div class="block" style="display:flex;flex-direction:column;gap:10px">
          <div style="font-weight:600;font-size:13px">Back up and sync</div>
-         <div style="font-size:12px;color:var(--muted);line-height:1.5">Sign in to generate study sets and sync them across your devices.</div>
+         <div style="font-size:12px;color:var(--text-muted);line-height:1.5">Sign in to generate study sets and sync them across your devices.</div>
          <button class="btn btn-ghost btn-block" data-action="auth-google">${GOOGLE_G} Continue with Google</button>
          <div class="or-divider">or</div>
          <div class="field"><label>Email</label><input id="youEmail" type="email" placeholder="you@example.com" autocomplete="email" /></div>
@@ -53,30 +54,41 @@ export async function renderYou() {
   setHTML(app, `
     <div class="view">
       ${updateBanner}
-      <div class="ahd"><div class="wordmark">Maf<b>sar</b></div></div>
-      <div class="block" style="text-align:center;padding:20px">
-        <div style="font-size:13px;color:var(--muted)">${auth?.user ? "Your sets are backed up" : "Sign in to back up your sets"}</div>
-        <div style="display:flex;justify-content:center;gap:8px;margin-top:12px">
-          <span class="streak">${FLAME}${streak}-day streak</span>
+      <div class="ahd"><h1 class="h-title">You</h1></div>
+      
+      <div class="listhd"><span class="t-label">Progress</span></div>
+      <button type="button" class="setting-row" data-action="nav-stats">
+        <div style="display:flex;align-items:center;justify-content:center;width:40px;height:40px;border-radius:12px;background:var(--accent-chip-bg);color:var(--accent-text);margin-right:2px"><svg viewBox="0 0 24 24" width="20" height="20" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"><path d="M18 20V10M12 20V4M6 20v-4"/></svg></div>
+        <div class="txt" style="flex:1;text-align:left">
+          <div class="title">Your stats</div>
+          <div class="sub">${streak}-day streak &middot; ${mastered} mastered</div>
         </div>
-      </div>
-      <div class="stats">
-        <div class="stat"><div class="v tnum">${mastered}</div><div class="k">Mastered</div></div>
+        <svg class="ic chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 18l6-6-6-6"/></svg>
+      </button>
+      <button type="button" class="setting-row" data-action="nav-teams" style="margin-top:8px">
+        <div style="display:flex;align-items:center;justify-content:center;width:40px;height:40px;border-radius:12px;background:var(--accent-chip-bg);color:var(--accent-text);margin-right:2px"><svg viewBox="0 0 24 24" width="20" height="20" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle><path d="M23 21v-2a4 4 0 0 0-3-3.87"></path><path d="M16 3.13a4 4 0 0 1 0 7.75"></path></svg></div>
+        <div class="txt" style="flex:1;text-align:left">
+          <div class="title">Teams</div>
+          <div class="sub">Study with a group</div>
+        </div>
+        <svg class="ic chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 18l6-6-6-6"/></svg>
+      </button>
+<div class="k">Mastered</div></div>
         <div class="stat"><div class="v tnum">${total}</div><div class="k">Cards</div></div>
         <div class="stat"><div class="v tnum">${studySets.length}</div><div class="k">Sets</div></div>
       </div>
       ${accountHtml}
             <div class="listhd"><span class="t-label">Layout</span></div>
       <label class="setting-row">
-        <span class="txt"><span class="main" style="display:block">Open Mafsar in a tab</span><span class="sub" style="display:block">Use a full page instead of the side panel</span></span>
-        <input type="checkbox" id="openInTabCheck" ${settings.openInTab ? "checked" : ""} />
+        <div class="txt" style="flex:1;text-align:left"><div class="title">Open Mafsar in a tab</div><div class="sub">Use a full page instead of the side panel</div></span>
+        <input type="checkbox" class="switch" id="openInTabCheck" ${settings.openInTab ? "checked" : ""} />
       </label>
       <div class="listhd"><span class="t-label">Backup</span></div>
       <div id="backupSlot"></div>
       <input type="file" id="backupFile" accept="application/json,.json" class="hidden" />
       ${auth?.user ? `<div class="listhd"><span class="t-label">Account</span></div>
       <button type="button" class="setting-row" data-action="delete-account-open">
-        <span class="txt"><span class="main" style="display:block">Delete account</span><span class="sub" style="display:block">Permanently delete your account and data</span></span>
+        <div class="txt" style="flex:1;text-align:left"><div class="title">Delete account</div><div class="sub">Permanently delete your account and data</div></span>
         <svg class="ic chev" viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"/></svg>
       </button>` : ""}
     </div>`);
@@ -117,7 +129,7 @@ function paintBackupSlot(plan) {
         <button class="btn btn-ghost" style="flex:1" data-action="export-backup">⇩ Export JSON</button>
         <button class="btn btn-ghost" style="flex:1" data-action="import-backup">⇪ Restore</button>
       </div>`
-      : `<div style="font-size:12px;color:var(--muted);text-align:center;padding:10px 0">Available on Plus and Pro plans.</div>`
+      : `<div style="font-size:12px;color:var(--text-muted);text-align:center;padding:10px 0">Available on Plus and Pro plans.</div>`
   );
 }
 
@@ -133,7 +145,7 @@ export async function refreshBilling() {
   try {
     const { authedFetch } = await import("../../sync/auth.js");
     const meRes = await authedFetch('/v1/me');
-    const PLAN_COPY = `<div style="font-size:11px;color:var(--muted);text-align:center;margin-top:6px">Plus $2/month, Pro $6/month</div>`;
+    const PLAN_COPY = `<div style="font-size:11px;color:var(--text-muted);text-align:center;margin-top:6px">Plus $2/month, Pro $6/month</div>`;
       if (meRes.ok) {
         const data = await meRes.json();
         const plan = data.usage.plan;
@@ -146,11 +158,11 @@ export async function refreshBilling() {
              if (l === null) return "";
              const pct = Math.min(100, Math.max(0, (u / l) * 100));
              return `
-               <div style="font-size:12px;color:var(--muted);display:flex;justify-content:space-between">
+               <div style="font-size:12px;color:var(--text-muted);display:flex;justify-content:space-between">
                  <span>${name}</span>
                  <span>${u} of ${l}</span>
                </div>
-               <div class="bar" style="margin-bottom:8px"><i style="width:${pct}%"></i></div>
+               <div class="bar" style="margin-bottom:8px"><i style="width:${Math.max(2, pct)}%"></i></div>
              `;
           };
 
@@ -182,7 +194,7 @@ export async function refreshBilling() {
           billingHtml = `
             <div class="block" style="display:flex;flex-direction:column;gap:6px;margin-bottom:12px">
               <div style="font-weight:600;font-size:13px">${title}</div>
-              <div style="font-size:12px;color:var(--muted);margin-bottom:4px">Usage ${winText}</div>
+              <div style="font-size:12px;color:var(--text-muted);margin-bottom:4px">Usage ${winText}</div>
               ${metersHtml}
               <div style="margin-top:6px">
                 ${btnsHtml}
@@ -193,10 +205,10 @@ export async function refreshBilling() {
           billingHtml = `
             <div class="block" style="display:flex;flex-direction:column;gap:10px;margin-bottom:12px">
               <div style="font-weight:600;font-size:13px;display:flex;align-items:center;gap:6px">
-                <svg class="ic" viewBox="0 0 24 24" style="color:var(--primary);width:16px;height:16px"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>
+                <svg class="ic" viewBox="0 0 24 24" style="color:var(--accent);width:16px;height:16px"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>
                 Mafsar Pro
               </div>
-              <div style="font-size:12px;color:var(--muted)">Unlimited generations</div>
+              <div style="font-size:12px;color:var(--text-muted)">Unlimited generations</div>
               <button class="btn btn-ghost btn-block" data-action="billing-portal">Manage subscription</button>
             </div>
           `;
@@ -365,7 +377,7 @@ export function renderAuthGate() {
     <div class="view" style="justify-content:center;min-height:100%">
       <div style="text-align:center;margin-bottom:8px">
         <div class="wordmark" style="font-size:26px">Maf<b>sar</b></div>
-        <div style="font-size:13px;color:var(--muted);margin-top:6px;line-height:1.5">
+        <div style="font-size:13px;color:var(--text-muted);margin-top:6px;line-height:1.5">
           Turn your AI chats into flashcards,<br>quizzes, and spaced-repetition review.
         </div>
       </div>

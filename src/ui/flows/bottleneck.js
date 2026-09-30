@@ -39,8 +39,8 @@ function paintBottleneckLoader(msg) {
     <div class="rev-body teach">
       <div class="t-label">Find the bottleneck</div>
       <div style="display:flex;align-items:center;gap:10px;margin-top:8px">
-        <span class="spinner" style="border-color:var(--border);border-top-color:var(--primary)"></span>
-        <span style="font-size:13px;color:var(--muted)">${esc(msg)}</span>
+        <span class="spinner" style="border-color:var(--border-control);border-top-color:var(--accent)"></span>
+        <span style="font-size:13px;color:var(--text-muted)">${esc(msg)}</span>
       </div>
     </div>`);
 }
@@ -73,11 +73,11 @@ export function paintBottleneckQuestion() {
       <div class="t-label">Architecture</div>
       <pre class="arch-flow" role="img" aria-label="Request flow: ${esc((s.task.architecture || []).join(", then "))}">${esc(renderArchitecture(s.task.architecture))}</pre>
       
-      ${s.hint ? `<div class="t-label">Hint</div><div class="block tint" style="margin-bottom:16px">${esc(s.hint)}</div>` : `<button class="btn btn-ghost btn-sm" data-action="bottleneck-hint" style="margin-bottom:16px">Get a hint (costs half a point)</button>`}
+      ${s.hint ? `<div class="t-label">Hint</div><div class="block tint" style="margin-bottom:16px">${esc(s.hint)}</div>` : `<button class="btn-ghost btn-sm" data-action="bottleneck-hint" style="margin-bottom:16px">Get a hint (costs half a point)</button>`}
       
       <div class="t-label">What breaks and why?</div>
       <textarea id="bottleneckAnswer" class="sa-input" placeholder="What breaks, why (under what load or failure), and how you'd fix it." rows="6">${esc(s.draft)}</textarea>
-      <button class="btn btn-primary btn-block" data-action="bottleneck-submit" style="margin-top:12px">Submit</button>
+      <button class="btn-primary btn-block" data-action="bottleneck-submit" style="margin-top:12px">Submit</button>
     </div>`);
 }
 
@@ -144,28 +144,28 @@ function paintBottleneckReveal() {
       ${r.other_valid_issue ? `<div class="block" style="margin-bottom:16px"><b>Also a real problem you spotted:</b> ${esc(r.other_valid_issue)}</div>` : ""}
       
       <div style="display:flex;flex-direction:column;gap:8px;margin-bottom:20px">
-        <div style="display:flex;justify-content:space-between;align-items:center;background:var(--surface-2);padding:12px;border-radius:8px">
+        <div style="display:flex;justify-content:space-between;align-items:center;background:var(--bg-surface2);padding:12px;border-radius:8px">
           <span style="font-size:14px;font-weight:500">Found flaw</span>
           ${scoreBadge(r.found_flaw)}
         </div>
-        <div style="display:flex;justify-content:space-between;align-items:center;background:var(--surface-2);padding:12px;border-radius:8px">
+        <div style="display:flex;justify-content:space-between;align-items:center;background:var(--bg-surface2);padding:12px;border-radius:8px">
           <span style="font-size:14px;font-weight:500">Valid explanation</span>
           ${scoreBadge(r.explanation_correct)}
         </div>
-        <div style="display:flex;justify-content:space-between;align-items:center;background:var(--surface-2);padding:12px;border-radius:8px">
+        <div style="display:flex;justify-content:space-between;align-items:center;background:var(--bg-surface2);padding:12px;border-radius:8px">
           <span style="font-size:14px;font-weight:500">Fix works</span>
           ${scoreBadge(r.fix_works)}
         </div>
       </div>
       
       <div class="t-label">The Planted Flaw</div>
-      <div style="background:var(--surface-2);padding:16px;border-radius:8px;margin-bottom:16px">
-        <p style="margin-bottom:8px;font-weight:600;color:var(--danger)">${esc(r.planted_flaw)}</p>
+      <div style="background:var(--bg-surface2);padding:16px;border-radius:8px;margin-bottom:16px">
+        <p style="margin-bottom:8px;font-weight:600;color:var(--danger-text)">${esc(r.planted_flaw)}</p>
         ${r.why_it_fails ? `<div style="font-size:14px;line-height:1.5;margin-bottom:8px">${esc(r.why_it_fails)}</div>` : ""}
-        <div style="font-size:14px;color:var(--ink);line-height:1.5"><b>A good fix:</b> ${esc(r.model_solution)}</div>
+        <div style="font-size:14px;color:var(--text-primary);line-height:1.5"><b>A good fix:</b> ${esc(r.model_solution)}</div>
       </div>
       
-      <button class="btn btn-primary btn-block" data-action="return-focus" style="margin-top:16px">Done</button>
+      <button class="btn-primary btn-block" data-action="return-focus" style="margin-top:16px">Done</button>
     </div>`);
 }
 

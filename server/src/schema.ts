@@ -8,6 +8,8 @@ export const registerSchema = z.object({
 
 export const loginSchema = registerSchema;
 
+export const ratingSchema = z.object({ stars: z.number().int().min(1).max(5) });
+export const ratingLookupSchema = z.object({ ids: z.array(z.string()).max(200) });
 export const setSchema = z.object({
   id: z.string().min(1),
   title: z.string().min(1),
@@ -15,9 +17,17 @@ export const setSchema = z.object({
   sourceLabel: z.string().nullable().optional(),
   mode: z.string().default("general"),
   examDate: z.string().nullable().optional(),
-    originSetId: z.string().nullable().optional(),
-    isGlobal: z.boolean().optional(),
   chainOverrides: z.record(z.string()).optional(),
+  // Server-computed fields come back on the pull and clients echo them on the
+  // next push. They're accepted so the batch isn't rejected, and never written:
+  // ratings change only through the rating routes, visibility only through
+  // publish.
+  yourStars: z.number().int().min(1).max(5).nullable().optional(),
+  ratingAvg: z.number().nullable().optional(),
+  ratingCount: z.number().int().optional(),
+  isGlobal: z.boolean().optional(),
+  originSetId: z.string().max(100).nullable().optional(),
+  description: z.string().max(500).nullable().optional(),
   createdAt: z.string(),
   updatedAt: z.string(),
   deleted: z.boolean().optional(),
@@ -46,6 +56,8 @@ export const cardSchema = z.object({
   state: z.string().nullable().optional(),
   lapses: z.number().int().nullable().optional(),
   lastReview: isoDate.nullable().optional(),
+  originCardId: z.string().max(100).nullable().optional(),
+  detached: z.boolean().optional(),
 });
 
 export const quizSchema = z.object({

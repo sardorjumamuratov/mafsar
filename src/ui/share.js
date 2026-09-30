@@ -12,7 +12,7 @@ import { confirmSheet } from "./confirm.js";
  */
 export function copyRowHtml(label, value, hint = "", valueCls = "") {
   return `<div class="field">
-    <label>${label}${hint ? ` <span style="font-weight:normal;color:var(--muted)">— ${hint}</span>` : ""}</label>
+    <label>${label}${hint ? ` <span style="font-weight:normal;color:var(--text-muted)">— ${hint}</span>` : ""}</label>
     <div style="display:flex;gap:8px">
       <input type="text" readonly value="${esc(value)}" class="share-readonly ${valueCls}" data-action="select-all" style="flex:1" />
       <button class="btn btn-ghost btn-sm copy-btn" data-action="share-copy" data-code="${esc(value)}" aria-label="Copy ${esc(label.toLowerCase())}">
@@ -31,7 +31,7 @@ export function shareBlockHtml(studySet) {
     ${copyRowHtml("Code", code, "entered under Sets → Add a shared set", "share-code tnum")}
     <div>
       <button class="linkbtn" style="align-self:flex-start" data-action="share-revoke" data-id="${esc(studySet.sessionId)}">Stop sharing</button>
-      <div style="font-size:12px;color:var(--muted);margin-top:2px">Both link and code will stop working. Copies already added are kept.</div>
+      <div style="font-size:12px;color:var(--text-muted);margin-top:2px">Both link and code will stop working. Copies already added are kept.</div>
     </div>
   </div>`;
 }

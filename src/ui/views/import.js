@@ -69,19 +69,14 @@ export function renderImport() {
       </div>
       <div class="help"><b>Anki:</b> File → Export → "Notes in Plain Text" (.txt), then upload the file below (leave HTML cleanup on).<br>
         <b>Quizlet:</b> open a set page and click the floating <b>Import to Mafsar</b> button, or export (⋯ → Export, Tab + New line) and paste below. CSV/TSV works too.</div>
-      <div class="listhd" style="margin-top:10px"><span class="t-label">Add a shared set</span></div>
-      <div class="help" style="margin:0">Have a code or link from another Mafsar user? Enter it to add a copy of their cards to your sets.</div>
-      <div class="field"><label>Share code or link</label>
-        <input id="shareCode" type="text" placeholder="e.g. 7KX2M9QRTA or mafsar.../s/..." autocomplete="off" autocapitalize="off" /></div>
-      <button class="btn btn-primary btn-block" data-action="share-lookup">Look up set</button>
-      <div id="sharePreview"></div>
+      
       
       <div class="listhd" style="margin-top:24px"><span class="t-label">Import file or text</span></div>
       <div class="field"><label>Title</label><input id="importTitle" type="text" placeholder="e.g. Biology — Chapter 3" /></div>
       <div style="display:flex;gap:10px;align-items:center">
-        <button class="btn btn-ghost" style="flex:1" data-action="import-file">⇪ Load Anki/CSV file</button>
-        <label style="display:flex;gap:6px;align-items:center;font-size:12.5px;color:var(--muted)">
-          <input type="checkbox" id="importClean" checked /> clean HTML
+        <button class="btn-ghost" style="flex:1" data-action="import-file">⇪ Load Anki/CSV file</button>
+        <label style="display:flex;gap:6px;align-items:center;font-size:12.5px;color:var(--text-muted)">
+          <input type="checkbox" class="switch" id="importClean" checked /> clean HTML
         </label>
       </div>
       <input type="file" id="importFile" accept=".txt,.csv,.tsv,text/plain" class="hidden" />
@@ -94,8 +89,8 @@ export function renderImport() {
       <div class="field"><label>Content</label><textarea id="importText" rows="7" placeholder="term&#9;definition"></textarea></div>
       <div class="preview" id="importPreview"></div>
       <div style="display:flex;gap:10px">
-        <button class="btn btn-ghost" style="flex:1" data-action="import-preview">Preview</button>
-        <button class="btn btn-primary" style="flex:1" data-action="import-save">Import</button>
+        <button class="btn-ghost" style="flex:1" data-action="import-preview">Preview</button>
+        <button class="btn-primary" style="flex:1" data-action="import-save">Import</button>
       </div>
     </div>`);
   topOfView();
@@ -109,7 +104,7 @@ export function previewImport() {
   }
   setHTML(
     box,
-    `<div style="font-size:12.5px;color:var(--muted);margin-bottom:8px">${cards.length} card(s) detected</div>` +
+    `<div style="font-size:12.5px;color:var(--text-muted);margin-bottom:8px">${cards.length} card(s) detected</div>` +
     cards
       .slice(0, 3)
       .map((c) => `<div class="pv-card"><b>${esc(c.front)}</b><span>${esc(c.back)}</span></div>`)
@@ -141,7 +136,7 @@ export async function lookupShare() {
   const code = parseShareCode(/** @type {HTMLInputElement} */ (document.getElementById("shareCode"))?.value || "");
   if (!code) return toast("Enter a code first.");
   const out = document.getElementById("sharePreview");
-  if (out) setHTML(out, '<div style="font-size:13px;color:var(--muted)">Looking up?</div>');
+  if (out) setHTML(out, '<div style="font-size:13px;color:var(--text-muted)">Looking up?</div>');
   try {
     const payload = await send({ type: "SHARE_FETCH", code });
     const { sessions } = await bundle();
@@ -168,9 +163,9 @@ export function paintSharePreview(out) {
   setHTML(target, `
     <div class="block" style="display:flex;flex-direction:column;gap:9px">
       <div class="t-label">Found</div>
-      <div style="font-weight:650;color:var(--ink);line-height:1.3">${esc(title)}</div>
-      <div style="font-size:12.5px;color:var(--muted)">Copy with ${cards.length} card${cards.length === 1 ? "" : "s"}${quiz?.length ? ` and ${quiz.length} quiz question${quiz.length === 1 ? "" : "s"}` : ""} ?" added fresh, reviews start from scratch.</div>
-      <button class="btn btn-primary btn-block" data-action="share-import">Add to my sets</button>
+      <div style="font-weight:650;color:var(--text-primary);line-height:1.3">${esc(title)}</div>
+      <div style="font-size:12.5px;color:var(--text-muted)">Copy with ${cards.length} card${cards.length === 1 ? "" : "s"}${quiz?.length ? ` and ${quiz.length} quiz question${quiz.length === 1 ? "" : "s"}` : ""} ?" added fresh, reviews start from scratch.</div>
+      <button class="btn-primary btn-block" data-action="share-import">Add to my sets</button>
     </div>`);
 }
 

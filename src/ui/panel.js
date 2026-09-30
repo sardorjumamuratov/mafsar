@@ -1,5 +1,4 @@
-import { renderStats } from "./views/stats.js";
-import { rateSet, clearRating } from "../storage/ratings.js";
+import { renderStats, openFeedback } from "./views/stats.js";
 import { saveSettings } from "../storage/store.js";
 import { startCompare, selectComparePair, toggleCompareSame, createForkCards } from "./flows/compare.js";
 import { finishDesignDrill, requestDesignCurveball, startDesignDrill, submitDesign, submitDesignCurveball } from "./flows/design.js";
@@ -12,9 +11,9 @@ import { app, bundle, nav, send, setFor, toast } from "./core.js";
 import { goToActiveTab, inFocusView, registerTabs } from "./nav.js";
 import { renderSets } from "./views/sets.js";
 import { onActiveTabChange } from "./tab-watch.js";
-import { currentDetail, makeSet, openDetailTab, paintDetail, promptAddCard, renderSetDetail, saveCardEdit, saveNewCard, setEditingCardId, startQuizForCurrentSet, toggleSetMenu } from "./views/set-detail.js";
-import { captureCurrent, captureLastAnswer, refreshCaptureDock } from "./capture.js";
-import { deleteCard, deleteSession, updateStudySet, setExamDate } from "../storage/store.js";
+import { currentDetail, makeSet, openDetailTab, paintDetail, promptAddCard, renderSetDetail, saveCardEdit, saveNewCard, setEditingCardId, editingCardId, startQuizForCurrentSet, } from "./views/set-detail.js";
+import { captureCurrent, captureLastAnswer, refreshCaptureDock, openAddMenu } from "./capture.js";
+import { deleteCard, restoreCard, deleteSession, updateStudySet, setExamDate } from "../storage/store.js";
 import { review } from "../../shared/srs.js";
 import { applyNext, goReturn, gradeCard, revealCard, startGlobalReview, startSetReview } from "./flows/review.js";
 import { startChainDrill } from "./flows/chain-drill.js";
@@ -27,10 +26,9 @@ import { startTeach, setTeachPersona, sendTeach, finishTeach } from "./flows/tea
 import { copyShareCode, revokeShareFor, toggleSetShare } from "./share.js";
 import { createTeamFromForm, joinTeamFromInput, leaveTeam, renderTeam, renderTeamCreate, renderTeams } from "./views/teams.js";
 import { renderGlobal, filterGlobalTab, openGlobalPreview, addGlobalSet, openAddedSet, reportGlobal } from "./views/global.js";
-import { publishGlobalSet, unpublishGlobalSet } from "./views/set-detail.js";
 import { checkTyped, startTypedPractice, typedNext } from "./flows/typed.js";
 import { getAuth, login, logout, register } from "../sync/auth.js";
-import { examDraft, openExamPicker, renderHome, saveExamSelection, setExamDraft } from "./views/home.js";
+import { renderHome, setHomeExamEditing } from "./views/home.js";
 import { answerQuiz, quickQuizLen, quizNext, startQuiz } from "./flows/quiz.js";
 import { SYNC_PULLED_EVENT, syncNow } from "../sync/sync.js";
 
@@ -47,14 +45,20 @@ document.addEventListener("click", (e) => {
       send({ type: "APPLY_UPDATE" }).catch((e) => toast(e.message));
       break;
     case "dismiss-update": dismissUpdateBanner(t); break;
-    case "set-menu": toggleSetMenu(t); break;
+    case "set-menu":
+      case "more-regenerate":
+      case "more-type":
+      case "more-delete":
+        /* Handled locally in set-detail.js */ break;
     case "nav-back": goToActiveTab(); break;
     case "nav-sets": renderSets(); break;
     case "open-set": renderSetDetail(id); break;
     case "open-weak": openWeakCard(id, (/** @type {any} */ (t)).dataset.card).catch((e) => toast(e.message)); break;
     case "make-set": makeSet(id); break;
     case "capture-current": captureCurrent(/** @type {HTMLElement} */ (t)); break;
-    case "capture-last-answer": captureLastAnswer(t); break;
+    case "capture-last-answer": captureLastAnswer(/** @type {HTMLElement} */ (t)); break;
+      case "dock-add": openAddMenu(); break;
+      case "add-import": case "add-paste": case "add-create": case "add-share": /* Handled locally */ break;
     case "tab": openDetailTab((/** @type {any} */ (t)).dataset.tab); break;
     case "delete-set":
       confirmDeleteSet(id);
@@ -155,9 +159,9 @@ document.addEventListener("click", (e) => {
     case "team-join": joinTeamFromInput(); break;
     case "team-leave": leaveTeam(id); break;
     case "nav-teams": renderTeams(); break;
-      case "nav-global": renderGlobal(); break;
-      case "global-seg-discover": renderGlobal(); break;
-      case "global-seg-teams": renderTeams(); break;
+    case "nav-global": renderGlobal(); break;
+    case "nav-stats": renderStats(); break;
+    case "open-feedback": openFeedback(); break;
     case "nav-you": renderYou(); break;
     case "select-all":
       (/** @type {any} */ (t)).select();
@@ -174,19 +178,30 @@ document.addEventListener("click", (e) => {
     case "typed-next": typedNext(); break;
     case "clear-exam": setExamDate(id, null).then(() => renderSetDetail(id, "cards")).catch(e => toast(e.message)); break;
     case "add-card": promptAddCard(id); break;
-    case "card-edit": setEditingCardId(id); paintDetail(); break;
-    case "edit-cancel": setEditingCardId(null); paintDetail(); break;
+    case "card-edit": setEditingCardId(id); paintDetail(true, true); break;
+    case "edit-cancel":
+        const oldId = editingCardId;
+        setEditingCardId(null);
+        paintDetail(true, true).then(() => {
+          document.querySelector(`button[data-action="card-edit"][data-id="${oldId}"]`)?.focus();
+        });
+        break;
     case "edit-save":
       saveCardEdit(currentDetail().session.id, id).then(() => {
         setEditingCardId(null);
         openDetailTab("cards");
       }).catch(e => toast(e.message));
       break;
-    case "card-del":
-      confirmSheet({ title: "Delete this card?", body: "It's removed from this set on all your devices. This can't be undone.", confirmLabel: "Delete card", destructive: true })
-        .then((ok) => ok && deleteCard(currentDetail().session.id, id).then(() => paintDetail()))
-        .catch((e) => toast(e.message));
-      break;
+    case "card-del": {
+        const sessionId = currentDetail().session.id;
+        deleteCard(sessionId, id).then(() => {
+          paintDetail();
+          toast("Card deleted", 2600, "Undo", () => {
+            restoreCard(sessionId, id).then(() => paintDetail());
+          });
+        });
+        break;
+      }
     // case "export-tsv": exportSetTsv(id); break; // paused with the export button
     case "gen-summary": generateSummary(id); break;
     case "export-backup": exportBackup(); break;
@@ -196,8 +211,6 @@ document.addEventListener("click", (e) => {
     case "global-open-added": openAddedSet(t); break;
     case "global-add-set": addGlobalSet(t); break;
     case "global-report": reportGlobal(t); break;
-    case "global-unpublish": unpublishGlobalSet(id); break;
-    case "global-publish": publishGlobalSet(id); break;
 
     case "import-backup": document.getElementById("backupFile")?.click(); break;
     case "auth-signin": authSubmit("login", t); break;
@@ -209,13 +222,30 @@ document.addEventListener("click", (e) => {
     case "delete-account-open": renderDeleteAccount(); break;
     case "teams-open": renderTeams(); break;
     case "delete-account-confirm": confirmDeleteAccount(); break;
+    case "nav-teams": renderTeams(); break;
     case "auth-signout":
       logout().then(() => {
         toast("Signed out. Your sets stay on this device.");
         renderAuthGate();
       }).catch((e) => toast(e.message));
       break;
-    case "exam-pick": openExamPicker(); break;
+    case "exam-edit-home": setHomeExamEditing(true); break;
+      case "exam-save-home":
+        (async () => {
+          const { studySets } = await bundle();
+          const v = document.getElementById("home-exam-input").value;
+          const ms = v ? new Date(v + "T12:00:00").getTime() : null;
+          for (const s of studySets) {
+            await updateStudySet(s.sessionId, { examDate: ms });
+          }
+          setHomeExamEditing(false);
+          toast(ms ? "Exam date saved for all sets" : "Exam date cleared");
+        })().catch(e => toast(e.message));
+        break;
+      case "exam-edit-set":
+        
+        if (detail) { detailState.editingExam = true; paintDetail(true); }
+        break;
     case "exam-clear":
       (async () => {
         const { studySets } = await bundle();
@@ -224,7 +254,7 @@ document.addEventListener("click", (e) => {
         renderHome();
       })().catch(e => toast(e.message));
       break;
-    case "picker-save": saveExamSelection(); break;
+    
     case "quiz-len":
       app.querySelectorAll(".qlen").forEach((b) => {
         const on = b === t;
@@ -317,17 +347,28 @@ document.addEventListener("change", (e) => {
 document.addEventListener("click", (e) => {
   const t = (/** @type {any} */ (e.target)).closest("[data-action]");
   if (!t) return;
-  if ((/** @type {any} */ (t)).dataset.action === "add-cancel") openDetailTab("cards");
-  if ((/** @type {any} */ (t)).dataset.action === "add-save") saveNewCard((/** @type {any} */ (t)).dataset.id);
+  if ((/** @type {any} */ (t)).dataset.action === "add-cancel") {
+      currentDetail().addingCard = false;
+      paintDetail(true, true).then(() => document.querySelector('button[data-action="add-card"]')?.focus());
+    }
+  if ((/** @type {any} */ (t)).dataset.action === "add-done") saveNewCard((/** @type {any} */ (t)).dataset.id);
 });
 // bottom nav
-nav.addEventListener("click", (e) => {
+nav.addEventListener("click", async (e) => {
+    const { editingCardId, currentDetail } = await import("./views/set-detail.js");
+    if (editingCardId || currentDetail()?.addingCard) {
+      const ok = await confirmSheet({ title: "Discard your edit?", confirmLabel: "Discard", cancelLabel: "Keep editing", destructive: true });
+      if (!ok) return;
+      setEditingCardId(null);
+      if (currentDetail()) currentDetail().addingCard = false;
+      paintDetail(true, true);
+    }
   const b = (/** @type {any} */ (e.target)).closest("button[data-nav]");
   if (!b) return;
   const n = b.dataset.nav;
   if (n === "home") renderHome();
   else if (n === "sets") renderSets();
-  else if (n === "discover" || n === "global") renderGlobal();
+  else if (n === "discover") renderGlobal();
   else if (n === "stats") renderStats();
   else if (n === "you") renderYou();
 });
@@ -398,87 +439,50 @@ async function openWeakCard(sessionId, cardId) {
 }
 
 
-
-
-document.addEventListener("click", (e) => {
-  const btn = /** @type {HTMLButtonElement|null} */ (/** @type {HTMLElement} */ (e.target).closest(".star-btn"));
-  if (btn && !btn.disabled) {
-    const group = btn.closest(".rating-group");
-    const rootId = /** @type {HTMLElement} */ (group).dataset.root;
-    const clientSetId = /** @type {HTMLElement} */ (group).dataset.client;
-    const val = parseInt(/** @type {HTMLElement} */ (btn).dataset.val, 10);
-    const current = btn.getAttribute("aria-checked") === "true";
-    if (current) {
-      clearRating(rootId, clientSetId);
-    } else {
-      rateSet(rootId, clientSetId, val);
-    }
-  }
+let pendingDeleteCard = null;
+let pendingDeleteCardTimer = null;
+window.addEventListener("pagehide", () => {
+  if (pendingDeleteCard) deleteCard(pendingDeleteCard.sessionId, pendingDeleteCard.cardId);
 });
 
-
-document.addEventListener("mouseover", (e) => {
-  const btn = /** @type {HTMLButtonElement|null} */ (/** @type {HTMLElement} */ (e.target).closest(".star-btn"));
-  if (btn && !btn.disabled) {
-    const val = parseInt(btn.dataset.val, 10);
-    const group = btn.closest(".rating-group");
-    const btns = group.querySelectorAll(".star-btn");
-    btns.forEach((b, i) => {
-      const svg = b.querySelector("svg");
-      if (i < val) {
-        svg.style.fill = "var(--warm, #f0c75e)";
-        svg.style.stroke = "var(--warm, #f0c75e)";
-      } else {
-        svg.style.fill = "none";
-        svg.style.stroke = "var(--faint, #6d7c78)";
-      }
-    });
+async function confirmDeleteCard(sessionId, cardId) {
+  if (pendingDeleteCard) {
+    clearTimeout(pendingDeleteCardTimer);
+    await deleteCard(pendingDeleteCard.sessionId, pendingDeleteCard.cardId);
   }
-});
-document.addEventListener("mouseout", (e) => {
-  const btn = /** @type {HTMLButtonElement|null} */ (/** @type {HTMLElement} */ (e.target).closest(".star-btn"));
-  if (btn && !btn.disabled) {
-    // We let mafsar-ratings-changed repaint it correctly. 
-    // For now we can just dispatch it to trigger a redraw.
-    window.dispatchEvent(new Event("mafsar-ratings-changed"));
-  }
-});
-
-document.addEventListener("keydown", (e) => {
-  const t = /** @type {HTMLElement} */ (e.target);
-  if (t.classList && t.classList.contains("star-btn")) {
-    const group = /** @type {HTMLElement|null} */ (t.closest(".rating-group"));
-    const rootId = group.dataset.root;
-    const clientSetId = group.dataset.client;
-    let val = parseInt(t.dataset.val, 10);
-    if (e.key === "ArrowRight") {
-      val = Math.min(5, val + 1);
-      rateSet(rootId, clientSetId, val);
-      e.preventDefault();
-    } else if (e.key === "ArrowLeft") {
-      val = Math.max(1, val - 1);
-      rateSet(rootId, clientSetId, val);
-      e.preventDefault();
-    } else if (e.key === "Backspace" || e.key === "Delete") {
-      clearRating(rootId, clientSetId);
-      e.preventDefault();
-    }
-  }
-});
-
-
-window.addEventListener("mafsar-ratings-changed", () => {
+  
+  pendingDeleteCard = { sessionId, cardId };
+  
+  // hide card from UI
   const d = currentDetail();
-  if (d) {
-    renderSetDetail(d.session.id, d.tab);
-  } else if (document.getElementById("home-view")) {
-    renderHome();
-  } else if (document.getElementById("sets-view")) {
-    // We don't import renderSets here, maybe we can just reload or do nothing
-    // if renderSets is not imported, let's just use nav button clicks
-    const btn = document.querySelector('[data-action="nav-library"]');
-    if (btn) /** @type {HTMLElement} */ (btn).click();
-  } else if (document.getElementById("global-view")) {
-    renderGlobal();
+  if (d && d.session.id === sessionId && d.studySet) {
+    d.studySet.flashcards = d.studySet.flashcards.filter(c => c.id !== cardId);
+    paintDetail(true);
   }
-});
+  
+  toast("Card deleted", 4000, "Undo", async () => {
+    clearTimeout(pendingDeleteCardTimer);
+    const { sessionId: sId, cardId: cId } = pendingDeleteCard;
+    pendingDeleteCard = null;
+    
+    // restore card in UI
+    const b = await bundle();
+    const origSet = setFor(sId, b.studySets);
+    const c = origSet?.flashcards?.find(x => x.id === cId);
+    if (c) {
+      const cur = currentDetail();
+      if (cur && cur.session.id === sId) {
+        cur.studySet.flashcards.push(c);
+        paintDetail(true);
+      }
+    }
+  });
+  
+  pendingDeleteCardTimer = setTimeout(async () => {
+    const pc = pendingDeleteCard;
+    pendingDeleteCard = null;
+    if (pc) {
+      try { await deleteCard(pc.sessionId, pc.cardId); } catch(e) {}
+    }
+  }, 4000);
+}

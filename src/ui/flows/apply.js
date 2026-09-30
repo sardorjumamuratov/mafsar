@@ -11,13 +11,19 @@ export async function startApply() {
   const token = Math.random();
   applyState = { item, phase: "loading", token };
   setHTML(app, `
-    <div class="rev-top">${XBTN}<div class="bar"><i style="width:${Math.round((qIdx / queue.length) * 100)}%"></i></div>
-      <span class="rev-count tnum">${qIdx + 1} / ${queue.length}</span></div>
+    
+      <div class="ahd" style="display:flex;align-items:center;padding:12px;gap:12px">
+        <button class="iconbtn" data-action="return-focus" aria-label="End session"><svg class="ic" viewBox="0 0 24 24" width="20" height="20" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg></button>
+        <div class="focus-track">
+          <div class="focus-fill" style="width:${Math.max(2, Math.round((qIdx / queue.length) * 100))}%"></div>
+        </div>
+        <div style="font-size:13px;color:var(--text-muted);font-variant-numeric:tabular-nums">${qIdx + 1} / ${queue.length}</div>
+      </div>
     <div class="rev-body">
       <div class="t-label">Apply it</div>
       <div style="display:flex;align-items:center;gap:10px;margin-top:8px">
-        <span class="spinner" style="border-color:var(--border);border-top-color:var(--primary)"></span>
-        <span style="font-size:13px;color:var(--muted)">Writing a fresh scenario…</span>
+        <span class="spinner" style="border-color:var(--border-control);border-top-color:var(--accent)"></span>
+        <span style="font-size:13px;color:var(--text-muted)">Writing a fresh scenario…</span>
       </div>
     </div>`);
   try {
@@ -40,13 +46,19 @@ export async function startApply() {
 export function paintApplyAnswer() {
   const { hypothetical } = applyState;
   setHTML(app, `
-    <div class="rev-top">${XBTN}<div class="bar"><i style="width:${Math.round((qIdx / queue.length) * 100)}%"></i></div>
-      <span class="rev-count tnum">${qIdx + 1} / ${queue.length}</span></div>
+    
+      <div class="ahd" style="display:flex;align-items:center;padding:12px;gap:12px">
+        <button class="iconbtn" data-action="return-focus" aria-label="End session"><svg class="ic" viewBox="0 0 24 24" width="20" height="20" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg></button>
+        <div class="focus-track">
+          <div class="focus-fill" style="width:${Math.max(2, Math.round((qIdx / queue.length) * 100))}%"></div>
+        </div>
+        <div style="font-size:13px;color:var(--text-muted);font-variant-numeric:tabular-nums">${qIdx + 1} / ${queue.length}</div>
+      </div>
     <div class="rev-body">
       <div class="t-label">Apply it — new scenario</div>
       <div class="hypothetical">${esc(hypothetical.scenario)}</div>
       <textarea id="applyAnswer" class="sa-input" rows="4" placeholder="Type your answer…"></textarea>
-      <button class="btn btn-primary btn-block" data-action="apply-check">Check answer</button>
+      <button class="btn-primary btn-block" data-action="apply-check">Check answer</button>
     </div>`);
 }
 
@@ -89,10 +101,10 @@ export function paintGraded(grading, nextAction) {
   setHTML(box, `
     <div class="score-row">
       <div class="score tnum ${grading.correct ? "ok" : "no"}">${grading.score}</div>
-      <div><b style="color:${grading.correct ? "var(--success)" : "var(--danger)"}">${grading.correct ? "Correct" : "Needs work"}</b>
+      <div><b style="color:${grading.correct ? "var(--status-mastered)" : "var(--danger-text)"}">${grading.correct ? "Correct" : "Needs work"}</b>
         <div class="feedback">${esc(grading.feedback)}</div></div>
     </div>
-    <button class="btn btn-primary btn-block" data-action="${nextAction}">Continue</button>`);
+    <button class="btn-primary btn-block" data-action="${nextAction}">Continue</button>`);
   const body = app.querySelector(".rev-body");
   if (body) {
     body.querySelector(".sa-input")?.remove();

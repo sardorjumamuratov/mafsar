@@ -412,6 +412,15 @@ export const MIGRATIONS: string[] = [
   `
     ALTER TABLE cards ADD COLUMN origin_card_id TEXT;
     ALTER TABLE cards ADD COLUMN detached INTEGER NOT NULL DEFAULT 0;
+  `,
+  // The redesign branch (prompts 00-07) was built in parallel and added its
+  // own 017 and 018. 017-020 above were already pushed, so production may have
+  // applied them: its entries come after them instead. The ratings columns
+  // and table it also created already exist from 017/018, so only what's
+  // genuinely new is here.
+  `
+  ALTER TABLE sets ADD COLUMN description TEXT;
+  ALTER TABLE set_ratings ADD COLUMN created_at TEXT;
   `
 ];
 

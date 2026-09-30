@@ -1,18 +1,12 @@
+import { app, appendHTML, esc, replaceHTML, setHTML, send, topOfView, toast } from "../core.js";
+import { openSheet, closeSheet } from "../sheet.js";
+import { syncNow } from "../../sync/sync.js";
 
-function presentSheet(html, opts) {
-  const host = document.getElementById("sheet");
-  if (!host) return;
-  host.innerHTML = html;
-  host.classList.remove("hidden");
+// The shared bottom sheet (focus handling, Esc, overlay tap), holding the
+// preview's own padded layout.
+function presentSheet(html) {
+  openSheet("", html, false);
 }
-function closeSheet() {
-  const host = document.getElementById("sheet");
-  if (host) {
-    host.classList.add("hidden");
-    host.innerHTML = "";
-  }
-}
-import { app, esc, setHTML, send, topOfView, toast } from "../core.js";
 import { setNav, showChrome } from "../nav.js";
 import { getAuth } from "../../sync/auth.js";
 import { setSharedPreview } from "./teams.js";
@@ -31,13 +25,12 @@ let observer = null;
 // Offline cache
 let offlineCache = null;
 
-export function globalHeader(active) {
+// Teams lives in You now (redesign 00), so Discover's header is just its title.
+export function globalHeader() {
   return `
-    <div class="ahd" style="margin-bottom:4px">
-      <div class="seg" style="width:100%;max-width:240px;margin:0 auto">
-        <button class="${active === 'discover' ? 'on' : ''}" data-action="global-seg-discover">Discover</button>
-        <button class="${active === 'teams' ? 'on' : ''}" data-action="global-seg-teams">Teams</button>
-      </div>
+    <div style="padding:0 4px;display:flex;flex-direction:column;gap:2px;margin-bottom:14px">
+      <h1 style="margin:0;font-size:24px;font-weight:650;letter-spacing:-0.02em;color:var(--text-primary)">Discover</h1>
+      <div style="font-size:13px;color:var(--text-muted)">Sets shared by other learners, picked for you</div>
     </div>`;
 }
 
@@ -56,7 +49,7 @@ function fmtNum(n) {
 }
 
 export async function renderGlobal() {
-  setNav("global");
+  setNav("discover");
   showChrome(true);
   
   const auth = await getAuth();
@@ -139,7 +132,7 @@ async function loadMore(isFirstPage) {
   if (isFirstPage) {
     setHTML(slot, skeletonHtml);
   } else {
-    slot.insertAdjacentHTML("beforeend", `<div id="globalLoading">${skeletonHtml}</div>`);
+    appendHTML(slot, `<div id="globalLoading">${skeletonHtml}</div>`);
   }
   
   try {
@@ -273,10 +266,10 @@ export async function openGlobalPreview(btn) {
   }
   
   let btnHtml = s.added ? 
-    `<button class="btn" style="height:52px;border-radius:14px;background:var(--surface-2);border:1px solid var(--primary);color:var(--primary);font-size:16px;font-weight:650;width:100%" data-action="global-open-added" data-id="${s.id}">
+    `<button class="btn" style="height:52px;border-radius:14px;background:var(--surface-2);border:1px solid var(--primary);color:var(--primary);font-size:16px;font-weight:650;width:100%" data-action="global-open-added" data-id="${esc(s.id)}">
       <svg class="ic" viewBox="0 0 24 24" style="stroke:currentColor"><path d="M20 6L9 17l-5-5"/></svg> Added - Open set
     </button>` :
-    `<button class="btn btn-primary" style="height:52px;border-radius:14px;font-size:16px;font-weight:650;width:100%" data-action="global-add-set" data-id="${s.id}" data-idx="${idx}">
+    `<button class="btn btn-primary" style="height:52px;border-radius:14px;font-size:16px;font-weight:650;width:100%" data-action="global-add-set" data-id="${esc(s.id)}" data-idx="${idx}">
       Add to my sets
     </button>`;
 
@@ -298,11 +291,11 @@ export async function openGlobalPreview(btn) {
       
       ${btnHtml}
       
-      <button class="btn btn-text" style="font-size:13px;color:var(--muted);height:32px;margin:0 auto" data-action="global-report" data-id="${s.id}">Report this set</button>
+      <button class="btn btn-text" style="font-size:13px;color:var(--muted);height:32px;margin:0 auto" data-action="global-report" data-id="${esc(s.id)}">Report this set</button>
     </div>
   `;
   
-  presentSheet(html, { maxHeight: "86%" });
+  presentSheet(html);
   
   // Fetch sample cards
   try {
@@ -326,19 +319,18 @@ export async function addGlobalSet(btn) {
   btn.textContent = "Adding...";
   btn.disabled = true;
   try {
-    const res = await send({ type: "SYNC_PULL_SET", id }); // Or similar add logic
-    // Actually we need to copy the set. We'll use SHARE_IMPORT logic or dedicated GLOBAL_ADD.
-    // The prompt says: "Add: a server-side copy with origin ids, idempotent, New schedules."
-    // If prompt 35 has it, let's use GLOBAL_ADD.
+    // The server makes the copy; a sync brings it into local storage so
+    // "Open set" has something to open.
     const addRes = await send({ type: "GLOBAL_ADD", id });
+    await syncNow().catch(() => {});
     toast("Added to your sets");
-    
+
     globalSets[idx].added = true;
     const s = globalSets[idx];
-    const newBtn = `<button class="btn" style="height:52px;border-radius:14px;background:var(--surface-2);border:1px solid var(--primary);color:var(--primary);font-size:16px;font-weight:650;width:100%" data-action="global-open-added" data-id="${addRes.id || s.id}">
-      <svg class="ic" viewBox="0 0 24 24" style="stroke:currentColor"><path d="M20 6L9 17l-5-5"/></svg> Added - Open set
+    const newBtn = `<button class="btn" style="height:52px;border-radius:14px;background:var(--surface-2);border:1px solid var(--border-hover);color:var(--primary);font-size:16px;font-weight:650;width:100%" data-action="global-open-added" data-id="${esc(addRes.id || s.id)}">
+      <svg class="ic" viewBox="0 0 24 24" style="stroke:currentColor"><path d="M20 6L9 17l-5-5"/></svg> Added · Open set
     </button>`;
-    btn.outerHTML = newBtn;
+    replaceHTML(btn, newBtn);
     paintGlobal(globalSets, false); // refresh list behind the sheet
   } catch(e) {
     btn.textContent = "Add to my sets";

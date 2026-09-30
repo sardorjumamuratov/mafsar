@@ -197,7 +197,9 @@ Rules:
 
 Respond with ONLY valid JSON, no markdown fences, matching exactly:
 {
-  "flashcards": [{ "front": string, "back": string }],
+  "title": string,
+    "description": string,
+    "flashcards": [{ "front": string, "back": string }],
   "quiz": [{ "q": string, "options": [string, string, string, string], "answer": number, "explain": string }],
   "mode": "coding" | "general",
   "medical": boolean
@@ -292,7 +294,8 @@ Rules:
 - "summary" is 2-4 sentences in plain language.
 - "keyPoints" is 3-6 short bullet strings.
 
-Respond with ONLY valid JSON: { "summary": string, "keyPoints": [string] }`;
+Respond with ONLY valid JSON: { "summary": string, "keyPoints": [string], "terms": [{ "key": string, "primary": string, "secondary": string }] }
+  Include "terms" only when the content compares or defines up to 8 things (key <= 6 chars, primary <= 40, secondary <= 90).`;
 
 const BLURB_PROMPT = `You get the title and flashcard fronts of a study set. Write a single tiny
 description of what this set covers — a natural phrase of 5-6 words, no quotes, no ending period.
@@ -353,11 +356,16 @@ export async function generateStudySet(messages: { role: string; text: string }[
       }));
     // A mode the learner chose wins; otherwise the model's coding/general guess.
     const outMode = mode !== "general" ? mode : String(parsed.mode).toLowerCase() === "coding" ? "coding" : "general";
-    if (flashcards.length || quiz.length) {
+    
+      let title = parsed.title ? String(parsed.title).substring(0, 60) : undefined;
+      let description = parsed.description ? String(parsed.description).substring(0, 160) : undefined;
+      if (flashcards.length || quiz.length) {
       return {
         flashcards,
         quiz,
         mode: outMode,
+          title,
+          description,
         // Drives the "Organise it as mechanism chains?" suggestion; never switches mode itself.
         suggestMedicine: mode === "general" && parsed.medical === true,
         ...(mode === "medicine" ? { chains: normalizeChains(parsed.chains) } : {}),

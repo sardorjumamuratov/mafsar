@@ -62,13 +62,13 @@ function finishDrill(failedLinks) {
   
   setHTML(app, `
     <div class="view" style="padding:16px; overflow-y:auto; padding-bottom:100px;">
-      <div class="ahd"><div class="h-title">Drill complete</div></div>
+      <div class="ahd" style="display:flex;align-items:center;padding:12px;gap:12px"><button class="iconbtn" data-action="return-focus" aria-label="End session"><svg class="ic" viewBox="0 0 24 24" width="20" height="20" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg></button><div class="h-title">Drill complete</div></div>
       <div class="help" style="margin-bottom:16px">${esc(takeaway)}</div>
       <div class="block chain">
         <ol class="chain-steps">
           ${cSteps.map((s, i) => {
              const arrow = i ? `<li class="chain-arrow" aria-hidden="true">↓</li>` : "";
-             const failedStyle = s.failed ? `style="border:1px solid var(--danger);"` : "";
+             const failedStyle = s.failed ? `style="border:1px solid var(--danger-text);"` : "";
              return `${arrow}<li class="chain-step" ${failedStyle}>
                  <span class="chain-label">${esc(s.label)}</span>
                  <details class="chain-body" open>
@@ -80,8 +80,8 @@ function finishDrill(failedLinks) {
         </ol>
       </div>
       <div style="display:flex;gap:10px;margin-top:20px">
-        <button class="btn btn-ghost" style="flex:1" data-drill-action="done">Done</button>
-        <button class="btn btn-primary" style="flex:2" data-drill-action="another">Another round</button>
+        <button class="btn-ghost" style="flex:1" data-drill-action="done">Done</button>
+        <button class="btn-primary" style="flex:2" data-drill-action="another">Another round</button>
       </div>
     </div>
   `);
@@ -118,20 +118,20 @@ function renderRebuild() {
     const isError = state.errorIdx === i;
     const isReveal = state.revealIdx === i;
     let style = "text-align:left;width:100%;margin-bottom:8px;";
-    if (isError) style += "border-color:var(--danger);transform:translateX(5px);";
-    if (isReveal) style += "border-color:var(--success);background-color:rgba(0,255,0,0.1);";
+    if (isError) style += "border-color:var(--danger-text);transform:translateX(5px);";
+    if (isReveal) style += "border-color:var(--status-mastered);background-color:rgba(0,255,0,0.1);";
     return `<button class="chain-step linkbtn" data-drill-action="rebuild-pick" data-idx="${i}" style="${style}">
       <div class="chain-text">${esc(cSteps[i].step.statement)}</div>
     </button>`;
   }).join("");
   
   setHTML(app, `
-    <div class="rev-top">${XBTN}</div>
+    <div class="ahd" style="display:flex;align-items:center;padding:12px;gap:12px"><button class="iconbtn" data-action="return-focus" aria-label="End session"><svg class="ic" viewBox="0 0 24 24" width="20" height="20" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg></button></div>
     <div class="rev-body" style="padding-bottom:100px;">
       <div class="h-title" style="margin-bottom:16px">Rebuild the chain</div>
       <div class="help">Tap the next step in the sequence.</div>
-      <div class="block chain" style="margin-bottom:20px;min-height:40px;border:1px dashed var(--border);padding:10px;border-radius:8px">
-        ${placedHtml || `<div class="empty" style="text-align:center;color:var(--faint)">Sequence starts here</div>`}
+      <div class="block chain" style="margin-bottom:20px;min-height:40px;border:1px dashed var(--border-control);padding:10px;border-radius:8px">
+        ${placedHtml || `<div class="empty" style="text-align:center;color:var(--text-faint)">Sequence starts here</div>`}
       </div>
       <div>
         ${remainingHtml}
@@ -178,7 +178,7 @@ function renderGap() {
     const arrow = i ? `<div class="chain-arrow" aria-hidden="true">↓</div>` : "";
     if (i === state.blankIdx) {
       if (state.result) {
-         const cl = state.result.correct ? "" : `border:1px solid var(--danger);`;
+         const cl = state.result.correct ? "" : `border:1px solid var(--danger-text);`;
          return `${arrow}<div class="chain-step" style="${cl}">
            <span class="chain-label">${esc(s.label)}</span>
            <div class="chain-text">${esc(s.step.statement)}</div>
@@ -188,7 +188,7 @@ function renderGap() {
          return `${arrow}<div class="chain-step" style="padding:10px">
            <span class="chain-label">${esc(s.label)}</span>
            <textarea id="gapInput" rows="2" style="width:100%;margin-top:8px" placeholder="Type the ${esc(s.label)}..."></textarea>
-           <button class="btn btn-primary" data-drill-action="gap-submit" style="margin-top:8px;width:100%" ${state.submitting ? "disabled" : ""}>Check</button>
+           <button class="btn-primary" data-drill-action="gap-submit" style="margin-top:8px;width:100%" ${state.submitting ? "disabled" : ""}>Check</button>
          </div>`;
       }
     }
@@ -196,13 +196,13 @@ function renderGap() {
   }).join("");
 
   setHTML(app, `
-    <div class="rev-top">${XBTN}</div>
+    <div class="ahd" style="display:flex;align-items:center;padding:12px;gap:12px"><button class="iconbtn" data-action="return-focus" aria-label="End session"><svg class="ic" viewBox="0 0 24 24" width="20" height="20" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg></button></div>
     <div class="rev-body" style="padding-bottom:100px;">
       <div class="h-title" style="margin-bottom:16px">Fill the gap</div>
       <div class="block chain">
         ${stepsHtml}
       </div>
-      ${state.result ? `<button class="btn btn-primary btn-block" style="margin-top:20px" data-drill-action="gap-next">Continue</button>` : ""}
+      ${state.result ? `<button class="btn-primary btn-block" style="margin-top:20px" data-drill-action="gap-next">Continue</button>` : ""}
     </div>
   `);
   
@@ -250,11 +250,11 @@ function renderBackwards() {
        stepsHtml.push(`<div class="chain-step" style="padding:10px">
            <span class="chain-label">Upstream: ${esc(cSteps[i].label)}</span>
            <textarea id="backInput" rows="2" style="width:100%;margin-top:8px" placeholder="What precedes the next step?"></textarea>
-           <button class="btn btn-primary" data-drill-action="backwards-submit" style="margin-top:8px;width:100%" ${state.submitting ? "disabled" : ""}>Check</button>
+           <button class="btn-primary" data-drill-action="backwards-submit" style="margin-top:8px;width:100%" ${state.submitting ? "disabled" : ""}>Check</button>
          </div>${arrow}`);
     } else {
        const hist = state.history.find(h => h.idx === i);
-       const cl = hist && !hist.correct ? `border:1px solid var(--danger);` : "";
+       const cl = hist && !hist.correct ? `border:1px solid var(--danger-text);` : "";
        stepsHtml.push(`<div class="chain-step" style="${cl}">
            <span class="chain-label">${esc(cSteps[i].label)}</span>
            <div class="chain-text">${esc(cSteps[i].step.statement)}</div>
@@ -263,7 +263,7 @@ function renderBackwards() {
   }
 
   setHTML(app, `
-    <div class="rev-top">${XBTN}</div>
+    <div class="ahd" style="display:flex;align-items:center;padding:12px;gap:12px"><button class="iconbtn" data-action="return-focus" aria-label="End session"><svg class="ic" viewBox="0 0 24 24" width="20" height="20" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg></button></div>
     <div class="rev-body" style="padding-bottom:100px;">
       <div class="h-title" style="margin-bottom:16px">Work backwards</div>
       <div class="help">What directly causes or precedes the step below?</div>

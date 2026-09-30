@@ -27,22 +27,28 @@ export function paintTypedQ() {
     setHTML(app, `
       <div class="view">
         <div class="done-msg"><div class="big">✍️</div>
-          <div style="font-weight:650;color:var(--ink)">Practice complete</div>
+          <div style="font-weight:650;color:var(--text-primary)">Practice complete</div>
           <div style="margin-top:4px">${items.length} typed answer${items.length === 1 ? "" : "s"} graded.</div>
         </div>
-        <button class="btn btn-primary btn-block" data-action="return-focus">Done</button>
+        <button class="btn-primary btn-block" data-action="return-focus">Done</button>
       </div>`);
     return;
   }
   const { card } = items[idx];
   setHTML(app, `
-    <div class="rev-top">${XBTN}<div class="bar"><i style="width:${Math.round((idx / items.length) * 100)}%"></i></div>
-      <span class="rev-count tnum">${idx + 1} / ${items.length}</span></div>
+    
+      <div class="ahd" style="display:flex;align-items:center;padding:12px;gap:12px">
+        <button class="iconbtn" data-action="return-focus" aria-label="End session"><svg class="ic" viewBox="0 0 24 24" width="20" height="20" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg></button>
+        <div class="focus-track">
+          <div class="focus-fill" style="width:${Math.max(2, Math.round((idx / items.length) * 100))}%"></div>
+        </div>
+        <div style="font-size:13px;color:var(--text-muted);font-variant-numeric:tabular-nums">${idx + 1} / ${items.length}</div>
+      </div>
     <div class="rev-body">
       <div class="t-label">Type the answer</div>
       <div style="font-size:16px;font-weight:600;line-height:1.35">${esc(card.front)}</div>
       <textarea id="typedAnswer" class="sa-input" rows="3" placeholder="Answer in your own words…"></textarea>
-      <button class="btn btn-primary btn-block" data-action="typed-check">Check answer</button>
+      <button class="btn-primary btn-block" data-action="typed-check">Check answer</button>
       <div class="help" style="margin:0;text-align:center">AI-graded against this card's answer.</div>
     </div>`);
 }

@@ -26,22 +26,28 @@ export function paintCodingQ() {
     setHTML(app, `
       <div class="view">
         <div class="done-msg"><div class="big">⌨️</div>
-          <div style="font-weight:650;color:var(--ink)">Coding practice complete</div>
+          <div style="font-weight:650;color:var(--text-primary)">Coding practice complete</div>
           <div style="margin-top:4px">${items.length} exercise${items.length === 1 ? "" : "s"} graded.</div>
         </div>
-        <button class="btn btn-primary btn-block" data-action="return-focus">Done</button>
+        <button class="btn-primary btn-block" data-action="return-focus">Done</button>
       </div>`);
     return;
   }
   const { card } = items[idx];
   setHTML(app, `
-    <div class="rev-top">${XBTN}<div class="bar"><i style="width:${Math.round((idx / items.length) * 100)}%"></i></div>
-      <span class="rev-count tnum">${idx + 1} / ${items.length}</span></div>
+    
+      <div class="ahd" style="display:flex;align-items:center;padding:12px;gap:12px">
+        <button class="iconbtn" data-action="return-focus" aria-label="End session"><svg class="ic" viewBox="0 0 24 24" width="20" height="20" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg></button>
+        <div class="focus-track">
+          <div class="focus-fill" style="width:${Math.max(2, Math.round((idx / items.length) * 100))}%"></div>
+        </div>
+        <div style="font-size:13px;color:var(--text-muted);font-variant-numeric:tabular-nums">${idx + 1} / ${items.length}</div>
+      </div>
     <div class="rev-body">
       <div class="t-label">Solve in code</div>
       <div style="display:flex;align-items:center;gap:10px;margin-top:8px">
-        <span class="spinner" style="border-color:var(--border);border-top-color:var(--primary)"></span>
-        <span style="font-size:13px;color:var(--muted)">Writing a small exercise from “${esc(card.front)}”…</span>
+        <span class="spinner" style="border-color:var(--border-control);border-top-color:var(--accent)"></span>
+        <span style="font-size:13px;color:var(--text-muted)">Writing a small exercise from “${esc(card.front)}”…</span>
       </div>
     </div>`);
   requestCodingTask();
@@ -72,8 +78,14 @@ export async function requestCodingTask() {
 export function paintCodeEditor() {
   const { task, items, idx } = codingState;
   setHTML(app, `
-    <div class="rev-top">${XBTN}<div class="bar"><i style="width:${Math.round((idx / items.length) * 100)}%"></i></div>
-      <span class="rev-count tnum">${idx + 1} / ${items.length}</span></div>
+    
+      <div class="ahd" style="display:flex;align-items:center;padding:12px;gap:12px">
+        <button class="iconbtn" data-action="return-focus" aria-label="End session"><svg class="ic" viewBox="0 0 24 24" width="20" height="20" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg></button>
+        <div class="focus-track">
+          <div class="focus-fill" style="width:${Math.max(2, Math.round((idx / items.length) * 100))}%"></div>
+        </div>
+        <div style="font-size:13px;color:var(--text-muted);font-variant-numeric:tabular-nums">${idx + 1} / ${items.length}</div>
+      </div>
     <div class="rev-body">
       <div class="t-label">Solve in code · ${esc(task.language)}</div>
       <div class="hypothetical">${esc(task.scenario)}</div>
@@ -86,7 +98,7 @@ export function paintCodeEditor() {
         <span class="target">About ${task.expectedLines} lines</span>
         <span class="count tnum" id="codeCount"></span>
       </div>
-      <button class="btn btn-primary btn-block" data-action="code-check">Submit for review</button>
+      <button class="btn-primary btn-block" data-action="code-check">Submit for review</button>
     </div>`);
 
   const ta = document.getElementById("codeInput");
@@ -172,7 +184,7 @@ export function paintCodeGraded(g) {
   setHTML(box, `
     <div class="score-row">
       <div class="score tnum ${g.correct ? "ok" : "no"}">${g.score}</div>
-      <div><b style="color:${g.correct ? "var(--success)" : "var(--danger)"}">${g.correct ? "Passes" : "Not yet"}</b>
+      <div><b style="color:${g.correct ? "var(--status-mastered)" : "var(--danger-text)"}">${g.correct ? "Passes" : "Not yet"}</b>
         <div class="feedback">${esc(g.feedback)}</div></div>
     </div>
     <div class="checklist graded-ck">
@@ -191,7 +203,7 @@ export function paintCodeGraded(g) {
           }</div>`
         : ""
     }
-    <button class="btn btn-primary btn-block" data-action="code-next">Continue</button>`);
+    <button class="btn-primary btn-block" data-action="code-next">Continue</button>`);
   const body = app.querySelector(".rev-body");
   if (body) {
     body.querySelector(".code-input")?.remove();

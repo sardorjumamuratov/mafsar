@@ -166,10 +166,10 @@ export async function backendExtractPdf(bytes) {
 }
 
 export function backendGlobalPublish(setId) {
-  return post("/v1/global/publish", { setId });
+  return post("/v1/discover/" + encodeURIComponent(setId) + "/publish");
 }
 export function backendGlobalUnpublish(setId) {
-  return post("/v1/global/unpublish", { setId });
+  return post("/v1/discover/" + encodeURIComponent(setId) + "/unpublish");
 }
 export function backendGlobalList(tab, q, cursor) {
   return get("/v1/discover?tab=" + encodeURIComponent(tab || "for") + "&q=" + encodeURIComponent(q || "") + "&cursor=" + encodeURIComponent(cursor || "0"));

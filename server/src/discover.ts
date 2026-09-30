@@ -26,7 +26,7 @@ export function createDiscoverApp(db: DB) {
     const set = await one<any>(db, "SELECT * FROM sets WHERE id = ? AND user_id = ? AND deleted = 0", [setId, userId]);
     if (!set) return c.json({ error: "not_found" }, 404);
     
-    if (set.source === "quizlet" || set.source === "anki" || set.source === "shared" || set.is_global || set.origin_set_id) {
+    if (["quizlet", "anki", "shared", "share", "global"].includes(set.source) || set.is_global || set.origin_set_id) {
       return c.json({ error: "invalid_source", message: "Only your own sets can be published." }, 400);
     }
     
@@ -40,7 +40,9 @@ export function createDiscoverApp(db: DB) {
       if (cleanTitle === "UNSAFE") {
         return c.json({ error: "safety", message: "Set title was flagged by safety filters." }, 400);
       }
-      await run(db, "UPDATE sets SET is_global = 1, title = ?, updated_at = ? WHERE id = ?", [cleanTitle, new Date().toISOString(), setId]);
+      // server_updated_at so the owner's other devices learn it's global.
+      const now = new Date().toISOString();
+      await run(db, "UPDATE sets SET is_global = 1, title = ?, updated_at = ?, server_updated_at = ? WHERE id = ?", [cleanTitle, now, now, setId]);
       bumpCatalogue();
       return c.json({ ok: true, title: cleanTitle });
     } catch(e) {
@@ -51,7 +53,8 @@ export function createDiscoverApp(db: DB) {
   app.post("/:id/unpublish", async (c) => {
     const userId = c.get("userId");
     const setId = c.req.param("id");
-    await run(db, "UPDATE sets SET is_global = 0, updated_at = ? WHERE id = ? AND user_id = ?", [new Date().toISOString(), setId, userId]);
+    const now = new Date().toISOString();
+    await run(db, "UPDATE sets SET is_global = 0, updated_at = ?, server_updated_at = ? WHERE id = ? AND user_id = ?", [now, now, setId, userId]);
     bumpCatalogue();
     return c.json({ ok: true });
   });
@@ -230,28 +233,36 @@ export function createDiscoverApp(db: DB) {
     
     const newSetId = randomUUID();
     const now = new Date().toISOString();
-    
-    // NOTE: run DOES NOT EXIST. Use execute from db.ts! Wait! run DOES exist, we exported it!
-    // Wait, let's use run from db.ts! But we also have db.batch. I will use run for simplicity.
-    await run(db, 
-      "INSERT INTO sets (id, user_id, title, description, source, source_label, mode, created_at, updated_at, origin_set_id, category_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
-      [newSetId, userId, rootSet.title, rootSet.description, rootSet.source, rootSet.source_label, rootSet.mode, now, now, rootId, rootSet.category_id]
-    );
-    
-    const cards = await all<any>(db, "SELECT * FROM cards WHERE set_id = ? AND deleted = 0", [rootId]);
-    for (const card of cards) {
-      await run(db, 
-        "INSERT INTO cards (id, set_id, user_id, front, back, created_at, updated_at, easiness, interval, repetitions) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
-        [randomUUID(), newSetId, userId, card.front, card.back, now, now, 2.5, 0, 0]
-      );
-    }
-    
+
+    // One batch, so a failure never leaves a copy with half its cards. The
+    // server_updated_at stamps are what make the copy come down on the
+    // learner's next sync; origin_card_id is what lets the owner's later
+    // edits reach it. Cards start New (no due date, no FSRS state).
+    const cards = await all<any>(db, "SELECT id, front, back FROM cards WHERE set_id = ? AND deleted = 0", [rootId]);
+    await db.batch([
+      {
+        sql: `INSERT INTO sets (id, user_id, title, description, source, source_label, mode, created_at, updated_at, server_updated_at, origin_set_id, category_id)
+              VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        args: [newSetId, userId, rootSet.title, rootSet.description ?? null, rootSet.source ?? null, rootSet.source_label ?? null,
+               rootSet.mode ?? "general", now, now, now, rootId, rootSet.category_id ?? null],
+      },
+      ...cards.map((card) => ({
+        sql: `INSERT INTO cards (id, set_id, user_id, front, back, easiness, interval, repetitions, due_date, updated_at, server_updated_at, origin_card_id)
+              VALUES (?, ?, ?, ?, ?, 2.5, 0, 0, NULL, ?, ?, ?)`,
+        args: [randomUUID(), newSetId, userId, card.front, card.back, now, now, card.id],
+      })),
+    ], "write");
+
     return c.json({ id: newSetId });
   });
 
   app.get("/:id/preview", async (c) => {
     const rootId = c.req.param("id");
-    const cards = await all<any>(db, "SELECT front, back FROM cards WHERE set_id = ? AND deleted = 0 LIMIT 3", [rootId]);
+    // Only published, visible sets: without this any set's cards were readable
+    // by id.
+    const listed = await one(db, "SELECT 1 AS x FROM sets WHERE id = ? AND is_global = 1 AND is_hidden = 0 AND deleted = 0", [rootId]);
+    if (!listed) return c.json({ error: "not_found", message: "This set isn't in Discover any more." }, 404);
+    const cards = await all<any>(db, "SELECT front FROM cards WHERE set_id = ? AND deleted = 0 LIMIT 3", [rootId]);
     return c.json({ cards });
   });
 

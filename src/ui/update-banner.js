@@ -19,13 +19,15 @@ function readFlags() {
 export async function updateBannerHtml() {
   const state = await readFlags();
   if (state.clientOutdated) {
-    return `<div class="update-banner warn" role="status"><span>${esc(state.clientOutdated)}</span></div>`;
+    return `<div class="block tint" style="margin:16px 16px 0; display:flex; align-items:center; gap:10px" role="status"><span>${esc(state.clientOutdated)}</span></div>`;
   }
   if (!state.updateReady || dismissedFor() === state.updateReady) return "";
-  return `<div class="update-banner" role="status">
+  return `<div class="block tint" style="margin:16px 16px 0; display:flex; align-items:center; justify-content:space-between; gap:10px" role="status">
       <span>Mafsar ${esc(state.updateReady)} is ready.</span>
-      <button type="button" class="btn btn-primary btn-sm" data-action="apply-update">Restart</button>
-      <button type="button" class="iconbtn ic-xs" data-action="dismiss-update" aria-label="Dismiss"><svg class="ic ic-sm" viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
+      <div style="display:flex;gap:6px">
+        <button type="button" class="btn-sm" style="color:var(--accent-text)" data-action="apply-update">Restart</button>
+        <button type="button" class="iconbtn" style="width:36px;height:36px" data-action="dismiss-update" aria-label="Dismiss"><svg class="ic" viewBox="0 0 24 24" width="16" height="16" stroke="currentColor" stroke-width="2" fill="none"><path d="M18 6L6 18M6 6l12 12"/></svg></button>
+      </div>
     </div>`;
 }
 
@@ -37,7 +39,7 @@ export async function dismissUpdateBanner(el) {
   } catch {
     /* storage unavailable: dismiss visually only */
   }
-  el?.closest(".update-banner")?.remove();
+  el?.closest(".block.tint")?.remove();
 }
 
 function dismissedFor() {

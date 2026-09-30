@@ -39,8 +39,14 @@ export async function startTeach(sessionId) {
 
 function progressBar() {
   const { covered, total } = coverageCount(teachState.coverage, teachState.cards);
-  return `<div class="rev-top">${XBTN}<div class="bar"><i style="width:${esc(Math.round((covered / total) * 100))}%"></i></div>
-    <span class="rev-count tnum">${esc(covered)} / ${esc(total)}</span></div>`;
+  return `
+      <div class="ahd" style="display:flex;align-items:center;padding:12px;gap:12px">
+        <button class="iconbtn" data-action="return-focus" aria-label="End session"><svg class="ic" viewBox="0 0 24 24" width="20" height="20" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg></button>
+        <div class="focus-track">
+          <div class="focus-fill" style="width:${Math.max(2, Math.round((covered / total) * 100))}%"></div>
+        </div>
+        <div style="font-size:13px;color:var(--text-muted);font-variant-numeric:tabular-nums">${esc(covered)} / ${esc(total)}</div>
+      </div>`;
 }
 
 export function paintTeachIntro() {
@@ -59,7 +65,7 @@ export function paintTeachIntro() {
         ${personaOptions(teachState.isMedicine).map((id) => option(id, PERSONAS[id].emoji + " " + PERSONAS[id].option)).join("")}
       </div>
       <textarea id="teachInput" class="sa-input" rows="6" placeholder="Start explaining in your own words…"></textarea>
-      <button class="btn btn-primary btn-block" data-action="teach-send">Start teaching</button>
+      <button class="btn-primary btn-block" data-action="teach-send">Start teaching</button>
     </div>`);
   wireInput();
 }
@@ -98,10 +104,10 @@ export function paintTeachChat() {
       </div>
       <textarea id="teachInput" class="sa-input" rows="3" placeholder="Answer the ${esc(info.short)}, or keep explaining…"${off}></textarea>
       <div class="teach-actions">
-        <button class="btn btn-ghost" data-action="teach-hint"${off}>I'm stuck</button>
-        <button class="btn btn-primary" data-action="teach-send"${off}>Send</button>
+        <button class="btn-ghost" data-action="teach-hint"${off}>I'm stuck</button>
+        <button class="btn-primary" data-action="teach-send"${off}>Send</button>
       </div>
-      <button class="btn btn-ghost btn-block" data-action="teach-finish"${busy || !(done || canFinish(messages)) ? " disabled" : ""}>Finish and see how I did</button>
+      <button class="btn-ghost btn-block" data-action="teach-finish"${busy || !(done || canFinish(messages)) ? " disabled" : ""}>Finish and see how I did</button>
     </div>`);
   const thread = document.getElementById("teachThread");
   if (thread) thread.scrollTop = thread.scrollHeight;
@@ -166,8 +172,8 @@ export async function finishTeach() {
     <div class="rev-body teach">
       <div class="t-label">Teach it back</div>
       <div style="display:flex;align-items:center;gap:10px;margin-top:8px">
-        <span class="spinner" style="border-color:var(--border);border-top-color:var(--primary)"></span>
-        <span style="font-size:13px;color:var(--muted)">Looking at how you taught ${esc(s.topic)} to ${esc(personaInfo(s.persona).long)}…</span>
+        <span class="spinner" style="border-color:var(--border-control);border-top-color:var(--accent)"></span>
+        <span style="font-size:13px;color:var(--text-muted)">Looking at how you taught ${esc(s.topic)} to ${esc(personaInfo(s.persona).long)}…</span>
       </div>
     </div>`);
   const token = (s.token = {});
@@ -226,7 +232,7 @@ export function paintTeachResult() {
     <div class="view teach-result">
       <div class="ahd">
         <div class="h-title" style="margin-bottom:2px">How you taught</div>
-        <div style="font-size:12px;color:var(--muted);font-weight:normal">${esc(teachState.topic)} · to ${esc(personaInfo(teachState.persona).long)}</div>
+        <div style="font-size:12px;color:var(--text-muted);font-weight:normal">${esc(teachState.topic)} · to ${esc(personaInfo(teachState.persona).long)}</div>
       </div>
       <div class="block teach-score">
         <div class="score tnum ${u >= 70 ? "ok" : "no"}">${esc(u)}</div>
@@ -244,6 +250,6 @@ export function paintTeachResult() {
         <div class="teach-jargon">${ev.jargon.map((j) => `<span class="tag">${esc(j)}</span>`).join("")}</div>` : ""}
       ${ev.improve ? `<div class="block tint"><div class="t-label">Next step</div><div style="margin-top:6px">${esc(ev.improve)}</div></div>` : ""}
       ${ev.modelExplanation ? `<div class="block"><div class="t-label">A simple way to say it</div><div class="teach-model">${esc(ev.modelExplanation)}</div></div>` : ""}
-      <button class="btn btn-primary btn-block" data-action="return-focus">Done</button>
+      <button class="btn-primary btn-block" data-action="return-focus">Done</button>
     </div>`);
 }

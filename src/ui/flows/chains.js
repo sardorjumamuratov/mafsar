@@ -21,7 +21,7 @@ export async function openChainStepEdit(sessionId, chainId, key) {
   setHTML(app, `
     <div class="view">
       <div class="ahd">
-        <button class="iconbtn" data-action="chain-edit-cancel" aria-label="Back"><svg class="ic" viewBox="0 0 24 24"><path d="M15 6l-6 6 6 6"/></svg></button>
+        <button class="iconbtn" data-action="chain-edit-cancel" aria-label="End session"><svg class="ic" viewBox="0 0 24 24"><path d="M15 6l-6 6 6 6"/></svg></button>
         <div class="h-title" style="font-size:16px">${step ? "Edit" : "Add"} ${esc(label)}</div><span style="width:32px"></span>
       </div>
       <div class="help">${esc(chain.title)} · your edits are kept when the set is regenerated.</div>
@@ -30,8 +30,8 @@ export async function openChainStepEdit(sessionId, chainId, key) {
       <div class="field"><label for="chainWhy">Why it follows from the step before (optional)</label>
         <textarea id="chainWhy" class="sa-input" rows="3">${esc(step?.why || "")}</textarea></div>
       <div class="del-actions">
-        <button class="btn btn-ghost" data-action="chain-edit-cancel">Cancel</button>
-        <button class="btn btn-primary" data-action="chain-edit-save">Save</button>
+        <button class="btn-ghost" data-action="chain-edit-cancel">Cancel</button>
+        <button class="btn-primary" data-action="chain-edit-save">Save</button>
       </div>
       ${step ? `<button class="linkbtn chain-remove" data-action="chain-edit-remove">Remove this step</button>` : ""}
     </div>`);
