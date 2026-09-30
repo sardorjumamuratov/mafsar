@@ -33,12 +33,12 @@ export function createRatingsApp(db: DB) {
   // Rate limited to ~60 writes a minute (we'll just use a standard limit, e.g. 60 per minute is basically 1 per sec)
   const rateLimit = limitByUser(slidingWindow({ limit: 60, windowMs: 60000 }));
 
-  app.put("/v1/sets/:id/rating", requireAuth, rateLimit, async (c) => {
+  app.put("/sets/:id/rating", requireAuth(), rateLimit, async (c) => {
     const userId = c.get("userId") as string;
     const id = c.req.param("id");
     const body = await c.req.json();
     const stars = body.stars;
-    if (typeof stars !== "number" || stars < 1 || stars > 5) return c.json({error: "bad_request"}, 400);
+    if (typeof stars !== "number" || stars < 1 || stars > 5 || !Number.isInteger(stars)) return c.json({error: "bad_request"}, 400);
 
     // Check ownership and resolve root
     const set = await one<{ origin_set_id: string | null }>(db, "SELECT origin_set_id FROM sets WHERE id = ? AND user_id = ? AND deleted = 0", [id, userId]);
@@ -64,7 +64,7 @@ export function createRatingsApp(db: DB) {
     }
   });
 
-  app.delete("/v1/sets/:id/rating", requireAuth, rateLimit, async (c) => {
+  app.delete("/sets/:id/rating", requireAuth(), rateLimit, async (c) => {
     const userId = c.get("userId") as string;
     const id = c.req.param("id");
 
@@ -85,7 +85,7 @@ export function createRatingsApp(db: DB) {
     }
   });
 
-  app.post("/v1/ratings/lookup", requireAuth, async (c) => {
+  app.post("/ratings/lookup", requireAuth(), async (c) => {
     const userId = c.get("userId") as string;
     const body = await c.req.json();
     const ids = body.ids;

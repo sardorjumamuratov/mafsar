@@ -69,6 +69,7 @@ export function createApp(db: DB) {
 
   // Public — required by the Chrome Web Store / Firefox Add-ons listings.
   
+  app.route("/v1", createRatingsApp(db));
   app.route("/v1/discover", createDiscoverApp(db));
   app.route("/v1/admin", createAdminApp(db));
   

@@ -399,6 +399,24 @@ async function openWeakCard(sessionId, cardId) {
 
 
 
+
+document.addEventListener("click", (e) => {
+  const btn = /** @type {HTMLButtonElement|null} */ (/** @type {HTMLElement} */ (e.target).closest(".star-btn"));
+  if (btn && !btn.disabled) {
+    const group = btn.closest(".rating-group");
+    const rootId = /** @type {HTMLElement} */ (group).dataset.root;
+    const clientSetId = /** @type {HTMLElement} */ (group).dataset.client;
+    const val = parseInt(/** @type {HTMLElement} */ (btn).dataset.val, 10);
+    const current = btn.getAttribute("aria-checked") === "true";
+    if (current) {
+      clearRating(rootId, clientSetId);
+    } else {
+      rateSet(rootId, clientSetId, val);
+    }
+  }
+});
+
+
 document.addEventListener("mouseover", (e) => {
   const btn = /** @type {HTMLButtonElement|null} */ (/** @type {HTMLElement} */ (e.target).closest(".star-btn"));
   if (btn && !btn.disabled) {

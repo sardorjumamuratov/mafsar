@@ -70,6 +70,13 @@ export async function applySync(db: DB, userId: string, body: SyncBody): Promise
          s.originSetId ?? null, s.isGlobal ? 1 : 0,
          s.originSetId ?? null, s.originSetId ?? null, s.originSetId ?? null, s.originSetId ?? null, s.originSetId ?? null]
       );
+      if (s.deleted && s.originSetId) {
+        await run(db, "DELETE FROM set_ratings WHERE set_root_id = ? AND user_id = ?", [s.originSetId, userId]);
+        await run(db, "UPDATE sets SET rating_sum = (SELECT SUM(stars) FROM set_ratings WHERE set_root_id = sets.id), rating_count = (SELECT COUNT(stars) FROM set_ratings WHERE set_root_id = sets.id) WHERE id = ?", [s.originSetId]);
+        await run(db, "UPDATE sets SET rating_avg = CAST(rating_sum AS REAL) / rating_count WHERE id = ? AND rating_count > 0", [s.originSetId]);
+        await run(db, "UPDATE sets SET rating_avg = NULL WHERE id = ? AND rating_count = 0", [s.originSetId]);
+      }
+
   }
 
   // Cards/quizzes reference a set; ensure the set row exists even if the
