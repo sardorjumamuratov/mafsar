@@ -56,8 +56,10 @@ test("in-place repaints never reset scroll", () => {
   // home, exam picker, sets, set detail, make-set, import, teams (two exits:
   // signed-out early return + normal path), team detail, you, auth gate,
   // delete account, and the chain step editor.
+  // Redesign: + Home's empty/first-sync exit, + Discover (signed-out exit),
+  // + Stats; the old exam picker screen is gone (the exam edits in place).
   const callSites = src.split("topOfView();").length - 1;
-  assert.equal(callSites, 13, "exactly the view-renderer exits reset scroll");
+  assert.equal(callSites, 16, "exactly the view-renderer exits reset scroll");
 });
 
 console.log("regenerate affordance (item 1a)");
@@ -436,7 +438,9 @@ test("Inline edit replaces separate blocks", () => {
   const saveFn = detail.slice(detail.indexOf("function saveCardEdit"));
   assert.ok(saveFn.includes("if (card.front === front && card.back === back)"), "unchanged text writes nothing");
   assert.ok(saveFn.includes("ratio > 0.5"), "reset threshold must be 50%");
-  assert.ok(saveFn.includes("toast(\"Card saved &middot; Reset progress?\""), "Reset toast triggers");
+  // toast() escapes its text, so an HTML entity would show literally: the
+  // separator is the character itself.
+  assert.ok(saveFn.includes("toast(\"Card saved · Reset progress?\""), "Reset toast triggers");
   assert.ok(saveFn.includes("initSchedule()"), "Reset calls initSchedule");
   
   const panel = fs.readFileSync(new URL("../src/ui/panel.js", import.meta.url), "utf8");
@@ -538,7 +542,8 @@ test("Ratings (prompt 07)", async () => {
   
   // store
   assert.ok(ratings.includes("pending"), "optimistic update state exists");
-  assert.ok(ratings.includes("backup"), "rollback implemented");
+  // Behaviour is covered in tests/ratings.test.mjs (a failed write rolls back).
+  assert.ok(ratings.includes("cache[rootId] = prev"), "rollback implemented");
   assert.ok(ratings.includes("flushPendingRatings"), "offline queue flush function exists");
   assert.ok(sync.includes("flushPendingRatings"), "syncNow calls flush");
   
