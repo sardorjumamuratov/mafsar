@@ -52,7 +52,7 @@ export function createRatingsApp(db: DB) {
     const userId = c.get("userId");
     const parsed = ratingSchema.safeParse(await c.req.json().catch(() => ({})));
     if (!parsed.success) return c.json({ error: "bad_request", message: "Stars must be a whole number from 1 to 5." }, 400);
-    const rootId = await resolveRoot(c.req.param("id"), userId);
+    const rootId = await resolveRoot(c.req.param("id") ?? "", userId);
     if (!rootId) return c.json({ error: "not_found", message: "No such set for this account." }, 404);
 
     const now = new Date().toISOString();
@@ -69,7 +69,7 @@ export function createRatingsApp(db: DB) {
 
   app.delete("/sets/:id/rating", requireAuth(), rateLimit, async (c) => {
     const userId = c.get("userId");
-    const rootId = await resolveRoot(c.req.param("id"), userId);
+    const rootId = await resolveRoot(c.req.param("id") ?? "", userId);
     if (!rootId) return c.json({ error: "not_found", message: "No such set for this account." }, 404);
 
     await db.batch([
