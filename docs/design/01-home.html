@@ -1,0 +1,125 @@
+<!--
+  PIXEL REFERENCE: 01 Home
+  Exported from App Screens.dc.html. This is the exact source markup of the screen at a 390 × 884 viewport.
+  It isn't runnable on its own; open App Screens.dc.html to see it live and interactive.
+
+  How to read it:
+  - Every style="" value is final. Copy sizes, colors, radii, gaps, paddings, weights and line-heights 1:1.
+  - style-hover="…"  = the :hover state. style-focus="…" = the :focus state.
+  - {{ name }}       = a dynamic value. Its logic is in logic.js (search for the name inside renderVals / v2 / v3).
+  - <sc-for list="{{ items }}" as="x">…</sc-for> = render the children once per item (a map).
+  - <sc-if value="{{ flag }}">…</sc-if>          = render the children only when flag is true.
+  - Font: Geist 400/500/600/650/700 (the helmet block below).
+  - An SVG path is the exact icon to use. Keep viewBox 0 0 24 24 and the given stroke widths.
+  If Implementation Prompts.md and this file ever disagree on a visual value, THIS FILE WINS.
+-->
+<helmet>
+<meta name="design_doc_mode" content="canvas">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+body{margin:0;background:#e8ebea;font-family:'Geist',system-ui,sans-serif;-webkit-font-smoothing:antialiased}
+a{color:#1f8f84}a:hover{color:#146b63}
+button{font-family:inherit}
+</style>
+</helmet>
+
+<div data-screen-label="01 Home" style="display:flex;flex-direction:column;gap:12px;width:390px">
+      <div style="display:flex;align-items:center;gap:8px;font-size:14px;font-weight:600;color:#121816"><span style="padding:3px 8px;border-radius:6px;background:#1f8f84;color:#fff;font-size:12px">01</span>Home</div>
+      <div style="position:relative;width:390px;height:884px;border-radius:24px;overflow:hidden;background:#0e1513;color:#e7eeec;box-shadow:0 20px 50px rgba(10,20,18,.25);display:flex;flex-direction:column">
+        <div style="flex:1;overflow-y:auto;display:flex;flex-direction:column;gap:20px;padding:18px 16px 28px">
+          <div style="display:flex;flex-direction:column;gap:2px;padding:0 4px">
+            <div style="font-size:14px;color:#9aa9a4">Good morning</div>
+            <div style="font-size:24px;font-weight:650;letter-spacing:-.02em">Today’s review</div>
+          </div>
+
+          <div style="padding:20px;border-radius:20px;background:#34bcad;color:#04211d;display:flex;flex-direction:column;gap:14px">
+            <div style="display:flex;flex-direction:column;gap:4px">
+              <div style="font-size:12px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;opacity:.75">Today’s goal</div>
+              <div style="display:flex;align-items:baseline;gap:8px"><span style="font-size:52px;line-height:1;font-weight:700;letter-spacing:-.03em">40</span><span style="font-size:18px;font-weight:600">cards</span></div>
+              <div style="font-size:14px;font-weight:500">~15 min · keeps you on pace for Oct 29</div>
+            </div>
+            <button style="height:50px;border-radius:14px;border:0;background:#fff;color:#16786e;font-size:16px;font-weight:650;cursor:pointer" style-hover="background:#f0fbf9">Start review</button>
+            <div style="display:flex;justify-content:space-between;font-size:13px;font-weight:500"><span>201 due across 19 sets</span><span style="font-weight:650;text-decoration:underline;text-underline-offset:3px">Review all</span></div>
+          </div>
+
+          <div style="padding:16px;border-radius:16px;background:#141d1b;border:1px solid #222c2a;display:flex;flex-direction:column;gap:14px">
+            <div style="display:flex;justify-content:space-between;align-items:center">
+              <span style="font-size:13px;font-weight:600;letter-spacing:.04em;text-transform:uppercase;color:#9aa9a4">This week</span>
+              <span style="font-size:13px;color:#a9b6b2">Start a streak today</span>
+            </div>
+            <div style="display:grid;grid-template-columns:repeat(7,1fr);gap:6px">
+              <sc-for list="{{ week }}" as="d" hint-placeholder-count="7">
+                <div style="display:flex;flex-direction:column;align-items:center;gap:6px">
+                  <div style="width:32px;height:32px;border-radius:16px;border:2px solid {{ d.ring }};background:{{ d.fill }}"></div>
+                  <div style="font-size:12px;font-weight:{{ d.weight }};color:{{ d.color }}">{{ d.l }}</div>
+                </div>
+              </sc-for>
+            </div>
+          </div>
+
+          <button style="display:flex;flex-direction:column;gap:12px;padding:16px;border-radius:16px;background:#141d1b;border:1px solid #222c2a;color:#e7eeec;text-align:left;cursor:pointer">
+            <span style="display:flex;align-items:center;gap:12px;width:100%">
+              <span style="width:36px;height:36px;border-radius:10px;background:#1c2826;display:flex;align-items:center;justify-content:center;color:#5fd3c5;flex-shrink:0"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="3.5" y="5" width="17" height="15" rx="2.5"></rect><path d="M3.5 10h17M8 3v4M16 3v4"></path></svg></span>
+              <span style="flex:1;display:flex;flex-direction:column;gap:2px">
+                <span style="font-size:15px;font-weight:600">Exam · Thu, Oct 29</span>
+                <span style="font-size:13px;color:#9aa9a4">30 days left · 19 sets included</span>
+              </span>
+              <span style="font-size:13px;color:#5fd3c5;font-weight:600">Edit</span>
+            </span>
+            <span style="display:flex;flex-direction:column;gap:6px;width:100%">
+              <span style="display:flex;justify-content:space-between;font-size:13px;color:#a9b6b2"><span>Ready</span><span style="color:#e7eeec;font-weight:600">0%</span></span>
+              <span style="display:block;height:6px;border-radius:3px;background:#27322f"></span>
+            </span>
+          </button>
+
+          <div style="display:flex;flex-direction:column;gap:8px">
+            <div style="display:flex;justify-content:space-between;align-items:center;padding:0 4px">
+              <span style="font-size:13px;font-weight:600;letter-spacing:.04em;text-transform:uppercase;color:#9aa9a4">Fading soon</span>
+              <span style="font-size:14px;font-weight:600;color:#5fd3c5">Review 3</span>
+            </div>
+            <div style="border-radius:16px;background:#141d1b;border:1px solid #222c2a;display:flex;flex-direction:column;padding:0 14px">
+              <sc-for list="{{ fading }}" as="f" hint-placeholder-count="3">
+                <div style="display:flex;gap:12px;align-items:flex-start;padding:13px 0;border-bottom:1px solid {{ f.border }}">
+                  <span style="width:8px;height:8px;border-radius:4px;background:#e3a246;margin-top:7px;flex-shrink:0"></span>
+                  <span style="flex:1;font-size:15px;line-height:1.4;text-wrap:pretty">{{ f.q }}</span>
+                </div>
+              </sc-for>
+            </div>
+          </div>
+
+          <div style="display:flex;flex-direction:column;gap:8px">
+            <div style="display:flex;justify-content:space-between;align-items:center;padding:0 4px">
+              <span style="font-size:13px;font-weight:600;letter-spacing:.04em;text-transform:uppercase;color:#9aa9a4">Continue</span>
+              <span style="font-size:14px;font-weight:600;color:#5fd3c5">All 19 sets</span>
+            </div>
+            <sc-for list="{{ recentSets3 }}" as="s" hint-placeholder-count="3">
+              <button style="display:flex;align-items:center;gap:12px;padding:12px;border-radius:14px;background:#141d1b;border:1px solid #222c2a;color:#e7eeec;text-align:left;cursor:pointer" style-hover="border-color:#34514c">
+                <span style="width:40px;height:40px;border-radius:10px;background:{{ s.tileBg }};color:{{ s.tileFg }};font-size:12px;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0">{{ s.abbr }}</span>
+                <span style="flex:1;min-width:0;display:flex;flex-direction:column;gap:3px">
+                  <span style="font-size:15px;font-weight:600;line-height:1.3">{{ s.title }}</span>
+                  <span style="display:flex;align-items:center;flex-wrap:wrap;gap:6px;font-size:13px;color:#9aa9a4">
+                    <span>{{ s.source }}</span>
+                    <sc-if value="{{ s.hasRating }}" hint-placeholder-val="{{ false }}"><span style="display:flex;align-items:center;gap:3px">·<svg width="12" height="12" viewBox="0 0 24 24" fill="#cfd9d6" stroke="#cfd9d6" stroke-width="1.5" stroke-linejoin="round" style="margin-left:3px"><path d="M12 3.5l2.6 5.3 5.9.9-4.3 4.1 1 5.8L12 16.9l-5.2 2.7 1-5.8L3.5 9.7l5.9-.9z"></path></svg><span style="color:#cfd9d6;font-weight:600">{{ s.avg }}</span>{{ s.countText }}</span></sc-if>
+                    <sc-if value="{{ s.global }}" hint-placeholder-val="{{ false }}"><span style="display:flex;align-items:center;gap:4px">·<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" style="margin-left:2px"><circle cx="12" cy="12" r="9"></circle><path d="M3 12h18M12 3c2.5 2.7 3.8 5.7 3.8 9s-1.3 6.3-3.8 9c-2.5-2.7-3.8-5.7-3.8-9S9.5 5.7 12 3z"></path></svg>Global</span></sc-if>
+                  </span>
+                </span>
+                <span style="display:flex;flex-direction:column;align-items:flex-end"><span style="font-size:17px;font-weight:700;color:#e7eeec">{{ s.due }}</span><span style="font-size:11px;color:#9aa9a4">due</span></span>
+              </button>
+            </sc-for>
+          </div>
+        </div>
+        <div style="flex-shrink:0;padding:8px 12px;background:#0b1110;border-top:1px solid #1e2826;display:flex;gap:8px">
+          <button style="flex:1;height:44px;border-radius:12px;border:1px solid #27322f;background:#141d1b;color:#e7eeec;font-size:14px;font-weight:600;display:flex;align-items:center;justify-content:center;gap:8px;cursor:pointer"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#5fd3c5" stroke-width="2" stroke-linecap="round"><path d="M4 9V5a1 1 0 011-1h4M15 4h4a1 1 0 011 1v4M20 15v4a1 1 0 01-1 1h-4M9 20H5a1 1 0 01-1-1v-4"></path></svg>Capture page</button>
+          <button style="flex:1;height:44px;border-radius:12px;border:1px solid #27322f;background:#141d1b;color:#e7eeec;font-size:14px;font-weight:600;display:flex;align-items:center;justify-content:center;gap:8px;cursor:pointer"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#5fd3c5" stroke-width="2" stroke-linejoin="round"><path d="M5 5h14a1 1 0 011 1v9a1 1 0 01-1 1H10l-4 3.5V16H5a1 1 0 01-1-1V6a1 1 0 011-1z"></path></svg>Capture answer</button>
+          <button aria-label="Import or create" style="width:44px;height:44px;border-radius:12px;border:1px solid #27322f;background:#141d1b;color:#e7eeec;display:flex;align-items:center;justify-content:center;cursor:pointer"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M12 5v14M5 12h14"></path></svg></button>
+        </div>
+        <div style="height:64px;flex-shrink:0;background:#0b1110;display:grid;grid-template-columns:repeat(5,1fr);align-items:center">
+          <div style="display:flex;flex-direction:column;align-items:center;gap:3px;color:#5fd3c5;font-size:11px;font-weight:600"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><path d="M4 10.5L12 4l8 6.5V20h-5v-6H9v6H4z"></path></svg>Home</div>
+          <div style="display:flex;flex-direction:column;align-items:center;gap:3px;color:#8b9a96;font-size:11px"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M4 7h16M4 12h16M4 17h16"></path></svg>Sets</div>
+          <div style="display:flex;flex-direction:column;align-items:center;gap:3px;color:#8b9a96;font-size:11px"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"><circle cx="12" cy="12" r="9"></circle><path d="M15.5 8.5l-2 5-5 2 2-5z"></path></svg>Discover</div>
+          <div style="display:flex;flex-direction:column;align-items:center;gap:3px;color:#8b9a96;font-size:11px"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M5 20v-8M12 20V5M19 20v-5"></path></svg>Stats</div>
+          <div style="display:flex;flex-direction:column;align-items:center;gap:3px;color:#8b9a96;font-size:11px"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="12" cy="8" r="4"></circle><path d="M4 20.5c.8-4 4-6 8-6s7.2 2 8 6"></path></svg>You</div>
+        </div>
+      </div>
+    </div>

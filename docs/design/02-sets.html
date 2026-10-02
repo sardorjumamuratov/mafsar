@@ -1,0 +1,115 @@
+<!--
+  PIXEL REFERENCE: 02 Sets
+  Exported from App Screens.dc.html. This is the exact source markup of the screen at a 390 × 884 viewport.
+  It isn't runnable on its own; open App Screens.dc.html to see it live and interactive.
+
+  How to read it:
+  - Every style="" value is final. Copy sizes, colors, radii, gaps, paddings, weights and line-heights 1:1.
+  - style-hover="…"  = the :hover state. style-focus="…" = the :focus state.
+  - {{ name }}       = a dynamic value. Its logic is in logic.js (search for the name inside renderVals / v2 / v3).
+  - <sc-for list="{{ items }}" as="x">…</sc-for> = render the children once per item (a map).
+  - <sc-if value="{{ flag }}">…</sc-if>          = render the children only when flag is true.
+  - Font: Geist 400/500/600/650/700 (the helmet block below).
+  - An SVG path is the exact icon to use. Keep viewBox 0 0 24 24 and the given stroke widths.
+  If Implementation Prompts.md and this file ever disagree on a visual value, THIS FILE WINS.
+-->
+<helmet>
+<meta name="design_doc_mode" content="canvas">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+body{margin:0;background:#e8ebea;font-family:'Geist',system-ui,sans-serif;-webkit-font-smoothing:antialiased}
+a{color:#1f8f84}a:hover{color:#146b63}
+button{font-family:inherit}
+</style>
+</helmet>
+
+<div data-screen-label="02 Sets" style="display:flex;flex-direction:column;gap:12px;width:390px">
+      <div style="display:flex;align-items:center;gap:8px;font-size:14px;font-weight:600;color:#121816"><span style="padding:3px 8px;border-radius:6px;background:#1f8f84;color:#fff;font-size:12px">02</span>Sets</div>
+      <div style="position:relative;width:390px;height:884px;border-radius:24px;overflow:hidden;background:#0e1513;color:#e7eeec;box-shadow:0 20px 50px rgba(10,20,18,.25);display:flex;flex-direction:column">
+        <div style="flex:1;overflow-y:auto;display:flex;flex-direction:column;gap:14px;padding:18px 16px 24px">
+          <div style="display:flex;flex-direction:column;gap:2px;padding:0 4px">
+            <div style="font-size:24px;font-weight:650;letter-spacing:-.02em">Sets</div>
+            <div style="font-size:13px;color:#9aa9a4">19 sets · 201 cards due</div>
+          </div>
+          <div style="display:flex;gap:8px">
+            <label style="flex:1;min-width:0;display:flex;align-items:center;gap:10px;height:44px;padding:0 14px;border-radius:12px;background:#141d1b;border:1px solid #222c2a;color:#8b9a96">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"></circle><path d="M20 20l-4-4"></path></svg>
+              <input placeholder="Search sets and cards" style="flex:1;min-width:0;background:transparent;border:0;outline:none;color:#e7eeec;font-size:15px;font-family:inherit">
+            </label>
+            <button onClick="{{ openFilter3 }}" aria-label="Filter and sort" style="position:relative;width:44px;height:44px;border-radius:12px;border:1px solid {{ filterBorder3 }};background:#141d1b;color:{{ filterColor3 }};display:flex;align-items:center;justify-content:center;cursor:pointer;flex-shrink:0">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 7h10M18 7h2M4 17h4M12 17h8"></path><circle cx="16" cy="7" r="2"></circle><circle cx="10" cy="17" r="2"></circle></svg>
+              <sc-if value="{{ filterActive3 }}" hint-placeholder-val="{{ false }}"><span style="position:absolute;top:8px;right:8px;width:8px;height:8px;border-radius:4px;background:#34bcad;box-shadow:0 0 0 2px #141d1b"></span></sc-if>
+            </button>
+          </div>
+          <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;min-height:30px;padding:0 4px;font-size:13px;color:#9aa9a4">
+            <span style="display:flex;align-items:center;gap:8px">
+              <span>{{ sets3Count }}</span>
+              <sc-if value="{{ filterActive3 }}" hint-placeholder-val="{{ false }}">
+                <button onClick="{{ clearFilter3 }}" aria-label="Clear filter" style="height:28px;padding:0 6px 0 10px;border-radius:999px;border:1px solid #34514c;background:#1c2826;color:#e7eeec;font-size:13px;font-weight:600;display:flex;align-items:center;gap:4px;cursor:pointer">{{ filterLabel3 }}<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#9aa9a4" stroke-width="2.4" stroke-linecap="round"><path d="M7 7l10 10M17 7L7 17"></path></svg></button>
+              </sc-if>
+            </span>
+            <button onClick="{{ openFilter3 }}" style="height:30px;padding:0 4px;border:0;background:transparent;display:flex;align-items:center;gap:6px;color:#cfd9d6;font-size:13px;font-weight:600;cursor:pointer"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M7 4v16M3 16l4 4 4-4M17 20V4M13 8l4-4 4 4"></path></svg>{{ sortLabel3 }}</button>
+          </div>
+          <div style="display:flex;flex-direction:column;gap:8px">
+            <sc-for list="{{ sets3 }}" as="s" hint-placeholder-count="7">
+              <button style="display:flex;align-items:center;gap:12px;padding:12px;border-radius:14px;background:#141d1b;border:1px solid #222c2a;color:#e7eeec;text-align:left;cursor:pointer" style-hover="border-color:#34514c">
+                <span style="width:40px;height:40px;border-radius:10px;background:{{ s.tileBg }};color:{{ s.tileFg }};font-size:12px;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0">{{ s.abbr }}</span>
+                <span style="flex:1;min-width:0;display:flex;flex-direction:column;gap:3px">
+                  <span style="font-size:15px;font-weight:600;line-height:1.3">{{ s.title }}</span>
+                  <span style="display:flex;align-items:center;flex-wrap:wrap;gap:6px;font-size:13px;color:#9aa9a4">
+                    <span>{{ s.source }}</span>
+                    <sc-if value="{{ s.hasRating }}" hint-placeholder-val="{{ false }}"><span style="display:flex;align-items:center;gap:3px">·<svg width="12" height="12" viewBox="0 0 24 24" fill="#cfd9d6" stroke="#cfd9d6" stroke-width="1.5" stroke-linejoin="round" style="margin-left:3px"><path d="M12 3.5l2.6 5.3 5.9.9-4.3 4.1 1 5.8L12 16.9l-5.2 2.7 1-5.8L3.5 9.7l5.9-.9z"></path></svg><span style="color:#cfd9d6;font-weight:600">{{ s.avg }}</span>{{ s.countText }}</span></sc-if>
+                    <sc-if value="{{ s.global }}" hint-placeholder-val="{{ false }}"><span style="display:flex;align-items:center;gap:4px">·<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" style="margin-left:2px"><circle cx="12" cy="12" r="9"></circle><path d="M3 12h18M12 3c2.5 2.7 3.8 5.7 3.8 9s-1.3 6.3-3.8 9c-2.5-2.7-3.8-5.7-3.8-9S9.5 5.7 12 3z"></path></svg>Global</span></sc-if>
+                  </span>
+                </span>
+                <span style="display:flex;flex-direction:column;align-items:flex-end"><span style="font-size:17px;font-weight:700;color:#e7eeec">{{ s.due }}</span><span style="font-size:11px;color:#9aa9a4">due</span></span>
+              </button>
+            </sc-for>
+          </div>
+        </div>
+        <div style="flex-shrink:0;padding:8px 12px;background:#0b1110;border-top:1px solid #1e2826;display:flex;gap:8px">
+          <button onClick="{{ capPage }}" style="flex:1;height:44px;border-radius:12px;border:1px solid #27322f;background:#141d1b;color:#e7eeec;font-size:14px;font-weight:600;display:flex;align-items:center;justify-content:center;gap:8px;cursor:pointer" style-hover="border-color:#34514c"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#5fd3c5" stroke-width="2" stroke-linecap="round"><path d="M4 9V5a1 1 0 011-1h4M15 4h4a1 1 0 011 1v4M20 15v4a1 1 0 01-1 1h-4M9 20H5a1 1 0 01-1-1v-4"></path></svg>{{ capPageLabel }}</button>
+          <button onClick="{{ capAnswer }}" aria-label="Capture last answer" style="flex:1;height:44px;border-radius:12px;border:1px solid #27322f;background:#141d1b;color:#e7eeec;font-size:14px;font-weight:600;display:flex;align-items:center;justify-content:center;gap:8px;cursor:pointer" style-hover="border-color:#34514c"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#5fd3c5" stroke-width="2" stroke-linejoin="round"><path d="M5 5h14a1 1 0 011 1v9a1 1 0 01-1 1H10l-4 3.5V16H5a1 1 0 01-1-1V6a1 1 0 011-1z"></path></svg>{{ capAnswerLabel }}</button>
+          <button aria-label="Import or create" style="width:44px;height:44px;border-radius:12px;border:1px solid #27322f;background:#141d1b;color:#e7eeec;display:flex;align-items:center;justify-content:center;cursor:pointer" style-hover="border-color:#34514c"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M12 5v14M5 12h14"></path></svg></button>
+        </div>
+        <div style="height:64px;flex-shrink:0;background:#0b1110;display:grid;grid-template-columns:repeat(5,1fr);align-items:center">
+          <div style="display:flex;flex-direction:column;align-items:center;gap:3px;color:#8b9a96;font-size:11px"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"><path d="M4 10.5L12 4l8 6.5V20h-5v-6H9v6H4z"></path></svg>Home</div>
+          <div style="display:flex;flex-direction:column;align-items:center;gap:3px;color:#5fd3c5;font-size:11px;font-weight:600"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 7h16M4 12h16M4 17h16"></path></svg>Sets</div>
+          <div style="display:flex;flex-direction:column;align-items:center;gap:3px;color:#8b9a96;font-size:11px"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"><circle cx="12" cy="12" r="9"></circle><path d="M15.5 8.5l-2 5-5 2 2-5z"></path></svg>Discover</div>
+          <div style="display:flex;flex-direction:column;align-items:center;gap:3px;color:#8b9a96;font-size:11px"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M5 20v-8M12 20V5M19 20v-5"></path></svg>Stats</div>
+          <div style="display:flex;flex-direction:column;align-items:center;gap:3px;color:#8b9a96;font-size:11px"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="12" cy="8" r="4"></circle><path d="M4 20.5c.8-4 4-6 8-6s7.2 2 8 6"></path></svg>You</div>
+        </div>
+        <sc-if value="{{ filterOpen3 }}" hint-placeholder-val="{{ false }}">
+          <div onClick="{{ closeFilter3 }}" style="position:absolute;inset:0;z-index:2;background:rgba(0,0,0,.6);display:flex;align-items:flex-end">
+            <div onClick="{{ stop }}" style="width:100%;padding:10px 16px 24px;border-radius:22px 22px 0 0;background:#151e1c;border-top:1px solid #27322f;display:flex;flex-direction:column;gap:14px">
+              <div style="align-self:center;width:36px;height:4px;border-radius:2px;background:#3b4845"></div>
+              <div style="font-size:18px;font-weight:650;padding:0 6px">Filter and sort</div>
+              <div style="display:flex;flex-direction:column;gap:4px">
+                <div style="font-size:13px;font-weight:600;letter-spacing:.04em;text-transform:uppercase;color:#9aa9a4;padding:0 6px 4px">Show</div>
+                <sc-for list="{{ showOpts3 }}" as="o" hint-placeholder-count="4">
+                  <button onClick="{{ o.select }}" style="display:flex;align-items:center;gap:12px;height:48px;padding:0 12px;border-radius:12px;border:1px solid {{ o.border }};background:{{ o.bg }};color:#e7eeec;text-align:left;cursor:pointer">
+                    <span style="flex:1;font-size:15px;font-weight:600">{{ o.label }}</span>
+                    <span style="font-size:13px;color:#9aa9a4">{{ o.count }}</span>
+                    <span style="width:18px;display:flex"><sc-if value="{{ o.sel }}" hint-placeholder-val="{{ false }}"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#5fd3c5" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.5l4.5 4.5L19 7.5"></path></svg></sc-if></span>
+                  </button>
+                </sc-for>
+              </div>
+              <div style="display:flex;flex-direction:column;gap:4px">
+                <div style="font-size:13px;font-weight:600;letter-spacing:.04em;text-transform:uppercase;color:#9aa9a4;padding:0 6px 4px">Sort by</div>
+                <sc-for list="{{ sortOpts3 }}" as="o" hint-placeholder-count="4">
+                  <button onClick="{{ o.select }}" style="display:flex;align-items:center;gap:12px;height:48px;padding:0 12px;border-radius:12px;border:1px solid {{ o.border }};background:{{ o.bg }};color:#e7eeec;text-align:left;cursor:pointer">
+                    <span style="flex:1;font-size:15px;font-weight:600">{{ o.label }}</span>
+                    <span style="width:18px;display:flex"><sc-if value="{{ o.sel }}" hint-placeholder-val="{{ false }}"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#5fd3c5" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.5l4.5 4.5L19 7.5"></path></svg></sc-if></span>
+                  </button>
+                </sc-for>
+              </div>
+              <button onClick="{{ closeFilter3 }}" style="height:50px;border-radius:12px;border:0;background:#34bcad;color:#04211d;font-size:15px;font-weight:650;cursor:pointer" style-hover="background:#45cbbc">{{ applyLabel3 }}</button>
+            </div>
+          </div>
+        </sc-if>
+        <sc-if value="{{ capToastOn }}" hint-placeholder-val="{{ false }}">
+          <div style="position:absolute;left:16px;right:16px;bottom:138px;height:48px;padding:0 8px 0 16px;border-radius:12px;background:#e7eeec;color:#0e1513;display:flex;align-items:center;justify-content:space-between;font-size:14px;font-weight:500;box-shadow:0 8px 24px rgba(0,0,0,.4)">{{ capToast }}<button style="height:36px;padding:0 12px;border-radius:8px;border:0;background:transparent;color:#16786e;font-size:14px;font-weight:700;cursor:pointer">Open</button></div>
+        </sc-if>
+      </div>
+    </div>

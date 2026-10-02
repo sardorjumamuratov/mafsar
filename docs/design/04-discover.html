@@ -1,0 +1,116 @@
+<!--
+  PIXEL REFERENCE: 04 Discover
+  Exported from App Screens.dc.html. This is the exact source markup of the screen at a 390 × 884 viewport.
+  It isn't runnable on its own; open App Screens.dc.html to see it live and interactive.
+
+  How to read it:
+  - Every style="" value is final. Copy sizes, colors, radii, gaps, paddings, weights and line-heights 1:1.
+  - style-hover="…"  = the :hover state. style-focus="…" = the :focus state.
+  - {{ name }}       = a dynamic value. Its logic is in logic.js (search for the name inside renderVals / v2 / v3).
+  - <sc-for list="{{ items }}" as="x">…</sc-for> = render the children once per item (a map).
+  - <sc-if value="{{ flag }}">…</sc-if>          = render the children only when flag is true.
+  - Font: Geist 400/500/600/650/700 (the helmet block below).
+  - An SVG path is the exact icon to use. Keep viewBox 0 0 24 24 and the given stroke widths.
+  If Implementation Prompts.md and this file ever disagree on a visual value, THIS FILE WINS.
+-->
+<helmet>
+<meta name="design_doc_mode" content="canvas">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+body{margin:0;background:#e8ebea;font-family:'Geist',system-ui,sans-serif;-webkit-font-smoothing:antialiased}
+a{color:#1f8f84}a:hover{color:#146b63}
+button{font-family:inherit}
+</style>
+</helmet>
+
+<div data-screen-label="04 Discover" style="display:flex;flex-direction:column;gap:12px;width:390px">
+      <div style="display:flex;align-items:center;gap:8px;font-size:14px;font-weight:600;color:#121816"><span style="padding:3px 8px;border-radius:6px;background:#1f8f84;color:#fff;font-size:12px">04</span>Discover</div>
+      <div style="position:relative;width:390px;height:884px;border-radius:24px;overflow:hidden;background:#0e1513;color:#e7eeec;box-shadow:0 20px 50px rgba(10,20,18,.25);display:flex;flex-direction:column">
+        <div style="flex:1;overflow-y:auto;display:flex;flex-direction:column;gap:14px;padding:18px 16px 24px">
+          <div style="display:flex;flex-direction:column;gap:2px;padding:0 4px">
+            <div style="font-size:24px;font-weight:650;letter-spacing:-.02em">Discover</div>
+            <div style="font-size:13px;color:#9aa9a4">Sets shared by other learners, picked for you</div>
+          </div>
+          <label style="display:flex;align-items:center;gap:10px;height:44px;padding:0 14px;border-radius:12px;background:#141d1b;border:1px solid #222c2a;color:#8b9a96">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"></circle><path d="M20 20l-4-4"></path></svg>
+            <input value="{{ discQuery }}" onChange="{{ setDiscQuery }}" placeholder="Search global sets" style="flex:1;min-width:0;background:transparent;border:0;outline:none;color:#e7eeec;font-size:15px;font-family:inherit">
+          </label>
+          <div style="display:flex;padding:3px;border-radius:12px;background:#141d1b;border:1px solid #222c2a">
+            <sc-for list="{{ discTabs }}" as="t" hint-placeholder-count="3">
+              <button onClick="{{ t.select }}" style="flex:1;height:36px;border:0;border-radius:9px;background:{{ t.bg }};color:{{ t.color }};font-size:14px;font-weight:600;cursor:pointer">{{ t.label }}</button>
+            </sc-for>
+          </div>
+          <div style="display:flex;flex-direction:column;gap:8px">
+            <sc-for list="{{ discList }}" as="g" hint-placeholder-count="6">
+              <button onClick="{{ g.open }}" style="display:flex;align-items:center;gap:12px;padding:12px;border-radius:14px;background:#141d1b;border:1px solid #222c2a;color:#e7eeec;text-align:left;cursor:pointer" style-hover="border-color:#34514c">
+                <span style="width:40px;height:40px;border-radius:10px;background:{{ g.tileBg }};color:{{ g.tileFg }};font-size:12px;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0">{{ g.abbr }}</span>
+                <span style="flex:1;min-width:0;display:flex;flex-direction:column;gap:3px">
+                  <span style="font-size:15px;font-weight:600;line-height:1.3">{{ g.title }}</span>
+                  <span style="font-size:13px;color:#9aa9a4">{{ g.meta }}</span>
+                </span>
+                <sc-if value="{{ g.notAdded }}" hint-placeholder-val="{{ true }}">
+                  <span style="display:flex;flex-direction:column;align-items:flex-end;gap:1px">
+                    <span style="display:flex;align-items:center;gap:4px;font-size:15px;font-weight:700"><svg width="13" height="13" viewBox="0 0 24 24" fill="#cfd9d6" stroke="#cfd9d6" stroke-width="1.5" stroke-linejoin="round"><path d="M12 3.5l2.6 5.3 5.9.9-4.3 4.1 1 5.8L12 16.9l-5.2 2.7 1-5.8L3.5 9.7l5.9-.9z"></path></svg>{{ g.avg }}</span>
+                    <span style="font-size:11px;color:#9aa9a4">{{ g.nText }}</span>
+                  </span>
+                </sc-if>
+                <sc-if value="{{ g.added }}" hint-placeholder-val="{{ false }}">
+                  <span style="display:flex;align-items:center;gap:4px;font-size:13px;font-weight:600;color:#5fd3c5"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.5l4.5 4.5L19 7.5"></path></svg>Added</span>
+                </sc-if>
+              </button>
+            </sc-for>
+            <sc-if value="{{ discEmpty }}" hint-placeholder-val="{{ false }}">
+              <div style="padding:28px 12px;text-align:center;font-size:14px;color:#9aa9a4">No global sets match “{{ discQuery }}”</div>
+            </sc-if>
+          </div>
+        </div>
+        <div style="flex-shrink:0;padding:8px 12px;background:#0b1110;border-top:1px solid #1e2826;display:flex;gap:8px">
+          <button style="flex:1;height:44px;border-radius:12px;border:1px solid #27322f;background:#141d1b;color:#e7eeec;font-size:14px;font-weight:600;display:flex;align-items:center;justify-content:center;gap:8px;cursor:pointer"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#5fd3c5" stroke-width="2" stroke-linecap="round"><path d="M4 9V5a1 1 0 011-1h4M15 4h4a1 1 0 011 1v4M20 15v4a1 1 0 01-1 1h-4M9 20H5a1 1 0 01-1-1v-4"></path></svg>Capture page</button>
+          <button style="flex:1;height:44px;border-radius:12px;border:1px solid #27322f;background:#141d1b;color:#e7eeec;font-size:14px;font-weight:600;display:flex;align-items:center;justify-content:center;gap:8px;cursor:pointer"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#5fd3c5" stroke-width="2" stroke-linejoin="round"><path d="M5 5h14a1 1 0 011 1v9a1 1 0 01-1 1H10l-4 3.5V16H5a1 1 0 01-1-1V6a1 1 0 011-1z"></path></svg>Capture answer</button>
+          <button aria-label="Import or create" style="width:44px;height:44px;border-radius:12px;border:1px solid #27322f;background:#141d1b;color:#e7eeec;display:flex;align-items:center;justify-content:center;cursor:pointer"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M12 5v14M5 12h14"></path></svg></button>
+        </div>
+        <div style="height:64px;flex-shrink:0;background:#0b1110;display:grid;grid-template-columns:repeat(5,1fr);align-items:center">
+          <div style="display:flex;flex-direction:column;align-items:center;gap:3px;color:#8b9a96;font-size:11px"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"><path d="M4 10.5L12 4l8 6.5V20h-5v-6H9v6H4z"></path></svg>Home</div>
+          <div style="display:flex;flex-direction:column;align-items:center;gap:3px;color:#8b9a96;font-size:11px"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M4 7h16M4 12h16M4 17h16"></path></svg>Sets</div>
+          <div style="display:flex;flex-direction:column;align-items:center;gap:3px;color:#5fd3c5;font-size:11px;font-weight:600"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><circle cx="12" cy="12" r="9"></circle><path d="M15.5 8.5l-2 5-5 2 2-5z"></path></svg>Discover</div>
+          <div style="display:flex;flex-direction:column;align-items:center;gap:3px;color:#8b9a96;font-size:11px"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M5 20v-8M12 20V5M19 20v-5"></path></svg>Stats</div>
+          <div style="display:flex;flex-direction:column;align-items:center;gap:3px;color:#8b9a96;font-size:11px"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="12" cy="8" r="4"></circle><path d="M4 20.5c.8-4 4-6 8-6s7.2 2 8 6"></path></svg>You</div>
+        </div>
+        <sc-if value="{{ previewOn }}" hint-placeholder-val="{{ false }}">
+          <div onClick="{{ closePreview }}" style="position:absolute;inset:0;background:rgba(0,0,0,.6);display:flex;align-items:flex-end">
+            <div onClick="{{ stop }}" style="width:100%;max-height:86%;overflow-y:auto;padding:10px 20px 24px;border-radius:22px 22px 0 0;background:#151e1c;border-top:1px solid #27322f;display:flex;flex-direction:column;gap:16px">
+              <div style="align-self:center;width:36px;height:4px;border-radius:2px;background:#3b4845"></div>
+              <div style="display:flex;gap:14px;align-items:flex-start">
+                <span style="width:48px;height:48px;border-radius:12px;background:{{ pv.tileBg }};color:{{ pv.tileFg }};font-size:13px;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0">{{ pv.abbr }}</span>
+                <div style="flex:1;display:flex;flex-direction:column;gap:4px">
+                  <div style="font-size:20px;line-height:1.2;font-weight:650;letter-spacing:-.01em">{{ pv.title }}</div>
+                  <div style="font-size:13px;color:#9aa9a4">by {{ pv.author }} · {{ pv.cards }} cards</div>
+                </div>
+              </div>
+              <div style="display:flex;align-items:center;gap:8px">
+                <div style="display:flex;gap:2px">
+                  <sc-for list="{{ pv.stars }}" as="st" hint-placeholder-count="5"><svg width="18" height="18" viewBox="0 0 24 24" fill="{{ st.fill }}" stroke="{{ st.stroke }}" stroke-width="1.7" stroke-linejoin="round"><path d="M12 3.5l2.6 5.3 5.9.9-4.3 4.1 1 5.8L12 16.9l-5.2 2.7 1-5.8L3.5 9.7l5.9-.9z"></path></svg></sc-for>
+                </div>
+                <span style="font-size:14px;font-weight:600">{{ pv.avg }}</span>
+                <span style="font-size:13px;color:#9aa9a4">· {{ pv.nFull }} ratings</span>
+              </div>
+              <div style="padding:12px 14px;border-radius:12px;background:#1c2826;font-size:14px;line-height:1.45;color:#cfd9d6">Picked because you study <b style="font-weight:600">{{ pv.related }}</b></div>
+              <div style="display:flex;flex-direction:column;gap:4px">
+                <div style="font-size:13px;font-weight:600;letter-spacing:.04em;text-transform:uppercase;color:#9aa9a4;padding-bottom:4px">Sample cards</div>
+                <sc-for list="{{ pv.samples }}" as="q" hint-placeholder-count="3">
+                  <div style="display:flex;gap:12px;padding:10px 0;border-bottom:1px solid #1e2826"><span style="width:8px;height:8px;border-radius:4px;background:#6d7c78;margin-top:7px;flex-shrink:0"></span><span style="font-size:15px;line-height:1.4">{{ q }}</span></div>
+                </sc-for>
+              </div>
+              <sc-if value="{{ pv.notAdded }}" hint-placeholder-val="{{ true }}">
+                <button onClick="{{ addPreview }}" style="height:52px;border-radius:14px;border:0;background:#34bcad;color:#04211d;font-size:16px;font-weight:650;cursor:pointer" style-hover="background:#45cbbc">Add to my sets</button>
+              </sc-if>
+              <sc-if value="{{ pv.added }}" hint-placeholder-val="{{ false }}">
+                <button style="height:52px;border-radius:14px;border:1px solid #34514c;background:#1c2826;color:#5fd3c5;font-size:16px;font-weight:650;display:flex;align-items:center;justify-content:center;gap:8px;cursor:pointer"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.5l4.5 4.5L19 7.5"></path></svg>Added · Open set</button>
+              </sc-if>
+              <button style="align-self:center;height:32px;padding:0 8px;border:0;background:transparent;color:#9aa9a4;font-size:13px;cursor:pointer">Report this set</button>
+            </div>
+          </div>
+        </sc-if>
+      </div>
+    </div>
