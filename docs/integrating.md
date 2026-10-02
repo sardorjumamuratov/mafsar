@@ -80,6 +80,17 @@ Things that have actually shipped broken here:
 - A feature gated on a flag nothing ever sets (a persona option keyed on
   `isMedicine`, which was never assigned).
 - A handler wired to a `data-action` the UI never renders, or vice versa.
+- A helper whose body calls itself (`const byId = (id) => byId(id)`, left by a
+  blind find-and-replace): every caller overflows the stack.
+- JS toggling a class the stylesheet doesn't style (`setNav` toggled `.on`;
+  the CSS styled `.active`), or a lookup into an object that has no such key
+  (`ICONS.flashcards` rendered "undefined").
+
+**Styles that lose**
+- A legacy rule that outranks the new one: an id selector (`#bottomNav button`)
+  beats any class, and an old class left on an element (`.setrow`'s
+  `flex-direction: column`) keeps every property the new class doesn't set.
+  Check computed styles in a browser, not just the new CSS.
 
 **Data that can't survive**
 - New cards or rows missing fields the rest of the system requires: `dueDate`,
