@@ -31,7 +31,8 @@ for (let i = 0; i < 65; i++) {
 }
 
 const fbHtml = stats.renderFeedback(logs, cards, sets, logs);
-assert(fbHtml.includes("FEEDBACK"));
+// 05-stats.html: "Feedback", uppercased by CSS.
+assert(fbHtml.includes(">Feedback<"));
 assert(fbHtml.includes("Your backlog is growing"));
 
 console.log("PASS stats logic");

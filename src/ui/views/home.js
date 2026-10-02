@@ -26,7 +26,7 @@ export function setHomeExamEditing(v) {
 let fadingRefs = [];
 export function getFadingRefs() { return fadingRefs; }
 
-const CAL_ICON = `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg>`;
+const CAL_ICON = `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><rect x="3.5" y="5" width="17" height="15" rx="2.5"/><path d="M3.5 10h17M8 3v4M16 3v4"/></svg>`;
 const LABEL = "font-size:13px;font-weight:600;text-transform:uppercase;letter-spacing:0.04em;color:var(--text-muted)";
 const LINK = "font-size:14px;font-weight:600;color:var(--accent-text);background:transparent;border:none;padding:0;cursor:pointer";
 const CARD = "padding:16px;border-radius:16px;background:var(--bg-surface);border:1px solid var(--border-card)";
@@ -58,14 +58,14 @@ export async function renderHome() {
 
   const greet = `<div style="padding:0 4px;display:flex;flex-direction:column;gap:2px">
       <div style="font-size:14px;color:var(--text-muted)">${esc(greeting())}</div>
-      <h1 style="margin:0;font-size:24px;font-weight:650;letter-spacing:-0.02em;color:var(--text-primary)">Today's review</h1>
+      <h1 style="margin:0;font-size:24px;font-weight:650;letter-spacing:-0.02em;color:var(--text-primary)">Today’s review</h1>
     </div>`;
 
   // Nothing stored and nothing ever synced: the first sync is still running,
   // so show that, not "you have nothing" (prompt 31).
   if (!live.length) {
     const first = !(await getLastSync());
-    setHTML(app, `<div style="padding:18px 16px 28px;display:flex;flex-direction:column;gap:20px">
+    setHTML(app, `<div class="screen" style="padding:18px 16px 28px;display:flex;flex-direction:column;gap:20px">
         ${updateBanner}${greet}
         ${first ? skeleton() : `<div style="${CARD};display:flex;flex-direction:column;gap:6px">
           <div style="font-size:15px;font-weight:600;color:var(--text-primary)">Make your first set</div>
@@ -80,7 +80,7 @@ export async function renderHome() {
   const goal = computeDailyGoal(live, now);
   const hero = `<div style="padding:20px;border-radius:20px;background:var(--accent);color:var(--accent-on);display:flex;flex-direction:column;gap:14px">
       <div style="display:flex;flex-direction:column;gap:4px">
-        <div style="font-size:12px;font-weight:700;letter-spacing:0.08em;text-transform:uppercase;opacity:0.75">Today's goal</div>
+        <div style="font-size:12px;font-weight:700;letter-spacing:0.08em;text-transform:uppercase;opacity:0.75">Today’s goal</div>
         <div style="display:flex;align-items:baseline;gap:8px">
           <span style="font-size:52px;font-weight:700;line-height:1;letter-spacing:-0.03em">${goal.goalCount}</span>
           <span style="font-size:18px;font-weight:600">${goal.goalCount === 1 ? "card" : "cards"}</span>
@@ -189,7 +189,7 @@ export async function renderHome() {
       ${recent.map((s) => SetRowHtml(s, ratings)).join("")}
     </div>`;
 
-  setHTML(app, `<div id="home-view" style="padding:18px 16px 28px;display:flex;flex-direction:column;gap:20px">
+  setHTML(app, `<div id="home-view" class="screen" style="padding:18px 16px 28px;display:flex;flex-direction:column;gap:20px">
       ${updateBanner}
       ${greet}
       ${hero}

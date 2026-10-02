@@ -44,7 +44,8 @@ test("every view renderer resets scroll after painting", () => {
   // renderSetDetail resets AFTER paintDetail (tab switches covered) — the
   // in-place repaints (paintDetail itself, grading, flipping) must not.
   assert.ok(
-    src.includes("  paintDetail();\n  topOfView();"),
+    // (awaited, so the reset lands after the async paint, not before it)
+    /\n {2}(await )?paintDetail\(\);\r?\n {2}topOfView\(\);/.test(src),
     "renderSetDetail must reset after paintDetail, not inside it"
   );
 });
@@ -58,8 +59,10 @@ test("in-place repaints never reset scroll", () => {
   // delete account, and the chain step editor.
   // Redesign: + Home's empty/first-sync exit, + Discover (signed-out exit),
   // + Stats; the old exam picker screen is gone (the exam edits in place).
+  // Design parity: + Discover's signed-in exit, and Stats has two exits (the
+  // empty state and the full screen).
   const callSites = src.split("topOfView();").length - 1;
-  assert.equal(callSites, 16, "exactly the view-renderer exits reset scroll");
+  assert.equal(callSites, 18, "exactly the view-renderer exits reset scroll");
 });
 
 console.log("regenerate affordance (item 1a)");
@@ -124,7 +127,8 @@ test("the review flow shows Apply unconditionally again", () => {
 
 test("the mode selector is present on the summary tab; the entry point is the set page button", () => {
   assert.ok(src.includes('data-action="set-mode"') || src.includes('dataset.action = "set-mode"'));
-  assert.ok(src.includes("modebtn"));
+  // The modes are the split button's Study mode menu (03-set-detail.html).
+  assert.ok(src.includes('role="menuitemradio"'));
   assert.ok(src.includes('data-action="start-coding"'));
   assert.ok(src.includes("⌨️ Coding exercises") || src.includes("?? Coding exercises"));
   // full-width (btn-block) and above the ＋ Card / ✍️ row in source order
@@ -557,11 +561,11 @@ test("Ratings (prompt 07)", async () => {
   const format = fs.readFileSync("shared/format.js", "utf8");
   assert.ok(format.includes("toFixed(1)"), "average formatted with 1 decimal");
   
-  // text states
-  assert.ok(detail.includes("Your rating &bull;"), "private rated text");
+  // text states, as 03-set-detail.html / logic.js word them (rating3Text)
+  assert.ok(detail.includes("`Your rating · ${rs.yourStars}`"), "private rated text");
   assert.ok(detail.includes("Tap to rate"), "private unrated text");
   assert.ok(detail.includes("No ratings yet"), "global unrated text");
-  assert.ok(detail.includes("rating(s)"), "global rated text");
+  assert.ok(detail.includes('`Avg ${formatAvg(rs.ratingAvg)} · ${formatCount(rs.ratingCount)} ${rs.ratingCount === 1 ? "rating" : "ratings"}`'), "global rated text");
   
   // SetRow meta
   assert.ok(setRow.includes("yours"), "SetRow private suffix");

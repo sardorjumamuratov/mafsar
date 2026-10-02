@@ -175,8 +175,9 @@ export async function startSetReview(sessionId) {
   const set = setFor(sessionId, studySets);
   // Due cards first; if none are due yet, fall through to studying ahead
   // (still applies SM-2 normally) so the button always does something.
-  const due = (set?.flashcards || []).filter((c) => isDue(c));
-  const pool = due.length ? due : set?.flashcards || [];
+  const live = (set?.flashcards || []).filter((c) => !c.deleted);
+  const due = live.filter((c) => isDue(c));
+  const pool = due.length ? due : live;
   const items = pool.map((card) => ({ sessionId, card, examDate: set?.examDate }));
   items.sort((a, b) => byDue(a.card, b.card));
   if (!items.length) return toast("This set has no cards yet.");

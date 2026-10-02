@@ -78,7 +78,7 @@ export function toast(msg, ms = 2600, actionLabel = "", onAction = null) {
   t.setAttribute("role", "status");
   t.setAttribute("aria-live", "polite");
   if (actionLabel && onAction) {
-    setHTML(t, `<span>${esc(msg)}</span><button class="toast-action" style="background:transparent;border:none;color:var(--toast-action);font-weight:600;cursor:pointer;margin-left:12px;padding:0">${esc(actionLabel)}</button>`);
+    setHTML(t, `<span class="toast-msg">${esc(msg)}</span><button type="button" class="toast-action">${esc(actionLabel)}</button>`);
     /** @type {any} */ (t.querySelector('.toast-action')).onclick = () => {
       t.classList.add("hidden");
       onAction();
