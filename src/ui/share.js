@@ -62,6 +62,8 @@ export async function toggleSetShare(sessionId) {
   }
   const set = await ensureShareFor(sessionId);
   if (!set) return;
+  // Set detail paints from its own copy of the set; give it the new code.
+  if (detail?.studySet && detail.session.id === sessionId) detail.studySet.shareCode = set.shareCode;
   setShareOpenFor(sessionId);
   paintDetail();
 }
@@ -99,6 +101,7 @@ export async function revokeShareFor(sessionId) {
     await send({ type: "SHARE_REVOKE", code: set.shareCode });
     await updateStudySet(sessionId, { shareCode: undefined });
       delete set.shareCode;
+    if (detail?.studySet && detail.session.id === sessionId) delete detail.studySet.shareCode;
     setShareOpenFor(null);
     paintDetail();
     toast("Sharing stopped");

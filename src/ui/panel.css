@@ -34,20 +34,20 @@
   --status-new-bar: #cfd8d5;
   --status-learning: #e3a246;
   --status-learning-text: #a8660d;
-  --status-mastered: #2f9e63;
+  --status-mastered: #1f9d8f;
   --danger-text: #c2412f;
   --overlay: rgba(14,21,19,0.45);
   --toast-bg: #0e1513;
   --toast-text: #e7eeec;
   --toast-action: #5fd3c5;
-  --rating-star: #e9b93a;
+  --rating-star: #26332f;
   --rating-empty: #a3b0ac;
   --chart-bar: #cfe3df;
   --chart-zero: #e6ecea;
   --src-ai-bg: #daf3ef;
   --src-ai-fg: #11766b;
-  --src-yt-bg: #fbe3df;
-  --src-yt-fg: #b3402e;
+  --src-yt-bg: #e2eae7;
+  --src-yt-fg: #0e1513;
   --src-gpt-bg: #e9efed;
   --src-gpt-fg: #26332f;
   --src-q-bg: #e3e9fb;
@@ -91,7 +91,7 @@
 html,
 body {
   height: 100%;
-  color-scheme: light;
+  color-scheme: light dark;
 }
 
 html {
@@ -876,53 +876,8 @@ body {
   background: var(--bg-surface);
 }
 
-/* --- bottom nav --- */
-#bottomNav {
-  display: flex;
-  justify-content: space-around;
-  align-items: flex-end;
-  padding: 8px 6px calc(8px + env(safe-area-inset-bottom));
-  border-top: 1px solid var(--border-control);
-  background: var(--bg-surface);
-}
-#bottomNav button {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 3px;
-  color: var(--text-faint);
-  font: 500 10px var("Geist", system-ui, sans-serif);
-  background: transparent;
-  border: 0;
-  cursor: pointer;
-  flex: 1;
-  padding: 2px 0;
-}
-#bottomNav button.on {
-  color: var(--accent);
-}
-#bottomNav .ic {
-  width: 20px;
-  height: 20px;
-}
-#bottomNav .center {
-  margin-top: -22px;
-}
-#bottomNav .center .cbtn {
-  width: 44px;
-  height: 44px;
-  border-radius: 14px;
-  background: var(--accent);
-  color: var(--bg-surface);
-  display: grid;
-  place-items: center;
-  box-shadow: var(--shadow);
-}
-#bottomNav .center .ic {
-  width: 22px;
-  height: 22px;
-  stroke: var(--bg-surface);
-}
+/* --- bottom nav: .bottom-nav / .nav-item, with the components below. (The
+   old #bottomNav rules outranked them by id and kept every tab grey.) --- */
 
 /* --- toast --- */
 .toast {
@@ -1832,7 +1787,7 @@ button.insight-row .q { flex: 1; min-width: 0; }
 button.insight-row:hover { background: var(--bg-surface2); }
 button.insight-row:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
 .insight-row .chev { width: 14px; height: 14px; flex-shrink: 0; color: var(--text-faint); }
-.cardrow.flash-highlight { background: var(--accent-chip-bg); transition: background-color 1.5s ease-out; }
+.cardrow.flash-highlight, .card-wrapper.flash-highlight { background: var(--accent-chip-bg); transition: background-color 1.5s ease-out; }
 
 /* --- update banner ------------------------------------------------------- */
 .update-banner {
@@ -2030,21 +1985,30 @@ button.insight-row:focus-visible { outline: 2px solid var(--accent); outline-off
   border: 1px solid var(--border-control); background: transparent; font-size: 13px; font-weight: 600;
   display: inline-flex; align-items: center; gap: 6px;
 }
+/* The redesigned screens, the bars and the sheets are drawn at the browser's
+   default line-height (docs/design); the older flows keep body's 1.5. */
+.screen, .bottom-nav, .capture-dock, .sheet, #toast { line-height: normal; }
+.screen { display: flex; flex-direction: column; }
+input[type="search"]::-webkit-search-cancel-button { display: none; }
+
+/* The dock sits straight on the nav: one border between them, none below. */
 .bottom-nav {
-  height: 64px; background: var(--bg-nav); padding-bottom: env(safe-area-inset-bottom);
+  height: 64px; flex-shrink: 0; background: var(--bg-nav); padding-bottom: env(safe-area-inset-bottom);
   display: grid; grid-template-columns: repeat(5, 1fr); align-items: center; justify-items: center;
-  border-top: 1px solid var(--border-divider);
 }
 .nav-item {
   display: flex; flex-direction: column; align-items: center; gap: 3px; background: none; border: none;
-  color: var(--text-faint); font-size: 11px; font-weight: 400; width: 100%; height: 100%; justify-content: center;
+  color: var(--text-faint); font-family: inherit; font-size: 11px; font-weight: 400;
+  width: 100%; height: 100%; justify-content: center; padding: 0; cursor: pointer;
 }
 .nav-item.active { color: var(--accent-text); font-weight: 600; }
-.nav-icon svg { width: 24px; height: 24px; stroke-width: 1.8; fill: none; }
+.nav-icon { display: flex; }
+.nav-icon svg { width: 20px; height: 20px; stroke-width: 1.8; fill: none; }
 .nav-item.active .nav-icon svg { stroke-width: 2; }
 .set-row {
   width: 100%; display: flex; align-items: center; gap: 12px; padding: 12px; border-radius: 14px;
   background: var(--bg-surface); border: 1px solid var(--border-card); text-align: left;
+  color: var(--text-primary); font-family: inherit; cursor: pointer;
 }
 .set-row:hover { border-color: var(--border-hover); }
 .home-hero-btn:hover { background: var(--hero-btn-hover) !important; }
@@ -2058,8 +2022,12 @@ button.insight-row:focus-visible { outline: 2px solid var(--accent); outline-off
 .sr-meta { display: flex; align-items: center; flex-wrap: wrap; gap: 6px; font-size: 13px; color: var(--text-muted); }
 .prog-bar { height: 4px; border-radius: 2px; background: var(--border-control); width: 100%; }
 .prog-fill { height: 100%; border-radius: 2px; background: var(--status-mastered); }
-.sr-right { text-align: right; }
-.due-count { font-size: 17px; font-weight: 700; color: var(--status-learning-text); line-height: 1; }
+.sr-right { display: flex; flex-direction: column; align-items: flex-end; }
+.sr-meta .sr-rating, .sr-meta .sr-global { display: flex; align-items: center; }
+.sr-meta .sr-rating { gap: 3px; }
+.sr-meta .sr-global { gap: 4px; }
+.sr-meta .sr-avg { color: var(--rating-star); font-weight: 600; }
+.due-count { font-size: 17px; font-weight: 700; color: var(--text-primary); }
 .due-label { font-size: 11px; color: var(--text-muted); }
 .due-check { width: 16px; height: 16px; stroke: var(--status-mastered); fill: none; stroke-width: 3; }
 .status-dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; }
@@ -2073,23 +2041,69 @@ button.insight-row:focus-visible { outline: 2px solid var(--accent); outline-off
   background: var(--overlay); display: flex; flex-direction: column; justify-content: flex-end;
 }
 .bottom-sheet.hidden { display: none; }
+/* #sheet itself is the overlay: rgba(0,0,0,.6) in the references. */
+.sheet { background: var(--overlay); }
+/* Each reference sheet pads differently (filter 16/24, menu 12/24, confirm
+   22/24, preview 20/24); openSheet's options set the three variables. */
 .sheet-panel {
-  width: 100%; max-height: 90vh; background: var(--bg-sheet); border-radius: 22px 22px 0 0;
-  border-top: 1px solid var(--border-control); display: flex; flex-direction: column;
+  --sheet-px: 16px; --sheet-pb: 24px; --sheet-gap: 14px; --sheet-max: 90%;
+  position: relative; width: 100%; max-height: var(--sheet-max, 90%); overflow-y: auto;
+  padding: 10px var(--sheet-px, 16px) var(--sheet-pb, 24px);
+  background: var(--bg-sheet); border-radius: 22px 22px 0 0; border-top: 1px solid var(--border-control);
+  display: flex; flex-direction: column; gap: var(--sheet-gap, 14px); color: var(--text-primary);
   animation: slideUp 220ms cubic-bezier(.2,.8,.2,1);
 }
 .sheet-grabber {
-  width: 36px; height: 4px; border-radius: 2px; background: var(--status-new-bar);
-  margin: 10px auto; flex-shrink: 0;
+  align-self: center; width: 36px; height: 4px; border-radius: 2px; background: var(--status-new-bar); flex-shrink: 0;
 }
-.sheet-title {
-  font-size: 18px; font-weight: 650; padding: 0 16px; margin-bottom: 10px;
+.sheet-panel .sheet-title { font-size: 18px; font-weight: 650; padding: 0 6px; margin: 0; line-height: normal; }
+.sheet-content { display: flex; flex-direction: column; gap: var(--sheet-gap, 14px); }
+.sheet-label {
+  font-size: 13px; font-weight: 600; letter-spacing: .04em; text-transform: uppercase;
+  color: var(--text-muted); padding: 0 6px 4px;
 }
-.sheet-content {
-  overflow-y: auto; padding: 0 16px 24px 16px; display: flex; flex-direction: column;
+/* A row in a ⋯ / add menu: 36px tile, label, optional sub. */
+.sheet-row {
+  display: flex; align-items: center; gap: 14px; padding: 12px; border-radius: 12px; border: 0;
+  background: transparent; color: var(--text-primary); text-align: left; cursor: pointer; width: 100%; font-family: inherit;
 }
-.info-sheet { gap: 16px; }
-.list-sheet { gap: 6px; padding: 10px 16px 24px; }
+.sheet-row:hover { background: var(--bg-surface2); }
+.sheet-row:disabled { opacity: .45; cursor: default; background: transparent; }
+.sheet-row.danger { color: var(--danger-text); }
+.sheet-row .tile {
+  width: 36px; height: 36px; border-radius: 10px; background: var(--bg-surface2);
+  display: flex; align-items: center; justify-content: center; flex-shrink: 0;
+}
+.sheet-row .tile.accent { color: var(--accent-text); }
+.sheet-row .txt { flex: 1; display: flex; flex-direction: column; gap: 2px; }
+.sheet-row .main { font-size: 15px; font-weight: 600; }
+.sheet-row .sub { font-size: 13px; color: var(--text-muted); }
+/* Radio rows in Filter and sort. */
+.opt-row {
+  display: flex; align-items: center; gap: 12px; height: 48px; padding: 0 12px; border-radius: 12px;
+  border: 1px solid transparent; background: transparent; color: var(--text-primary);
+  text-align: left; cursor: pointer; font-family: inherit; width: 100%;
+}
+.opt-row[aria-checked="true"] { border-color: var(--border-hover); background: var(--bg-surface2); }
+.opt-row .lbl { flex: 1; font-size: 15px; font-weight: 600; }
+.opt-row .count { font-size: 13px; color: var(--text-muted); }
+.opt-row .check { width: 18px; display: flex; }
+/* The two sheet buttons: primary (h50) and the quiet one under it (h48). */
+.sheet-primary {
+  height: 50px; border-radius: 12px; border: 0; background: var(--accent); color: var(--accent-on);
+  font-family: inherit; font-size: 15px; font-weight: 650; cursor: pointer; width: 100%;
+}
+.sheet-primary:hover:not(:disabled) { background: var(--accent-hover); }
+.sheet-primary:disabled { opacity: .45; cursor: default; }
+.sheet-primary.danger { background: var(--danger-text); color: var(--bg-app); }
+.sheet-quiet {
+  height: 48px; border-radius: 12px; border: 0; background: var(--bg-segment-active); color: var(--text-primary);
+  font-family: inherit; font-size: 15px; font-weight: 600; cursor: pointer; width: 100%;
+}
+.sheet-tip {
+  padding: 12px 14px; border-radius: 12px; background: var(--bg-surface2);
+  font-size: 14px; line-height: 1.45; color: var(--text-secondary);
+}
 @keyframes slideUp { from { transform: translateY(100%); } to { transform: translateY(0); } }
 @media (prefers-reduced-motion: reduce) {
   .sheet-panel { animation: fadeIn 150ms ease; }
@@ -2101,13 +2115,13 @@ button.insight-row:focus-visible { outline: 2px solid var(--accent); outline-off
   position: absolute; left: 16px; right: 16px; bottom: 78px; height: 48px; border-radius: 12px;
   padding: 0 8px 0 16px; background: var(--toast-bg); color: var(--toast-text);
   font-size: 14px; font-weight: 500; display: flex; align-items: center; justify-content: space-between;
-  z-index: 90;
+  box-shadow: 0 8px 24px rgba(0,0,0,.4); z-index: 90;
 }
 #toast.hidden { display: none; }
 .toast-msg { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .toast-action {
-  height: 36px; padding: 0 12px; background: transparent; border: none;
-  color: var(--accent-on-white); font-size: 14px; font-weight: 700; cursor: pointer; flex-shrink: 0;
+  height: 36px; padding: 0 12px; border-radius: 8px; background: transparent; border: none;
+  color: var(--toast-action); font-family: inherit; font-size: 14px; font-weight: 700; cursor: pointer; flex-shrink: 0;
 }
 /* Focus views push toast down */
 
@@ -2155,20 +2169,20 @@ button.insight-row:focus-visible { outline: 2px solid var(--accent); outline-off
   --status-new-bar: #3b4845;
   --status-learning: #e3a246;
   --status-learning-text: #e3a246;
-  --status-mastered: #45c483;
+  --status-mastered: #5fd3c5;
   --danger-text: #f08a7a;
   --overlay: rgba(0,0,0,0.6);
   --toast-bg: #e7eeec;
   --toast-text: #0e1513;
   --toast-action: #16786e;
-  --rating-star: #f0c75e;
+  --rating-star: #cfd9d6;
   --rating-empty: #6d7c78;
   --chart-bar: #2c4a46;
   --chart-zero: #1e2826;
   --src-ai-bg: #133a35;
   --src-ai-fg: #5fd3c5;
-  --src-yt-bg: #3a1f1d;
-  --src-yt-fg: #f08a7a;
+  --src-yt-bg: #27322f;
+  --src-yt-fg: #e7eeec;
   --src-gpt-bg: #1f2a28;
   --src-gpt-fg: #cfd9d6;
   --src-q-bg: #1c2540;

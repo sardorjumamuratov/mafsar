@@ -50,20 +50,29 @@ function dismiss() {
 /**
  * Open the shared bottom sheet. `titleHtml` and `contentHtml` are markup: the
  * caller escapes every interpolated value, as with setHTML.
+ *
+ * `opts` takes the reference sheet's spacing: `px` and `pb` (side and bottom
+ * padding), `gap` between blocks, and `maxHeight` (a CSS length). `labelledBy`
+ * names an element inside the content that titles it, for sheets that draw
+ * their own heading.
  */
-export function openSheet(titleHtml, contentHtml, isList = false, dismissed = null) {
+export function openSheet(titleHtml, contentHtml, isList = false, dismissed = null, opts = {}) {
   previousFocus = document.activeElement;
   onDismiss = dismissed;
   const sheet = sheetEl();
+  // Numbers only, so nothing from the caller reaches the style attribute raw.
+  const px = Number(opts.px ?? 16), pb = Number(opts.pb ?? 24), gap = Number(opts.gap ?? 14);
+  const max = /^\d+(%|px|vh)$/.test(opts.maxHeight || "") ? opts.maxHeight : "90%";
   setHTML(sheet, `
-    <div class="sheet-panel">
+    <div class="sheet-panel" style="--sheet-px:${px}px;--sheet-pb:${pb}px;--sheet-gap:${gap}px;--sheet-max:${max}">
       <div class="sheet-grabber"></div>
       ${titleHtml ? `<div class="sheet-title" id="sheetTitle">${titleHtml}</div>` : ""}
       <div class="sheet-content ${isList ? "list-sheet" : "info-sheet"}">
         ${contentHtml}
       </div>
     </div>`);
-  if (titleHtml) sheet.setAttribute("aria-labelledby", "sheetTitle");
+  const label = titleHtml ? "sheetTitle" : opts.labelledBy;
+  if (label) sheet.setAttribute("aria-labelledby", label);
   else sheet.removeAttribute("aria-labelledby");
   sheet.classList.remove("hidden");
 
