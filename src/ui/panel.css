@@ -2529,3 +2529,76 @@ input[type="checkbox"].switch:checked::after, .toggle-switch:checked::after {
 @media (prefers-reduced-motion: reduce) {
   .you-switch, .you-switch::after { transition: none; }
 }
+
+/* --- Sign-in screen (the "Redesign the Sign-in screen" prompt) -------------- */
+/* One 24px edge. No card, no container borders. The block is anchored 180px
+   from the top, not centred, so a state change never shifts it. */
+.signin {
+  min-height: 100%; display: flex; flex-direction: column; padding: 0 24px 28px;
+  background: var(--bg-app); line-height: normal;
+}
+.signin-main { flex: 1; display: flex; flex-direction: column; justify-content: flex-start; padding-top: 180px; gap: 32px; }
+.signin-brand { display: flex; flex-direction: column; align-items: center; gap: 10px; text-align: center; }
+.signin-wordmark {
+  font-family: ui-serif, "Iowan Old Style", Palatino, Georgia, serif;
+  font-size: 34px; font-weight: 700; line-height: 1; color: var(--text-primary);
+}
+.signin-wordmark span { color: var(--accent-text); }
+.signin-tag { margin: 0; max-width: 280px; font-size: 15px; line-height: 1.45; color: var(--text-muted); }
+.signin-auth { display: flex; flex-direction: column; gap: 20px; }
+.signin-google {
+  width: 100%; height: 50px; border-radius: 14px; background: var(--bg-surface);
+  border: 1px solid var(--border-control); color: var(--text-primary);
+  font-size: 15px; font-weight: 600; cursor: pointer;
+  display: flex; align-items: center; justify-content: center; gap: 10px;
+}
+.signin-google:hover:not(:disabled) { border-color: var(--border-hover); }
+.signin-google:disabled { cursor: default; }
+/* The mark and the spinner share one 20px box, so swapping them moves nothing. */
+.signin-gmark { width: 20px; height: 20px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+.signin-gmark .gicon { width: 20px; height: 20px; }
+.signin-divider { height: 20px; display: flex; align-items: center; gap: 12px; font-size: 13px; color: var(--status-new); }
+.signin-line { flex: 1; height: 1px; background: var(--border-card); }
+.signin-wait, .signin-gerr { flex: 1; text-align: center; font-size: 13px; }
+.signin-wait { color: var(--text-faint); flex: 0 1 auto; }
+.signin-divider:has(.signin-wait) { justify-content: center; gap: 6px; }
+.signin-gerr { color: var(--danger-text); }
+.signin-cancel { background: none; border: 0; padding: 0; font-size: 13px; font-weight: 600; color: var(--accent-text); cursor: pointer; }
+.signin-form { display: flex; flex-direction: column; gap: 14px; transition: opacity 150ms; }
+.signin-auth.is-waiting .signin-form { opacity: .4; pointer-events: none; }
+.signin-field { display: flex; flex-direction: column; gap: 6px; }
+.signin-labelrow { display: flex; justify-content: space-between; align-items: center; }
+.signin-label { font-size: 13px; font-weight: 600; color: var(--text-muted); }
+.signin-forgot { background: none; border: 0; padding: 0; font-size: 13px; font-weight: 600; color: var(--accent-text); cursor: pointer; }
+/* Hidden, not removed: the label row keeps its height in create mode. */
+.signin-forgot.is-off { visibility: hidden; }
+.signin-input {
+  width: 100%; height: 48px; padding: 0 14px; border: 0; border-radius: 12px;
+  background: var(--bg-surface); box-shadow: inset 0 0 0 1px var(--border-control);
+  font-size: 15px; color: var(--text-primary); outline: none;
+}
+.signin-input::placeholder { color: var(--status-new); opacity: 1; }
+.signin-input:focus { box-shadow: inset 0 0 0 1px var(--accent); }
+.signin-input[aria-invalid="true"] { box-shadow: inset 0 0 0 1px var(--danger-text); }
+.signin-error { margin: 0; font-size: 13px; color: var(--danger-text); }
+.signin-primary {
+  margin-top: 4px; width: 100%; height: 50px; border-radius: 14px; border: 0;
+  background: var(--accent); color: var(--accent-on);
+  font-size: 16px; font-weight: 650; cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+}
+.signin-primary:hover:not(:disabled) { background: var(--accent-hover); }
+.signin-primary:disabled { cursor: default; }
+.signin-switch { display: flex; justify-content: center; gap: 6px; font-size: 14px; color: var(--text-muted); }
+.signin-switch button { background: none; border: 0; padding: 0; font-size: 14px; font-weight: 600; color: var(--accent-text); cursor: pointer; }
+.signin-foot { margin: 24px 0 0; text-align: center; font-size: 13px; line-height: 1.45; color: var(--text-faint); }
+.signin-spin {
+  width: 18px; height: 18px; border-radius: 50%; flex-shrink: 0;
+  border: 2px solid var(--border-hover); border-top-color: var(--accent-text);
+  animation: spin .8s linear infinite;
+}
+/* On the teal button the ring is the button's own ink. */
+.signin-spin.on-accent {
+  border-color: color-mix(in srgb, var(--accent-on) 25%, transparent); border-top-color: var(--accent-on);
+}
+@media (prefers-reduced-motion: reduce) { .signin-spin { animation-duration: 2s; } }

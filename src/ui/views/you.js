@@ -8,6 +8,8 @@ import { renderSetDetail } from "../views/set-detail.js";
 import { confirmSheet } from "../confirm.js";
 import { updateBannerHtml } from "../update-banner.js";
 import { SectionLabel } from "../components.js";
+import { MODES, authErrorMessage, validateAuth } from "../auth-form.js";
+import { LANDING_BASE } from "../../config.js";
 import { openSheet, closeSheet } from "../sheet.js";
 
 // ===== YOU TAB ================================================================
@@ -250,55 +252,239 @@ export async function toggleOpenInTab(el, saveSettings) {
   }
 }
 
-// --- account actions ---------------------------------------------------------
+// ===== SIGN-IN SCREEN =========================================================
+// One 24px edge, a brand block anchored 180px from the top, and one filled
+// button in every state. Switching mode, waiting for Google and showing an
+// error all change text and classes in place (nothing re-renders), so the
+// wordmark, the Google button and both inputs never move; only what sits
+// below an inline error can.
 
+const byId = (id) => /** @type {any} */ (document.getElementById(id));
+
+/** @type {"login" | "register"} */
+let authMode = "login";
+let submitting = false;
 export let googleAbortController = null;
-export async function authGoogle(btn) {
+
+const OR_ROW = '<span class="signin-line"></span><span class="signin-or">or</span><span class="signin-line"></span>';
+const WAIT_ROW = '<span class="signin-wait">Finish in the Google window.</span><button type="button" class="signin-cancel" data-action="auth-google-cancel">Cancel</button>';
+
+export function renderAuthGate() {
+  showChrome(false);
+  authMode = "login";
+  submitting = false;
+  const m = MODES.login;
+  setHTML(app, `
+    <div class="signin" data-view="signin">
+      <div class="signin-main">
+        <div class="signin-brand">
+          <div class="signin-wordmark">Maf<span>sar</span></div>
+          <p class="signin-tag">Turn your AI chats into flashcards, quizzes and spaced-repetition review.</p>
+        </div>
+        <div class="signin-auth" id="signinAuth">
+          <button type="button" class="signin-google" id="googleBtn" data-action="auth-google">
+            <span class="signin-gmark" id="googleMark" aria-hidden="true">${GOOGLE_G}</span>
+            <span id="googleLabel">Continue with Google</span>
+          </button>
+          <div class="signin-divider" id="signinDivider">${OR_ROW}</div>
+          <form class="signin-form" id="signinForm" novalidate>
+            <div class="signin-field">
+              <label class="signin-label" for="youEmail">Email</label>
+              <input class="signin-input" id="youEmail" type="email" placeholder="you@example.com" autocomplete="email" aria-describedby="emailErr" />
+              <p class="signin-error" id="emailErr" role="alert" hidden></p>
+            </div>
+            <div class="signin-field">
+              <div class="signin-labelrow">
+                <label class="signin-label" for="youPass">Password</label>
+                <button type="button" class="signin-forgot" id="forgotBtn" data-action="auth-forgot">Forgot?</button>
+              </div>
+              <input class="signin-input" id="youPass" type="password" placeholder="${esc(m.placeholder)}" autocomplete="${m.autocomplete}" aria-describedby="passErr" />
+              <p class="signin-error" id="passErr" role="alert" hidden></p>
+            </div>
+            <button type="submit" class="signin-primary" id="signinSubmit">${esc(m.button)}</button>
+            <div class="signin-switch"><span id="switchQ">${esc(m.question)}</span><button type="button" id="switchBtn" data-action="auth-mode">${esc(m.switchLabel)}</button></div>
+          </form>
+        </div>
+      </div>
+      <p class="signin-foot">Your sets sync across devices through your account.</p>
+    </div>`);
+  topOfView();
+  byId("signinForm").addEventListener("submit", (e) => { e.preventDefault(); submitAuth().catch(() => {}); });
+  // An error clears the moment the learner types.
+  for (const f of ["email", "password"]) {
+    byId(f === "email" ? "youEmail" : "youPass").addEventListener("input", () => clearError(f));
+  }
+}
+
+/** Sign-in <-> create account: only the labels, the placeholder and Forgot? change. */
+export function toggleAuthMode() {
+  if (!byId("signinForm") || submitting) return;
+  authMode = authMode === "login" ? "register" : "login";
+  const m = MODES[authMode];
+  byId("signinSubmit").textContent = m.button;
+  byId("youPass").placeholder = m.placeholder;
+  byId("youPass").setAttribute("autocomplete", m.autocomplete);
+  byId("switchQ").textContent = m.question;
+  byId("switchBtn").textContent = m.switchLabel;
+  // Hidden, not removed, so the label row keeps its height.
+  const forgot = byId("forgotBtn");
+  forgot.classList.toggle("is-off", !m.forgot);
+  forgot.tabIndex = m.forgot ? 0 : -1;
+  forgot.setAttribute("aria-hidden", String(!m.forgot));
+  clearError("email");
+  clearError("password");
+}
+
+/** The error under a field: a danger ring and a sentence, never a toast. */
+function showError(field, message) {
+  const input = byId(field === "email" ? "youEmail" : "youPass");
+  const out = byId(field === "email" ? "emailErr" : "passErr");
+  input.setAttribute("aria-invalid", "true");
+  out.textContent = message;
+  out.hidden = false;
+  input.focus();
+}
+
+function clearError(field) {
+  const input = byId(field === "email" ? "youEmail" : "youPass");
+  const out = byId(field === "email" ? "emailErr" : "passErr");
+  if (!input || !out) return;
+  input.removeAttribute("aria-invalid");
+  out.hidden = true;
+  out.textContent = "";
+  // A Google error shares the divider row; typing dismisses it too.
+  if (byId("signinDivider")?.dataset.state === "error") setDivider("or");
+}
+
+/** The divider row keeps its 20px whatever it says. */
+function setDivider(state, text = "") {
+  const row = byId("signinDivider");
+  if (!row) return;
+  row.dataset.state = state;
+  if (state === "wait") setHTML(row, WAIT_ROW);
+  else if (state === "error") setHTML(row, `<span class="signin-gerr" role="alert">${esc(text)}</span>`);
+  else setHTML(row, OR_ROW);
+}
+
+/** The submit button, with a spinner in place of its label while it runs. */
+function setBusy(on) {
+  submitting = on;
+  const btn = byId("signinSubmit");
+  if (!btn) return;
+  const label = MODES[authMode].button;
+  btn.disabled = on;
+  btn.setAttribute("aria-busy", String(on));
+  if (on) {
+    btn.setAttribute("aria-label", label);
+    setHTML(btn, '<span class="signin-spin on-accent" aria-hidden="true"></span>');
+  } else {
+    btn.removeAttribute("aria-label");
+    btn.textContent = label;
+  }
+}
+
+async function submitAuth() {
+  if (submitting) return;
+  const email = byId("youEmail").value.trim();
+  const password = byId("youPass").value;
+  clearError("email");
+  clearError("password");
+  const bad = validateAuth(authMode, email, password);
+  if (bad) return showError(bad.field, bad.message);
+  const wasSignedIn = !!(await getAuth())?.user;
+  setBusy(true);
+  try {
+    if (authMode === "register") await register(email, password);
+    else await login(email, password);
+    await afterSignIn(wasSignedIn);
+  } catch (e) {
+    setBusy(false);
+    const shown = authErrorMessage(e, authMode);
+    showError(shown.field, shown.message);
+  }
+}
+
+/**
+ * "Forgot?": the server has no password reset yet (it would need an email
+ * provider), so this says so and points to the website's Support link instead
+ * of a dead end. The support address lives on the site, not in this code.
+ */
+export function openForgotSheet() {
+  openSheet("", `
+    <div style="display:flex;flex-direction:column;gap:6px">
+      <div id="forgotTitle" style="font-size:18px;font-weight:650">Reset your password</div>
+      <div style="font-size:14px;line-height:1.45;color:var(--text-body2)">Password reset isn't automatic yet. Use the Support link on our website to email us from the address you signed up with, and put “password reset” in the subject.</div>
+    </div>
+    <a class="sheet-primary" href="${esc(LANDING_BASE)}/" target="_blank" rel="noopener noreferrer" style="display:flex;align-items:center;justify-content:center;text-decoration:none">Open the website</a>
+    <button type="button" class="sheet-quiet" id="forgotDone">Close</button>`, false, null, { px: 22, pb: 24, gap: 16, labelledBy: "forgotTitle" });
+  byId("forgotDone")?.addEventListener("click", () => closeSheet());
+}
+
+/** Google's flow, in place: the button and the divider row swap contents; the form dims. */
+function setWaiting(on) {
+  const btn = byId("googleBtn");
+  if (!btn) return;
+  byId("signinAuth").classList.toggle("is-waiting", on);
+  byId("signinForm").toggleAttribute("inert", on);
+  btn.disabled = on;
+  if (on) {
+    setHTML(byId("googleMark"), '<span class="signin-spin" aria-hidden="true"></span>');
+    byId("googleLabel").textContent = "Waiting for Google…";
+    setDivider("wait");
+  } else {
+    setHTML(byId("googleMark"), GOOGLE_G);
+    byId("googleLabel").textContent = "Continue with Google";
+    if (byId("signinDivider").dataset.state === "wait") setDivider("or");
+  }
+}
+
+export async function authGoogle() {
   if (googleAbortController) {
     googleAbortController.abort();
     // A stale attempt is ended and a new one started
   }
-  btn.disabled = true;
-  
-  const originalNodes = Array.from(btn.childNodes);
-  setHTML(btn, 'Waiting for Google... <button class="btn btn-ghost" style="margin-left:auto;padding:2px 8px;font-size:12px;min-height:0" data-action="auth-google-cancel">Cancel</button>');
-  
+  setWaiting(true);
+
   googleAbortController = new AbortController();
-  
-  const tabListener = (closedTabId) => { 
-    if (closedTabId === googleAbortController?.tabId) { 
-      googleAbortController.abort(); 
-    } 
+
+  const tabListener = (closedTabId) => {
+    if (closedTabId === googleAbortController?.tabId) {
+      googleAbortController.abort();
+    }
   };
-  chrome.tabs.onRemoved.addListener(tabListener);
-  
+
+  // Inside the try: if anything below throws, the catch puts the screen back
+  // (it used to be left saying "Waiting for Google…").
   try {
+    chrome.tabs.onRemoved.addListener(tabListener);
     const user = await googleSignIn({
       onTab: (url) => chrome.tabs.create({ url, active: true }, (tab) => {
         (/** @type {any} */ (googleAbortController)).tabId = tab.id;
       }),
       cancelSignal: googleAbortController.signal
     });
-    
+
     if ((/** @type {any} */ (googleAbortController)).tabId) {
       chrome.tabs.remove((/** @type {any} */ (googleAbortController)).tabId).catch(() => {});
     }
     googleAbortController = null;
     chrome.tabs.onRemoved.removeListener(tabListener);
-    
+
     await afterSignIn(false);
   } catch (e) {
     if (/** @type {any} */ (googleAbortController)?.tabId) {
       chrome.tabs.remove((/** @type {any} */ (googleAbortController)).tabId).catch(() => {});
     }
     googleAbortController = null;
-    chrome.tabs.onRemoved.removeListener(tabListener);
-    
-    if (e.message !== 'cancelled') {
-      toast(e.message === 'google_unavailable' ? "Google sign-in isn't available right now." : e.message);
+    chrome.tabs.onRemoved?.removeListener(tabListener);
+
+    setWaiting(false);
+    // Cancel is the learner's own choice; anything else is said in the divider
+    // row (a toast would float over the form, and the row keeps its height).
+    // (An aborted request is the same Cancel, as the browser words it.)
+    if (e.message !== 'cancelled' && e.name !== 'AbortError') {
+      setDivider("error", e.message === 'google_unavailable' ? "Google sign-in isn't available right now." : e.message);
     }
-    btn.disabled = false;
-    btn.replaceChildren(...originalNodes);
   }
 }
 
@@ -318,25 +504,6 @@ function finishSignIn(wasSignedIn) {
   else renderYou();
 }
 
-export async function authSubmit(kind, btn) {
-    const email = /** @type {HTMLInputElement} */ (document.getElementById("youEmail"))?.value.trim();
-    const password = /** @type {HTMLInputElement} */ (document.getElementById("youPass"))?.value;
-    if (!email || !password) return toast("Enter an email and password.");
-    if (password.length < 8) return toast("Password needs at least 8 characters.");
-    const wasSignedIn = !!(await getAuth())?.user;
-    if (btn) btn.disabled = true;
-    try {
-      if (kind === "register") {
-        await register(email, password);
-      } else {
-        await login(email, password);
-      }
-      await afterSignIn(wasSignedIn);
-    } catch (e) {
-      if (btn) btn.disabled = false;
-      toast(e.message);
-    }
-}
 export function downloadFile(filename, text, type = "text/plain") {
   const a = document.createElement("a");
   a.href = URL.createObjectURL(new Blob([text], { type }));
@@ -394,28 +561,5 @@ export function importBackupFile(file) {
   reader.readAsText(file);
 }
 
-// date inputs + file input don't fire click-based data-action routing
-export function renderAuthGate() {
-  showChrome(false);
-  setHTML(app, `
-    <div class="view" style="justify-content:center;min-height:100%">
-      <div style="text-align:center;margin-bottom:8px">
-        <div class="wordmark" style="font-size:26px">Maf<b>sar</b></div>
-        <div style="font-size:13px;color:var(--text-muted);margin-top:6px;line-height:1.5">
-          Turn your AI chats into flashcards,<br>quizzes, and spaced-repetition review.
-        </div>
-      </div>
-      <div class="block" style="display:flex;flex-direction:column;gap:10px">
-        <button class="btn btn-ghost btn-block" data-action="auth-google">${GOOGLE_G} Continue with Google</button>
-        <div class="or-divider">or</div>
-        <div class="field"><label>Email</label><input id="youEmail" type="email" placeholder="you@example.com" autocomplete="email" /></div>
-        <div class="field"><label>Password</label><input id="youPass" type="password" placeholder="8+ characters" autocomplete="new-password" /></div>
-        <button class="btn btn-primary btn-block" data-action="auth-register">Create account</button>
-        <button class="btn btn-ghost btn-block" data-action="auth-signin">Sign in</button>
-      </div>
-      <div class="help" style="text-align:center">Your sets sync across devices through your account.</div>
-    </div>`);
-  topOfView();
-}
 
 // init — account required: gate first launch until signed in, then sync.

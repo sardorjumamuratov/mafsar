@@ -205,6 +205,10 @@
           onMessage: { addListener() {} },
         },
         tabs: {
+          // The sign-in screen listens for the Google tab being closed.
+          onRemoved: { addListener() {}, removeListener() {} },
+          create(_o, cb) { setTimeout(() => cb && cb({ id: 1 }), 0); },
+          remove() { return Promise.resolve(); },
           query(_q, cb) { setTimeout(() => cb && cb([]), 0); },
           sendMessage(_id, _msg, cb) { setTimeout(() => cb && cb(null), 0); },
         },
