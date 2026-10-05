@@ -15,6 +15,7 @@ import { cleanTitle } from "../../../shared/titles.js";
 import { confirmSheet } from "../confirm.js";
 import { readRatings, rateSet, clearRating, refreshRatings } from "../../storage/ratings.js";
 import { formatAvg, formatCount } from "../../../shared/format.js";
+import { ratingMode } from "../../../shared/rating-mode.js";
 import { shareBlockHtml, toggleSetShare } from "../share.js";
 import { GLOBE_PATHS, STAR_PATH } from "../set-row.js";
 
@@ -219,7 +220,9 @@ export async function paintDetail(updateInPlace = false, force = false) {
   const ratingsStore = await readRatings();
   ratingsSnapshot = ratingsStore;
   const rootId = studySet?.originSetId || session?.id;
-  // Every set can be rated, so unrated sets get the empty state, not nothing.
+  // What this set offers: stars on a copy from Discover, the average (read-only)
+  // on a set the learner published, nothing on a private set. Rating your own
+  // set tells you nothing (shared/rating-mode.js).
   const ratingData = studySet && rootId
     ? { yourStars: null, ratingAvg: null, ratingCount: 0, isGlobal: !!(studySet.isGlobal || studySet.originSetId), ...(ratingsStore[rootId] || {}) }
     : null;
@@ -389,22 +392,32 @@ export async function paintDetail(updateInPlace = false, force = false) {
   const description = studySet?.description || session.description || "";
 
   let ratingWidgetHtml = "";
-  if (ratingData) {
+  const mode = ratingData ? ratingMode({ originSetId: studySet.originSetId, isGlobal: ratingData.isGlobal }) : "none";
+  if (mode !== "none") {
     const rs = ratingData;
-    const text = rs.isGlobal
-      ? (rs.ratingCount > 0 ? `Avg ${formatAvg(rs.ratingAvg)} · ${formatCount(rs.ratingCount)} ${rs.ratingCount === 1 ? "rating" : "ratings"}` : "No ratings yet")
-      : (rs.yourStars ? `Your rating · ${rs.yourStars}` : "Tap to rate");
-    const yourStars = rs.yourStars || 0;
-    let starsHtml = "";
-    for (let i = 1; i <= 5; i++) {
-      const on = i <= yourStars;
-      starsHtml += `<button type="button" role="radio" aria-label="${i} star${i > 1 ? "s" : ""}" aria-checked="${on && i === yourStars ? "true" : "false"}" tabindex="${(yourStars === i || (yourStars === 0 && i === 1)) ? "0" : "-1"}" class="rating-star-btn" data-val="${i}" data-id="${esc(rootId)}" style="width:34px;height:34px;border:0;background:transparent;display:flex;align-items:center;justify-content:center;cursor:pointer;padding:0"><svg width="22" height="22" viewBox="0 0 24 24" fill="${on ? "var(--rating-star)" : "none"}" stroke="${on ? "var(--rating-star)" : "var(--rating-empty)"}" stroke-width="1.7" stroke-linejoin="round" style="pointer-events:none" aria-hidden="true"><path d="${STAR_PATH}"/></svg></button>`;
+    const text = rs.ratingCount > 0
+      ? `Avg ${formatAvg(rs.ratingAvg)} · ${formatCount(rs.ratingCount)} ${rs.ratingCount === 1 ? "rating" : "ratings"}`
+      : "No ratings yet";
+    if (mode === "rate") {
+      const yourStars = rs.yourStars || 0;
+      let starsHtml = "";
+      for (let i = 1; i <= 5; i++) {
+        const on = i <= yourStars;
+        starsHtml += `<button type="button" role="radio" aria-label="${i} star${i > 1 ? "s" : ""}" aria-checked="${on && i === yourStars ? "true" : "false"}" tabindex="${(yourStars === i || (yourStars === 0 && i === 1)) ? "0" : "-1"}" class="rating-star-btn" data-val="${i}" data-id="${esc(rootId)}" style="width:34px;height:34px;border:0;background:transparent;display:flex;align-items:center;justify-content:center;cursor:pointer;padding:0"><svg width="22" height="22" viewBox="0 0 24 24" fill="${on ? "var(--rating-star)" : "none"}" stroke="${on ? "var(--rating-star)" : "var(--rating-empty)"}" stroke-width="1.7" stroke-linejoin="round" style="pointer-events:none" aria-hidden="true"><path d="${STAR_PATH}"/></svg></button>`;
+      }
+      ratingWidgetHtml = `
+        <div style="display:flex;align-items:center;gap:8px;margin-left:-6px">
+          <div role="radiogroup" aria-label="Rate this set" style="display:flex">${starsHtml}</div>
+          <span style="font-size:13px;color:var(--text-muted)">${esc(text)}</span>
+        </div>`;
+    } else {
+      // Your own published set: how others rated it, with nothing to tap.
+      ratingWidgetHtml = `
+        <div class="rating-summary" style="display:flex;align-items:center;gap:6px;font-size:13px;color:var(--text-muted)">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="${rs.ratingCount > 0 ? "var(--rating-star)" : "none"}" stroke="${rs.ratingCount > 0 ? "var(--rating-star)" : "var(--rating-empty)"}" stroke-width="1.7" stroke-linejoin="round" aria-hidden="true"><path d="${STAR_PATH}"/></svg>
+          <span>${esc(text)}</span>
+        </div>`;
     }
-    ratingWidgetHtml = `
-      <div style="display:flex;align-items:center;gap:8px;margin-left:-6px">
-        <div role="radiogroup" aria-label="Rate this set" style="display:flex">${starsHtml}</div>
-        <span style="font-size:13px;color:var(--text-muted)">${esc(text)}</span>
-      </div>`;
   }
 
   const srcLabel = sourceLabel(session);

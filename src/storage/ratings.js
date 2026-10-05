@@ -34,7 +34,10 @@ export async function readRatings() {
 const isOffline = (e) => e?.message === "Offline" || e?.message === "Failed to fetch" || (typeof navigator !== "undefined" && navigator.onLine === false);
 
 async function write(rootId, clientSetId, stars) {
-  if (!cache[rootId]) cache[rootId] = { yourStars: null, ratingAvg: null, ratingCount: 0, isGlobal: false, fetchedAt: 0 };
+  // Only a global set can be rated (the server refuses anything else), so an
+  // entry made by rating one is global. Defaulting it to false hid the stars
+  // the moment a copy was rated before its first lookup came back.
+  if (!cache[rootId]) cache[rootId] = { yourStars: null, ratingAvg: null, ratingCount: 0, isGlobal: true, fetchedAt: 0 };
   const prev = { ...cache[rootId] };
   cache[rootId].yourStars = stars;
   cache[rootId].pendingStars = stars ?? "delete";
