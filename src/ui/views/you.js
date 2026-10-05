@@ -1,219 +1,178 @@
 import { activeTab, setNav, showChrome } from "../nav.js";
-import { FLAME, GOOGLE_G, app, bundle, esc, send, setFor, setHTML, summarize, toast, topOfView } from "../core.js";
-import { computeStreak, dayKey, exportAll, importAll } from "../../storage/store.js";
+import { GOOGLE_G, app, bundle, esc, send, setFor, setHTML, toast, topOfView } from "../core.js";
+import { dayKey, exportAll, importAll } from "../../storage/store.js";
 import { getAuth, googleSignIn, login, register } from "../../sync/auth.js";
 import { renderHome } from "../views/home.js";
 import { syncNow } from "../../sync/sync.js";
 import { renderSetDetail } from "../views/set-detail.js";
-import { review } from "../../../shared/srs.js";
 import { confirmSheet } from "../confirm.js";
 import { updateBannerHtml } from "../update-banner.js";
+import { SectionLabel } from "../components.js";
+import { openSheet, closeSheet } from "../sheet.js";
+
+// ===== YOU TAB ================================================================
+// One 16px edge (the scroll container's padding), a profile card, then groups:
+// a SectionLabel over one card of rows. No figures: Stats owns those.
+
+const ico = (inner, color = "var(--accent-text)") => `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="${color}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${inner}</svg>`;
+const ICON = {
+  bolt: '<path d="M13 2L4.5 13.5H12L11 22l8.5-11.5H12z"/>',
+  team: '<circle cx="9" cy="8" r="3.5"/><path d="M2.5 20v-1a4.5 4.5 0 014.5-4.5h4a4.5 4.5 0 014.5 4.5v1M16 4.6a3.5 3.5 0 010 6.8M21.5 20v-1a4.5 4.5 0 00-3-4.25"/>',
+  external: '<path d="M14 4h6v6M20 4l-9 9M18 14v5a1 1 0 01-1 1H5a1 1 0 01-1-1V7a1 1 0 011-1h5"/>',
+  download: '<path d="M4 15v4a1 1 0 001 1h14a1 1 0 001-1v-4M12 4v11M7 10l5 5 5-5"/>',
+  upload: '<path d="M4 15v4a1 1 0 001 1h14a1 1 0 001-1v-4M12 15V4M7 9l5-5 5 5"/>',
+  logout: '<path d="M9 20H6a2 2 0 01-2-2V6a2 2 0 012-2h3M16 16l4-4-4-4M20 12H9"/>',
+  login: '<path d="M15 4h3a2 2 0 012 2v12a2 2 0 01-2 2h-3M10 16l4-4-4-4M14 12H4"/>',
+  trash: '<path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13"/>',
+};
+const CHEVRON = `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--text-faint)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 6l6 6-6 6"/></svg>`;
+
+/**
+ * A settings row: icon tile, title and optional subtitle, and a trailing
+ * item (a chevron unless given). `attrs` is markup the caller escapes.
+ */
+function row({ icon, title, sub = "", trailing = CHEVRON, attrs = "", iconColor = "var(--accent-text)", titleColor = "" }) {
+  return `<button type="button" class="you-row" ${attrs}>
+      <span class="you-tile">${ico(icon, iconColor)}</span>
+      <span class="you-txt"><span class="you-title"${titleColor ? ` style="color:${titleColor}"` : ""}>${esc(title)}</span>${sub ? `<span class="you-sub">${esc(sub)}</span>` : ""}</span>
+      ${trailing}
+    </button>`;
+}
+
+function group(label, rows) {
+  return `<section style="display:flex;flex-direction:column;gap:8px">${SectionLabel(label)}<div class="you-group">${rows}</div></section>`;
+}
+
+const trailText = (label) => `<span class="you-trail" style="font-size:14px;font-weight:600;color:var(--accent-text)">${esc(label)}</span>`;
+
+/** "Not backed up yet" / "Backed up 5 min ago": the profile card's status line. */
+export function backupStatus(lastSync, now = Date.now()) {
+  const t = lastSync ? new Date(lastSync).getTime() : NaN;
+  if (!Number.isFinite(t)) return "Not backed up yet";
+  const s = Math.max(0, (now - t) / 1000);
+  if (s < 60) return "Backed up just now";
+  if (s < 3600) return `Backed up ${Math.floor(s / 60)} min ago`;
+  const day = (x) => new Date(x).setHours(0, 0, 0, 0);
+  const days = Math.round((day(now) - day(t)) / 86_400_000);
+  if (days === 0) return `Backed up ${Math.floor(s / 3600)} h ago`;
+  if (days === 1) return "Backed up yesterday";
+  const d = new Date(t);
+  const opts = /** @type {Intl.DateTimeFormatOptions} */ ({ month: "short", day: "numeric", ...(d.getFullYear() !== new Date(now).getFullYear() ? { year: "numeric" } : {}) });
+  return `Backed up ${d.toLocaleDateString("en-US", opts)}`;
+}
+
+/** The avatar's letter: never an empty circle. */
+export function avatarLetter(email) {
+  const c = String(email || "").trim().charAt(0);
+  return c ? c.toUpperCase() : "?";
+}
 
 export async function renderYou() {
   setNav("you");
   showChrome(true);
-  const { studySets, activity, settings } = await bundle();
-  let mastered = 0,
-    total = 0;
-  for (const s of studySets) {
-    const x = summarize(s);
-    mastered += x.mastered;
-    total += x.total;
-  }
-  const streak = computeStreak(activity);
+  const { settings } = await bundle();
   const auth = await getAuth();
+  const signedIn = !!auth?.user;
+  const openInTab = !!settings.openInTab;
 
-  const accountHtml = auth?.user
-    ? `<div id="billingSlot">${billingSkeleton()}</div><div class="block" style="display:flex;flex-direction:column;gap:10px">
-         <div style="display:flex;align-items:center;gap:10px">
-           <span class="tag dot" style="color:var(--status-mastered)"></span>
-           <div style="min-width:0">
-             <div style="font-size:13px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(auth.user.email)}</div>
-             <div style="font-size:11.5px;color:var(--text-muted)">${
-               auth.lastSync ? "Last synced " + new Date(auth.lastSync).toLocaleString() : "Not backed up yet"
-             }</div>
-           </div>
-         </div>
-         
-          <button class="btn btn-ghost btn-block" data-action="auth-signout">Sign out</button>
-       </div>`
-    : `<div class="block" style="display:flex;flex-direction:column;gap:10px">
-         <div style="font-weight:600;font-size:13px">Back up and sync</div>
-         <div style="font-size:12px;color:var(--text-muted);line-height:1.5">Sign in to generate study sets and sync them across your devices.</div>
-         <button class="btn btn-ghost btn-block" data-action="auth-google">${GOOGLE_G} Continue with Google</button>
-         <div class="or-divider">or</div>
-         <div class="field"><label>Email</label><input id="youEmail" type="email" placeholder="you@example.com" autocomplete="email" /></div>
-         <div class="field"><label>Password</label><input id="youPass" type="password" placeholder="8+ characters" autocomplete="new-password" /></div>
-         <div style="display:flex;gap:10px">
-           <button class="btn btn-primary" style="flex:1" data-action="auth-signin">Sign in</button>
-           <button class="btn btn-ghost" style="flex:1" data-action="auth-register">Create account</button>
-         </div>
-       </div>`;
+  const profile = signedIn
+    ? `<div style="padding:14px;border-radius:14px;background:var(--bg-surface);border:1px solid var(--border-card);display:flex;align-items:center;gap:12px">
+        <span class="you-avatar" aria-hidden="true">${esc(avatarLetter(auth.user.email))}</span>
+        <span style="display:flex;flex-direction:column;gap:2px;min-width:0">
+          <span style="font-size:15px;font-weight:600;overflow-wrap:anywhere">${esc(auth.user.email)}</span>
+          <span style="font-size:13px;color:var(--text-muted)">${esc(backupStatus(auth.lastSync))}</span>
+        </span>
+      </div>`
+    : `<div class="you-group">${row({ icon: ICON.login, title: "Sign in", sub: "Back up and sync across devices", attrs: 'data-action="you-signin"' })}</div>`;
 
   const updateBanner = await updateBannerHtml();
   setHTML(app, `
-    <div class="view">
+    <div class="screen" data-view="you" style="padding:18px 16px 24px;gap:14px">
       ${updateBanner}
-      <div class="ahd"><h1 class="h-title">You</h1></div>
-      
-      <div class="listhd"><span class="t-label">Progress</span></div>
-      <button type="button" class="setting-row" data-action="nav-stats">
-        <div style="display:flex;align-items:center;justify-content:center;width:40px;height:40px;border-radius:12px;background:var(--accent-chip-bg);color:var(--accent-text);margin-right:2px"><svg viewBox="0 0 24 24" width="20" height="20" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"><path d="M18 20V10M12 20V4M6 20v-4"/></svg></div>
-        <div class="txt" style="flex:1;text-align:left">
-          <div class="title">Your stats</div>
-          <div class="sub">${streak}-day streak &middot; ${mastered} mastered</div>
-        </div>
-        <svg class="ic chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 18l6-6-6-6"/></svg>
-      </button>
-      <button type="button" class="setting-row" data-action="nav-teams" style="margin-top:8px">
-        <div style="display:flex;align-items:center;justify-content:center;width:40px;height:40px;border-radius:12px;background:var(--accent-chip-bg);color:var(--accent-text);margin-right:2px"><svg viewBox="0 0 24 24" width="20" height="20" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle><path d="M23 21v-2a4 4 0 0 0-3-3.87"></path><path d="M16 3.13a4 4 0 0 1 0 7.75"></path></svg></div>
-        <div class="txt" style="flex:1;text-align:left">
-          <div class="title">Teams</div>
-          <div class="sub">Study with a group</div>
-        </div>
-        <svg class="ic chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 18l6-6-6-6"/></svg>
-      </button>
-<div class="k">Mastered</div></div>
-        <div class="stat"><div class="v tnum">${total}</div><div class="k">Cards</div></div>
-        <div class="stat"><div class="v tnum">${studySets.length}</div><div class="k">Sets</div></div>
-      </div>
-      ${accountHtml}
-            <div class="listhd"><span class="t-label">Layout</span></div>
-      <label class="setting-row">
-        <div class="txt" style="flex:1;text-align:left"><div class="title">Open Mafsar in a tab</div><div class="sub">Use a full page instead of the side panel</div></span>
-        <input type="checkbox" class="switch" id="openInTabCheck" ${settings.openInTab ? "checked" : ""} />
-      </label>
-      <div class="listhd"><span class="t-label">Backup</span></div>
-      <div id="backupSlot"></div>
+      <div style="padding:0 4px"><h1 style="margin:0;font-size:24px;font-weight:650;letter-spacing:-.02em">You</h1></div>
+      ${profile}
+      ${signedIn ? group("Plan", `<div id="billingSlot">${billingSkeleton()}</div>`) : ""}
+      ${group("Study", row({ icon: ICON.team, title: "Teams", sub: "Study with a group", attrs: 'data-action="nav-teams"' }))}
+      ${group("Preferences", row({
+        icon: ICON.external, title: "Open in a tab", sub: "Full page instead of the side panel",
+        attrs: `id="openInTabCheck" data-action="open-in-tab" role="switch" aria-checked="${openInTab}"`,
+        trailing: '<span class="you-switch" aria-hidden="true"></span>',
+      }))}
+      ${group("Data", `<div id="backupSlot">${backupRows(null)}</div>`)}
+      ${signedIn ? group("Account",
+        row({ icon: ICON.logout, title: "Sign out", attrs: 'data-action="auth-signout"', trailing: "" })
+        // The one red thing on the screen.
+        + row({ icon: ICON.trash, title: "Delete account", sub: "Permanently delete your account and data", attrs: 'data-action="delete-account-open"',
+          iconColor: "var(--danger-text)", titleColor: "var(--danger-text)" })) : ""}
       <input type="file" id="backupFile" accept="application/json,.json" class="hidden" />
-      ${auth?.user ? `<div class="listhd"><span class="t-label">Account</span></div>
-      <button type="button" class="setting-row" data-action="delete-account-open">
-        <div class="txt" style="flex:1;text-align:left"><div class="title">Delete account</div><div class="sub">Permanently delete your account and data</div></span>
-        <svg class="ic chev" viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"/></svg>
-      </button>` : ""}
     </div>`);
   topOfView();
-  if (auth?.user) refreshBilling().catch(() => {});
+  if (signedIn) refreshBilling().catch(() => {});
   else paintBackupSlot("free");
 }
 
 let billingToken = 0;
 
-/**
- * Approximates the free/plus billing block: title, usage caption, three meter
- * rows, one button row. The Pro block is shorter, so a Pro user sees a small
- * settle upward — acceptable, and far better than the empty slot's jump down.
- */
+/** The Plan row while /v1/me is in flight: the row's own shape, so nothing jumps. */
 function billingSkeleton() {
   return `
     <div class="skel" role="status" aria-label="Loading your plan">
-      <div class="sk-block" aria-hidden="true">
-        <div class="sk" style="height:13px;width:96px"></div>
-        <div class="sk" style="height:11px;width:120px"></div>
-        <div class="sk" style="height:6px;width:100%"></div>
-        <div class="sk" style="height:6px;width:100%"></div>
-        <div class="sk" style="height:6px;width:100%"></div>
-        <div class="sk" style="height:31px;width:100%;border-radius:var(--r-md)"></div>
+      <div class="you-row" aria-hidden="true" style="cursor:default">
+        <div class="sk" style="width:36px;height:36px;border-radius:10px;flex-shrink:0"></div>
+        <div style="flex:1;display:flex;flex-direction:column;gap:6px">
+          <div class="sk" style="height:14px;width:110px"></div>
+          <div class="sk" style="height:12px;width:160px"></div>
+        </div>
       </div>
     </div>`;
+}
+
+/**
+ * Export and Restore. Backup is a Plus/Pro feature; `plan` null means the
+ * plan isn't known yet, and the rows wait, disabled.
+ */
+function backupRows(plan) {
+  const paid = plan === "plus" || plan === "pro";
+  const off = paid ? "" : " disabled";
+  return row({ icon: ICON.download, title: "Export JSON", sub: plan && !paid ? "Available on Plus and Pro" : "All sets and cards", attrs: `data-action="export-backup"${off}` })
+    + row({ icon: ICON.upload, title: "Restore from file", sub: plan && !paid ? "Available on Plus and Pro" : "Replaces current data", attrs: `data-action="import-backup"${off}` });
 }
 
 /** Backup is a paid feature; the slot renders once the plan is known. */
 function paintBackupSlot(plan) {
   const slot = document.getElementById("backupSlot");
   if (!slot) return;
-  setHTML(
-    slot,
-    plan === "plus" || plan === "pro"
-      ? `<div style="display:flex;gap:10px">
-        <button class="btn btn-ghost" style="flex:1" data-action="export-backup">⇩ Export JSON</button>
-        <button class="btn btn-ghost" style="flex:1" data-action="import-backup">⇪ Restore</button>
-      </div>`
-      : `<div style="font-size:12px;color:var(--text-muted);text-align:center;padding:10px 0">Available on Plus and Pro plans.</div>`
-  );
+  setHTML(slot, backupRows(plan));
 }
 
 /**
- * Fetch /v1/me and fill the billing and backup slots. Runs after the paint:
+ * Fetch /v1/me and fill the Plan and Data slots. Runs after the paint:
  * awaiting it inline used to hold the entire You tab behind a network round
  * trip — two of them, when the access token needed refreshing.
  */
 export async function refreshBilling() {
   const token = ++billingToken;
-  let billingHtml = "";
+  let planHtml = "";
   let globalPlan = "free";
   try {
     const { authedFetch } = await import("../../sync/auth.js");
-    const meRes = await authedFetch('/v1/me');
-    const PLAN_COPY = `<div style="font-size:11px;color:var(--text-muted);text-align:center;margin-top:6px">Plus $2/month, Pro $6/month</div>`;
-      if (meRes.ok) {
-        const data = await meRes.json();
-        const plan = data.usage.plan;
-          globalPlan = plan;
-        const usage = data.usage;
-        if (plan === "free" || plan === "plus") {
-          const winText = usage.window === "day" ? "today" : "this month";
-          
-          const meter = (name, u, l) => {
-             if (l === null) return "";
-             const pct = Math.min(100, Math.max(0, (u / l) * 100));
-             return `
-               <div style="font-size:12px;color:var(--text-muted);display:flex;justify-content:space-between">
-                 <span>${name}</span>
-                 <span>${u} of ${l}</span>
-               </div>
-               <div class="bar" style="margin-bottom:8px"><i style="width:${Math.max(2, pct)}%"></i></div>
-             `;
-          };
-
-          const metersHtml = meter("Set generations", usage.set.used, usage.set.limit) +
-                             meter("Coding exercises", usage.coding.used, usage.coding.limit) +
-                             meter("Practice gradings", usage.practice.used, usage.practice.limit);
-
-          const title = plan === "plus" ? "Mafsar Plus" : "Mafsar Free";
-          
-          let btnsHtml = "";
-          if (plan === "free") {
-            btnsHtml = `
-              <div style="display:flex;gap:8px">
-                <button class="btn btn-primary" style="flex:1;padding:7px 10px;font-size:12.5px;" data-action="billing-checkout" data-plan="plus" data-current-plan="${plan}">Upgrade to Plus</button>
-                <button class="btn btn-ghost" style="flex:1;padding:7px 10px;font-size:12.5px;" data-action="billing-checkout" data-plan="pro" data-current-plan="${plan}">Upgrade to Pro</button>
-              </div>
-              ${PLAN_COPY}
-            `;
-          } else if (plan === "plus") {
-            btnsHtml = `
-              <div style="display:flex;gap:8px">
-                <button class="btn btn-ghost" style="flex:1;padding:7px 10px;font-size:12.5px;" data-action="billing-portal">Manage subscription</button>
-                <button class="btn btn-primary" style="flex:1;padding:7px 10px;font-size:12.5px;" data-action="billing-checkout" data-plan="pro" data-current-plan="${plan}">Upgrade to Pro</button>
-              </div>
-              ${PLAN_COPY}
-            `;
-          }
-
-          billingHtml = `
-            <div class="block" style="display:flex;flex-direction:column;gap:6px;margin-bottom:12px">
-              <div style="font-weight:600;font-size:13px">${title}</div>
-              <div style="font-size:12px;color:var(--text-muted);margin-bottom:4px">Usage ${winText}</div>
-              ${metersHtml}
-              <div style="margin-top:6px">
-                ${btnsHtml}
-              </div>
-            </div>
-          `;
-        } else {
-          billingHtml = `
-            <div class="block" style="display:flex;flex-direction:column;gap:10px;margin-bottom:12px">
-              <div style="font-weight:600;font-size:13px;display:flex;align-items:center;gap:6px">
-                <svg class="ic" viewBox="0 0 24 24" style="color:var(--accent);width:16px;height:16px"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>
-                Mafsar Pro
-              </div>
-              <div style="font-size:12px;color:var(--text-muted)">Unlimited generations</div>
-              <button class="btn btn-ghost btn-block" data-action="billing-portal">Manage subscription</button>
-            </div>
-          `;
-        }
+    const meRes = await authedFetch("/v1/me");
+    if (meRes.ok) {
+      const data = await meRes.json();
+      const plan = data.usage.plan;
+      globalPlan = plan;
+      if (plan === "pro") {
+        planHtml = row({ icon: ICON.bolt, title: "Mafsar Pro", sub: "Unlimited generations", attrs: 'data-action="billing-portal"', trailing: trailText("Manage") });
+      } else {
+        // Free and Plus: the same row, with how much of the window is left.
+        const u = data.usage.set;
+        const win = data.usage.window === "day" ? "today" : "this month";
+        const sub = u?.limit != null ? `${u.used} of ${u.limit} set generations ${win}` : "Set generations";
+        planHtml = plan === "plus"
+          ? row({ icon: ICON.bolt, title: "Mafsar Plus", sub, attrs: 'data-action="billing-portal"', trailing: trailText("Manage") })
+          : row({ icon: ICON.bolt, title: "Mafsar Free", sub, attrs: 'data-action="you-upgrade"', trailing: trailText("Upgrade") });
       }
+    }
   } catch (e) {
     // Session expiry is actionable; other errors (network, 500) shouldn't
     // block the rest of the You tab from rendering, but the user should know.
@@ -222,8 +181,73 @@ export async function refreshBilling() {
   if (token !== billingToken) return; // user navigated away mid-flight
   const slot = document.getElementById("billingSlot");
   if (!slot) return;
-  setHTML(slot, billingHtml);
+  setHTML(slot, planHtml || row({ icon: ICON.bolt, title: "Plan", sub: "Couldn't load your plan", attrs: 'data-action="you-retry-plan"', trailing: trailText("Retry") }));
   paintBackupSlot(globalPlan);
+}
+
+/** Free → the two paid plans, as a sheet of rows. */
+export function openUpgradeSheet() {
+  openSheet("Upgrade", `<div class="you-group">
+      ${row({ icon: ICON.bolt, title: "Mafsar Plus", sub: "$2/month · more generations and backup", attrs: 'data-action="billing-checkout" data-plan="plus" data-current-plan="free"', trailing: trailText("Choose") })}
+      ${row({ icon: ICON.bolt, title: "Mafsar Pro", sub: "$6/month · unlimited generations", attrs: 'data-action="billing-checkout" data-plan="pro" data-current-plan="free"', trailing: trailText("Choose") })}
+    </div>`, false, null, { px: 16, pb: 24, gap: 14 });
+}
+
+/**
+ * The plan rows' actions. Only the trailing label changes while they run, so
+ * a row keeps its icon and text (the old handlers rewrote the whole button).
+ */
+function busyLabel(el, text) {
+  const target = el.querySelector(".you-trail") || el;
+  const prev = target.textContent;
+  target.textContent = text;
+  el.disabled = true;
+  return () => { target.textContent = prev; el.disabled = false; };
+}
+
+export async function openBillingPortal(el) {
+  const restore = busyLabel(el, "Opening…");
+  try {
+    const res = await send({ type: "BILLING_PORTAL" });
+    chrome.tabs.create({ url: res.url });
+  } catch (e) {
+    toast(e.message);
+  } finally {
+    restore();
+  }
+}
+
+export async function startCheckout(el) {
+  const plan = el.dataset.plan || "plus";
+  const currentPlan = el.dataset.currentPlan || "free";
+  const restore = busyLabel(el, "Opening…");
+  try {
+    const res = await send({ type: "BILLING_CHECKOUT", plan });
+    closeSheet();
+    const { pollBilling } = await import("../../sync/auth.js");
+    let checkoutTabId = null;
+    chrome.tabs.create({ url: res.url }, (tab) => { if (tab) checkoutTabId = tab.id; });
+    await pollBilling({ cancelSignal: new AbortController().signal, fromPlan: currentPlan });
+    if (checkoutTabId) await chrome.tabs.remove(checkoutTabId).catch(() => {});
+    await renderYou();
+  } catch (e) {
+    toast(e.message);
+  } finally {
+    if (el.isConnected) restore();
+  }
+}
+
+/** The Open in a tab switch: the whole row toggles it. */
+export async function toggleOpenInTab(el, saveSettings) {
+  const openInTab = el.getAttribute("aria-checked") !== "true";
+  el.setAttribute("aria-checked", String(openInTab));
+  try {
+    await saveSettings({ openInTab });
+    send({ type: "SET_OPEN_IN_TAB", value: openInTab }).catch(() => {});
+  } catch (e) {
+    el.setAttribute("aria-checked", String(!openInTab));
+    toast(e.message);
+  }
 }
 
 // --- account actions ---------------------------------------------------------

@@ -414,12 +414,14 @@ test("open in tab rules", () => {
   assert.ok(!/async\s*\(tab\)/.test(handler), "the toolbar click handler must not be async");
   assert.ok(!handler.includes("await"), "nothing may be awaited before the sidebar opens");
 
+  // The You tab's "Open in a tab" row is a switch (role="switch"), not a checkbox.
   const you = read("../src/ui/views/you.js");
-  assert.ok(you.includes('id="openInTabCheck"'), "You view must have the checkbox");
+  assert.ok(you.includes('id="openInTabCheck" data-action="open-in-tab" role="switch"'), "You view must have the switch");
+  assert.ok(you.includes("saveSettings({ openInTab })"), "the switch must persist the preference");
+  assert.ok(you.includes('type: "SET_OPEN_IN_TAB"'), "and tell the worker");
 
   const panel = read("../src/ui/panel.js");
-  assert.ok(panel.includes('id === "openInTabCheck"'), "panel.js must wire the checkbox");
-  assert.ok(panel.includes("saveSettings({ openInTab"), "panel.js must persist the preference");
+  assert.ok(panel.includes('case "open-in-tab": toggleOpenInTab(t, saveSettings)'), "panel.js must wire the switch");
 });
 
 console.log(`\n${passed} tests passed`);
@@ -475,10 +477,12 @@ test("every view renders with no hex colour in inline styles", () => {
   }
 });
 
-test("Teams is reachable from You; 'Your stats' opens Stats", () => {
+test("Teams is reachable from You; Stats is its own tab", () => {
   const you = fs.readFileSync(new URL("../src/ui/views/you.js", import.meta.url), "utf8");
   assert.ok(you.includes('data-action="nav-teams"'), "Teams must be reachable from You");
-  assert.ok(you.includes('data-action="nav-stats"'), "Stats must be reachable from You");
+  // "Your stats" left You (it duplicated the Stats tab); the nav reaches Stats.
+  const html = fs.readFileSync(new URL("../src/ui/panel.html", import.meta.url), "utf8");
+  assert.ok(html.includes('data-nav="stats"'), "Stats must be in the bottom nav");
   const panel = fs.readFileSync(new URL("../src/ui/panel.js", import.meta.url), "utf8");
   assert.ok(panel.includes('case "nav-teams"'), "panel handles nav-teams");
   assert.ok(panel.includes('case "nav-stats"'), "panel handles nav-stats");
