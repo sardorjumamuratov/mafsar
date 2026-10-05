@@ -2465,10 +2465,16 @@ input[type="checkbox"].switch:checked::after, .toggle-switch:checked::after {
   background: var(--accent);
 }
 
-.edit-textarea:focus {
-  border-color: var(--accent) !important;
+/* In-place card editing: the outline is a box-shadow, not a border, so
+   focusing never changes the field's size. field-sizing makes the fields grow
+   with their text; set-detail.js's autoGrow is the fallback for browsers
+   without it (Firefox). */
+.edit-q, .edit-a { field-sizing: content; min-height: 0; }
+.edit-q:focus, .edit-a:focus {
+  box-shadow: inset 0 0 0 1px var(--accent) !important;
   outline: none !important;
 }
+.edit-q::placeholder, .edit-a::placeholder { color: var(--status-new); opacity: 1; }
 @media (hover: none) and (pointer: coarse) {
   .edit-hint-kbd { display: none !important; }
 }

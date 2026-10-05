@@ -10,7 +10,7 @@ import { openSheet, closeSheet } from "./sheet.js";
  * `detailsHtml` is optional markup between the body and the buttons; the
  * caller escapes what it interpolates.
  */
-export function confirmSheet({ title, body, confirmLabel, cancelLabel = "Cancel", destructive = false, detailsHtml = "" }) {
+export function confirmSheet({ title, body, confirmLabel, cancelLabel = "Cancel", destructive = false, detailsHtml = "", quietDanger = false }) {
   return new Promise((resolve) => {
     let settled = false;
     const finish = (value) => {
@@ -25,13 +25,18 @@ export function confirmSheet({ title, body, confirmLabel, cancelLabel = "Cancel"
       </div>
       ${detailsHtml}
       <div style="display:flex;flex-direction:column;gap:8px">
-        <button type="button" id="confirmOk" class="sheet-primary${destructive ? " danger" : ""}">${esc(confirmLabel || "OK")}</button>
-        <button type="button" id="confirmCancel" class="sheet-quiet">${esc(cancelLabel)}</button>
+        ${quietDanger
+          // "Discard changes?": the safe choice is the first button, and
+          // Discard is a quiet button in the danger colour, not a red fill.
+          ? `<button type="button" id="confirmCancel" class="sheet-quiet">${esc(cancelLabel)}</button>
+        <button type="button" id="confirmOk" class="sheet-quiet" style="color:var(--danger-text)">${esc(confirmLabel || "OK")}</button>`
+          : `<button type="button" id="confirmOk" class="sheet-primary${destructive ? " danger" : ""}">${esc(confirmLabel || "OK")}</button>
+        <button type="button" id="confirmCancel" class="sheet-quiet">${esc(cancelLabel)}</button>`}
       </div>`, false, () => finish(false), { px: 22, pb: 24, gap: 16, labelledBy: "confirmTitle" });
 
     // The sheet focuses its first button, now the confirm one; an Enter on a
     // destructive sheet must not delete, so focus starts on Cancel there.
-    if (destructive) document.getElementById("confirmCancel")?.focus();
+    if (destructive || quietDanger) document.getElementById("confirmCancel")?.focus();
     document.getElementById("confirmCancel")?.addEventListener("click", () => { finish(false); closeSheet(); });
     document.getElementById("confirmOk")?.addEventListener("click", () => { finish(true); closeSheet(); });
   });
