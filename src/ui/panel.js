@@ -11,7 +11,7 @@ import { app, bundle, nav, send, setFor, toast } from "./core.js";
 import { goToActiveTab, inFocusView, registerTabs } from "./nav.js";
 import { renderSets } from "./views/sets.js";
 import { onActiveTabChange } from "./tab-watch.js";
-import { currentDetail, makeSet, openDetailTab, openSetExamEditor, paintDetail, promptAddCard, renderSetDetail, saveCardEdit, saveNewCard, setEditingCardId, editingCardId, startQuizForCurrentSet, } from "./views/set-detail.js";
+import { confirmLeaveEdit, currentDetail, makeSet, openDetailTab, openSetExamEditor, paintDetail, promptAddCard, renderSetDetail, saveCardEdit, saveNewCard, setEditingCardId, editingCardId, startQuizForCurrentSet, } from "./views/set-detail.js";
 import { captureCurrent, captureLastAnswer, refreshCaptureDock, openAddMenu } from "./capture.js";
 import { deleteCard, restoreCard, deleteSession, updateStudySet, setExamDate } from "../storage/store.js";
 import { review } from "../../shared/srs.js";
@@ -289,16 +289,10 @@ document.addEventListener("click", (e) => {
 });
 // bottom nav
 nav.addEventListener("click", async (e) => {
-    const { editingCardId, currentDetail } = await import("./views/set-detail.js");
-    if (editingCardId || currentDetail()?.addingCard) {
-      const ok = await confirmSheet({ title: "Discard your edit?", body: "Your changes to this card will be lost.", confirmLabel: "Discard", cancelLabel: "Keep editing", destructive: true });
-      if (!ok) return;
-      setEditingCardId(null);
-      if (currentDetail()) currentDetail().addingCard = false;
-      paintDetail(true, true);
-    }
   const b = (/** @type {any} */ (e.target)).closest("button[data-nav]");
   if (!b) return;
+  // A card being edited with unsaved text asks "Discard changes?" first.
+  if (!(await confirmLeaveEdit())) return;
   const n = b.dataset.nav;
   if (n === "home") renderHome();
   else if (n === "sets") renderSets();

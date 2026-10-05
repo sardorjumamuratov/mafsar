@@ -141,29 +141,71 @@ function createdText(ms) {
   return d.toLocaleDateString("en-US", opts);
 }
 
-/** The cards editor in place of a row (prompt 06). */
-function renderEditor(id, defaultFront, defaultBack) {
-  const frontText = defaultFront || "";
-  const backText = defaultBack || "";
-  const isAdd = id === "new";
-  const invalid = !frontText.trim() || !backText.trim();
-  const area = "resize:none;overflow:hidden;background:var(--bg-app);border:1px solid var(--border-control);border-radius:10px;padding:10px 12px;color:var(--text-primary);font-family:inherit;outline:none";
-  const lbl = "font-size:12px;font-weight:600;letter-spacing:.04em;text-transform:uppercase;color:var(--text-muted)";
+// One card row, read-only or editing. Editing happens in the row itself: the
+// question and answer become textareas on the read-only text's own pixels and
+// Edit/Delete become Cancel/Save, so nothing else moves. Both states share
+// these styles, which is what keeps them aligned.
+const ROW_HEAD = "width:100%;display:flex;align-items:flex-start;gap:12px;padding:14px 8px;background:transparent;border:0;color:var(--text-primary);text-align:left;font-family:inherit";
+const ROW_BODY = "margin:0 8px 14px 28px;display:flex;flex-direction:column;gap:10px";
+const ANSWER_BOX = "padding:10px 12px;border:0;border-radius:10px;background:var(--bg-surface);font-size:14px;line-height:1.45";
+const ACTIONS = "display:flex;gap:8px;align-items:center";
+// The textareas' outline is a box-shadow, so focusing never changes their size.
+const FIELD = "box-shadow:inset 0 0 0 1px var(--border-control);font-family:inherit;color:var(--text-primary);resize:none;overflow:hidden;outline:none";
+
+/**
+ * `c` is the card, or null for the new card "Add card" opens. `opts`:
+ * expanded, editing, dim (another card is being edited).
+ */
+function cardRowHtml(c, { expanded = false, editing = false, dim = false } = {}) {
+  const isNew = !c;
+  const id = isNew ? "new" : c.id;
+  const dot = `<span style="width:8px;height:8px;border-radius:4px;background:${STATUS_COLOR[isNew ? "new" : masteryOf(c)]};margin-top:7px;flex-shrink:0" aria-hidden="true"></span>`;
+
+  if (editing) {
+    const front = isNew ? "" : c.front || "";
+    const back = isNew ? "" : c.back || "";
+    const invalid = !front.trim() || !back.trim();
+    return `
+      <div class="card-wrapper editing" ${isNew ? "" : `data-card-id="${esc(id)}"`} style="border-bottom:1px solid var(--border-divider)">
+        <div class="card-row-head" style="${ROW_HEAD};cursor:text">
+          ${dot}
+          <textarea id="edit-front-${esc(id)}" class="edit-q edit-textarea" rows="1" placeholder="Question" aria-label="Question" style="flex:1;min-width:0;display:block;margin:-4px -8px;padding:4px 8px;border:0;border-radius:8px;background:var(--bg-surface);font-size:15px;line-height:1.4;${FIELD}">${esc(front)}</textarea>
+          <span class="chev-spacer" style="width:16px;height:16px;margin-top:3px;flex-shrink:0" aria-hidden="true"></span>
+        </div>
+        <div style="${ROW_BODY}">
+          <textarea id="edit-back-${esc(id)}" class="edit-a edit-textarea" rows="1" placeholder="Answer" aria-label="Answer" style="display:block;width:100%;margin:0;${ANSWER_BOX};${FIELD}">${esc(back)}</textarea>
+          <div style="${ACTIONS}">
+            <button type="button" data-action="${isNew ? "add-cancel" : "edit-cancel"}" style="${OUTLINE_SM};color:var(--text-primary)">Cancel</button>
+            <button type="button" id="edit-done-${esc(id)}" data-action="${isNew ? "add-done" : "edit-done"}" data-id="${esc(id)}" ${invalid ? 'disabled aria-disabled="true"' : ""} style="height:36px;padding:0 14px;border-radius:10px;border:0;background:var(--accent);color:var(--accent-on);font-family:inherit;font-size:13px;font-weight:650;cursor:pointer;opacity:${invalid ? ".45" : "1"}">Save</button>
+            <span class="edit-hint" id="edit-hint-${esc(id)}" style="flex:1;text-align:right;font-size:12px;color:var(--text-faint)">${invalid ? "Both fields are required" : (isMac() ? "⌘ Enter to save" : "Ctrl Enter to save")}</span>
+          </div>
+        </div>
+      </div>`;
+  }
+
+  // While one card is being edited the rest dim and ignore taps.
+  const dimStyle = dim ? "opacity:.4;pointer-events:none;" : "";
+  const isLink = isLinkCard(c);
   return `
-    <div class="card-wrapper editing" style="margin:8px 0 12px;padding:12px;border-radius:14px;background:var(--bg-surface);border:1px solid var(--accent);display:flex;flex-direction:column;gap:12px">
-      <label style="display:flex;flex-direction:column;gap:6px">
-        <span style="${lbl}">Question</span>
-        <textarea id="edit-front-${esc(id)}" class="edit-textarea" rows="2" style="${area};font-size:15px;line-height:1.4">${esc(frontText)}</textarea>
-      </label>
-      <label style="display:flex;flex-direction:column;gap:6px">
-        <span style="${lbl}">Answer</span>
-        <textarea id="edit-back-${esc(id)}" class="edit-textarea" rows="2" style="${area};font-size:14px;line-height:1.45">${esc(backText)}</textarea>
-      </label>
-      <div style="display:flex;align-items:center;gap:8px">
-        <span class="edit-hint" id="edit-hint-${esc(id)}" style="flex:1;font-size:12px;color:var(--text-faint)">${invalid ? "Both fields are required" : (isMac() ? "⌘ Enter to save" : "Ctrl Enter to save")}</span>
-        <button type="button" data-action="${isAdd ? "add-cancel" : "edit-cancel"}" style="height:40px;padding:0 14px;border-radius:10px;border:1px solid var(--border-control);background:transparent;color:var(--text-primary);font-family:inherit;font-size:14px;font-weight:600;cursor:pointer">Cancel</button>
-        <button type="button" id="edit-done-${esc(id)}" data-action="${isAdd ? "add-done" : "edit-done"}" data-id="${esc(id)}" ${invalid ? 'disabled aria-disabled="true"' : ""} style="height:40px;padding:0 18px;border-radius:10px;border:0;background:var(--accent);color:var(--accent-on);font-family:inherit;font-size:14px;font-weight:650;cursor:pointer;opacity:${invalid ? ".45" : "1"}">Done</button>
-      </div>
+    <div class="card-wrapper" data-card-id="${esc(id)}" ${dim ? "inert" : ""} style="border-bottom:1px solid var(--border-divider);transition:opacity 150ms;${dimStyle}">
+      <button type="button" class="card-row-btn" data-id="${esc(id)}" aria-expanded="${expanded}" aria-controls="panel-${esc(id)}" style="${ROW_HEAD};cursor:pointer">
+        ${dot}
+        <span style="flex:1;min-width:0;font-size:15px;line-height:1.4;overflow-wrap:anywhere">${esc(c.front)}</span>
+        <span style="display:flex;margin-top:3px;flex-shrink:0;transform:rotate(${expanded ? 180 : 0}deg);transition:transform .2s">${I.chevron(16, "var(--status-new)").replace('stroke-width="2.2"', 'stroke-width="2"')}</span>
+      </button>
+      ${expanded ? `
+        <div id="panel-${esc(id)}" style="${ROW_BODY}">
+          <div style="${ANSWER_BOX};color:var(--text-answer);white-space:pre-wrap;overflow-wrap:anywhere">${esc(c.back)}</div>
+          <div style="${ACTIONS}">
+            ${isLink ? `
+              <span style="font-size:13px;color:var(--text-muted);flex:1">Made from a mechanism chain. Edit it in Chains.</span>
+              <button type="button" data-action="tab" data-tab="chains" style="${OUTLINE_SM};color:var(--accent-text)">Open Chains</button>
+            ` : `
+              <button type="button" data-action="card-edit" data-id="${esc(id)}" style="${OUTLINE_SM};color:var(--text-primary)">${I.edit}Edit</button>
+              <button type="button" data-action="card-del" data-id="${esc(id)}" style="${OUTLINE_SM};color:var(--danger-text)">${I.trash}Delete</button>
+            `}
+          </div>
+        </div>` : ""}
     </div>`;
 }
 
@@ -273,47 +315,27 @@ export async function paintDetail(updateInPlace = false, force = false) {
 
       const renderGroup = (title, items, isFirstVisible) => {
         if (items.length === 0 && !(title === "Due now" && cards.length === 0)) return "";
+        // The group header dims with the rest while a card is edited.
+        const headDim = anyEditing ? "opacity:.4;pointer-events:none;" : "";
         const header = `
-          <div style="margin:16px 20px 0;display:flex;align-items:center;gap:8px">
+          <div ${anyEditing ? "inert" : ""} style="margin:16px 20px 0;display:flex;align-items:center;gap:8px;transition:opacity 150ms;${headDim}">
             <span style="font-size:13px;font-weight:600;letter-spacing:.04em;text-transform:uppercase;color:var(--text-muted)">${title}</span>
             <span style="padding:1px 7px;border-radius:999px;background:var(--bg-surface2);font-size:12px;font-weight:600;color:var(--text-secondary)">${items.length}</span>
             <div style="flex:1"></div>
             ${isFirstVisible ? `<button type="button" data-action="add-card" style="height:32px;padding:0 10px;border-radius:9px;border:1px solid var(--border-control);background:transparent;color:var(--accent-text);font-family:inherit;font-size:13px;font-weight:600;display:flex;align-items:center;gap:6px;cursor:pointer">${I.plus}Add card</button>` : ""}
           </div>`;
-        const adding = isFirstVisible && detail.addingCard ? renderEditor("new", "", "") : "";
+        const adding = isFirstVisible && detail.addingCard ? cardRowHtml(null, { editing: true }) : "";
         if (items.length === 0) {
           return header + `<div style="margin:8px 12px 24px;display:flex;flex-direction:column">${adding}<div style="font-size:14px;color:var(--text-muted);padding:0 8px">No cards yet.</div></div>`;
         }
         let list = `<div style="margin:8px 12px 24px;display:flex;flex-direction:column">${adding}`;
         for (const c of items) {
-          // The card being edited becomes its editor, in place (prompt 06).
-          if (editingCardId === c.id) { list += renderEditor(c.id, c.front, c.back); continue; }
-          // While one card is being edited the rest dim and ignore taps.
-          const inertAttr = anyEditing ? "inert" : "";
-          const styleExtra = anyEditing ? "opacity:.4;pointer-events:none;" : "";
-          const expanded = state.expandedCardId === c.id;
-          const isLink = isLinkCard(c);
-          list += `
-            <div class="card-wrapper" data-card-id="${esc(c.id)}" ${inertAttr} style="border-bottom:1px solid var(--border-divider);transition:opacity .15s;${styleExtra}">
-              <button type="button" class="card-row-btn" data-id="${esc(c.id)}" aria-expanded="${expanded}" aria-controls="panel-${esc(c.id)}" style="width:100%;display:flex;align-items:flex-start;gap:12px;padding:14px 8px;background:transparent;border:0;color:var(--text-primary);text-align:left;cursor:pointer;font-family:inherit">
-                <span style="width:8px;height:8px;border-radius:4px;background:${STATUS_COLOR[masteryOf(c)]};margin-top:7px;flex-shrink:0" aria-hidden="true"></span>
-                <span style="flex:1;font-size:15px;line-height:1.4;text-wrap:pretty">${esc(c.front)}</span>
-                <span style="display:flex;margin-top:3px;flex-shrink:0;transform:rotate(${expanded ? 180 : 0}deg);transition:transform .2s">${I.chevron(16, "var(--status-new)").replace('stroke-width="2.2"', 'stroke-width="2"')}</span>
-              </button>
-              ${expanded ? `
-                <div id="panel-${esc(c.id)}" style="margin:0 8px 14px 28px;display:flex;flex-direction:column;gap:10px">
-                  <div style="padding:10px 12px;border-radius:10px;background:var(--bg-surface);font-size:14px;line-height:1.45;color:var(--text-answer);white-space:pre-wrap">${esc(c.back)}</div>
-                  <div style="display:flex;gap:8px;align-items:center">
-                    ${isLink ? `
-                      <span style="font-size:13px;color:var(--text-muted);flex:1">Made from a mechanism chain. Edit it in Chains.</span>
-                      <button type="button" data-action="tab" data-tab="chains" style="${OUTLINE_SM};color:var(--accent-text)">Open Chains</button>
-                    ` : `
-                      <button type="button" data-action="card-edit" data-id="${esc(c.id)}" style="${OUTLINE_SM};color:var(--text-primary)">${I.edit}Edit</button>
-                      <button type="button" data-action="card-del" data-id="${esc(c.id)}" style="${OUTLINE_SM};color:var(--danger-text)">${I.trash}Delete</button>
-                    `}
-                  </div>
-                </div>` : ""}
-            </div>`;
+          const editing = editingCardId === c.id;
+          list += cardRowHtml(c, {
+            expanded: editing || state.expandedCardId === c.id,
+            editing,
+            dim: anyEditing && !editing,
+          });
         }
         return header + list + "</div>";
       };
@@ -432,6 +454,71 @@ export async function paintDetail(updateInPlace = false, force = false) {
   if (state.studyMenuOpen) renderStudyMenu();
 }
 
+/** True while a card is being edited or added. */
+export function isEditing() {
+  return !!(editingCardId || detail?.addingCard);
+}
+
+/** Whether the open editor holds text that isn't saved yet. */
+function editDirty() {
+  const id = detail?.addingCard ? "new" : editingCardId;
+  if (!id) return false;
+  const front = byId("edit-front-" + id)?.value ?? "";
+  const back = byId("edit-back-" + id)?.value ?? "";
+  if (id === "new") return !!(front.trim() || back.trim());
+  const card = detail.studySet?.flashcards?.find((c) => c.id === id);
+  return front !== (card?.front ?? "") || back !== (card?.back ?? "");
+}
+
+/** Leave edit mode without saving, in memory only (the caller repaints). */
+function dropEdit() {
+  editingCardId = null;
+  if (detail) detail.addingCard = false;
+}
+
+/**
+ * Before leaving the card editor (Back, a tab switch, a tap on the dimmed
+ * area, the bottom nav): with unsaved changes ask "Discard changes?",
+ * otherwise just leave. Resolves true when it's fine to go; the editor is
+ * dropped then, and the caller does whatever it was doing.
+ */
+export async function confirmLeaveEdit() {
+  if (!isEditing()) return true;
+  if (editDirty()) {
+    const ok = await confirmSheet({
+      title: "Discard changes?",
+      body: "Your changes to this card will be lost.",
+      confirmLabel: "Discard",
+      cancelLabel: "Keep editing",
+      quietDanger: true,
+    });
+    if (!ok) return false;
+  }
+  dropEdit();
+  return true;
+}
+
+// One guard for the whole screen, registered once: any tap outside the row
+// being edited asks first when there's a draft. The tap is held back, and
+// replayed once the learner says Discard.
+let editGuardBound = false;
+function bindEditGuard() {
+  if (editGuardBound) return;
+  editGuardBound = true;
+  app.addEventListener("click", async (e) => {
+    if (!isEditing() || !app.querySelector('[data-view="set-detail"]')) return;
+    const el = /** @type {HTMLElement} */ (e.target);
+    if (el.closest(".card-wrapper.editing")) return;
+    const control = el.closest('button, [data-action], a, input, textarea, [role="radio"]');
+    e.stopPropagation();
+    e.preventDefault();
+    if (!(await confirmLeaveEdit())) return;
+    // A tap on the dimmed area only ends the edit; anything else carries on.
+    if (control) /** @type {HTMLElement} */ (control).click();
+    else paintDetail(true, true);
+  }, true);
+}
+
 function bindEditorEvents(id) {
   const fF = byId("edit-front-" + id);
   const fB = byId("edit-back-" + id);
@@ -439,9 +526,14 @@ function bindEditorEvents(id) {
   const hint = byId("edit-hint-" + id);
   if (!fF || !fB || !btn) return;
 
+  // field-sizing: content (panel.css) grows the fields by itself; this is the
+  // fallback for browsers without it. The fields have no border, so
+  // scrollHeight is their exact height.
+  const native = typeof CSS !== "undefined" && CSS.supports?.("field-sizing", "content");
   const autoGrow = (el) => {
+    if (native) return;
     el.style.height = "auto";
-    el.style.height = (el.scrollHeight + 2) + "px";
+    el.style.height = el.scrollHeight + "px";
   };
 
   const validate = () => {
@@ -537,6 +629,7 @@ function bindEvents() {
     });
   }
 
+  bindEditGuard();
   app.querySelectorAll(".tab-btn").forEach((b) => b.addEventListener("click", () => {
     openDetailTab(/** @type {HTMLElement} */ (b).dataset.tab);
   }));

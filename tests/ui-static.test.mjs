@@ -450,7 +450,10 @@ test("Inline edit replaces separate blocks", () => {
   assert.ok(saveFn.includes("initSchedule()"), "Reset calls initSchedule");
   
   const panel = fs.readFileSync(new URL("../src/ui/panel.js", import.meta.url), "utf8");
-  assert.ok(panel.includes("Discard your edit?"), "tapping nav with unsaved changes asks to discard");
+  // The sheet reads "Discard changes?" (set-detail.js) and only appears when
+  // there is a draft; the nav goes through that check.
+  assert.ok(panel.includes("confirmLeaveEdit()"), "tapping nav with unsaved changes asks to discard");
+  assert.ok(detail.includes('title: "Discard changes?"'), "the sheet's title");
 });
 
 console.log("Restyle remaining (prompt 13)");
