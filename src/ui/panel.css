@@ -55,6 +55,8 @@
   --track: #d3ddd9;
   --hero-btn: #ffffff;
   --hero-btn-hover: #f0fbf9;
+  --switch-thumb-on: #ffffff;
+  --switch-thumb-off: #ffffff;
 
   /* 00 ALIASES START */
   /* Legacy names, still used by the Discover and Stats views (built on the old
@@ -2190,6 +2192,8 @@ input[type="search"]::-webkit-search-cancel-button { display: none; }
   --track: #27322f;
   --hero-btn: #ffffff;
   --hero-btn-hover: #f0fbf9;
+  --switch-thumb-on: #ffffff;
+  --switch-thumb-off: #cfd9d6;
 
   }
 }
@@ -2471,4 +2475,44 @@ input[type="checkbox"].switch:checked::after, .toggle-switch:checked::after {
 }
 @media (hover: none) and (pointer: coarse) {
   .edit-hint-kbd { display: none !important; }
+}
+
+/* --- You tab (the "Fix the You tab" prompt): grouped settings rows ---------- */
+.you-group {
+  border-radius: 14px; background: var(--bg-surface); border: 1px solid var(--border-card); overflow: hidden;
+}
+.you-row {
+  width: 100%; display: flex; align-items: center; gap: 12px; min-height: 56px; padding: 10px 14px;
+  background: transparent; border: 0; text-align: left; color: var(--text-primary);
+  font-family: inherit; line-height: normal; cursor: pointer;
+}
+/* A divider between rows, none above the first or below the last. */
+.you-row + .you-row { border-top: 1px solid var(--border-divider); }
+.you-row:hover:not(:disabled) { background: var(--bg-surface2); }
+.you-row:disabled { cursor: default; }
+.you-row:disabled .you-tile, .you-row:disabled .you-txt { opacity: .45; }
+.you-tile {
+  width: 36px; height: 36px; border-radius: 10px; background: var(--bg-surface2);
+  display: flex; align-items: center; justify-content: center; flex-shrink: 0;
+}
+.you-txt { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.you-title { font-size: 15px; font-weight: 600; }
+.you-sub { font-size: 13px; color: var(--text-muted); }
+.you-avatar {
+  width: 40px; height: 40px; border-radius: 20px; background: var(--bg-surface2); flex-shrink: 0;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 15px; font-weight: 650; color: var(--text-secondary);
+}
+.you-switch {
+  position: relative; width: 44px; height: 26px; border-radius: 13px; flex-shrink: 0;
+  background: var(--border-control); transition: background 150ms ease;
+}
+.you-switch::after {
+  content: ""; position: absolute; top: 2px; left: 2px; width: 22px; height: 22px; border-radius: 11px;
+  background: var(--switch-thumb-off); transition: left 150ms ease;
+}
+[aria-checked="true"] > .you-switch { background: var(--accent); }
+[aria-checked="true"] > .you-switch::after { left: 20px; background: var(--switch-thumb-on); }
+@media (prefers-reduced-motion: reduce) {
+  .you-switch, .you-switch::after { transition: none; }
 }

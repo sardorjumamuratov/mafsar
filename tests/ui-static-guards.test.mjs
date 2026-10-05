@@ -337,7 +337,8 @@ test("Teach it back is wired end to end", () => {
 test("delete account: quiet entry on You, calm page, no innerHTML", () => {
   const you = readSrc("../src/ui/views/you.js");
   assert.ok(!you.includes("btn-danger"), "no red button on the You tab");
-  assert.ok(you.includes('class="setting-row" data-action="delete-account-open"'), "the page is still reachable");
+  // A settings row like the others, not a button (the You tab prompt).
+  assert.ok(you.includes("attrs: 'data-action=\"delete-account-open\"'"), "the page is still reachable");
   const del = readSrc("../src/ui/views/delete-account.js");
   assert.ok(del.includes('class="btn btn-ghost" data-action="nav-back">Cancel'), "a Cancel button");
   assert.ok(del.includes('data-action="export-backup"'), "offers an export first");

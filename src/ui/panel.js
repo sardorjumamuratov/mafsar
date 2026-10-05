@@ -19,7 +19,7 @@ import { applyNext, goReturn, gradeCard, revealCard, startCardListReview, startG
 import { startChainDrill } from "./flows/chain-drill.js";
 import { confirmSheet } from "./confirm.js";
 import { dismissUpdateBanner } from "./update-banner.js";
-import { authGoogle, authSubmit, exportBackup, exportSetTsv, generateSummary, googleAbortController, importBackupFile, renderAuthGate, renderYou } from "./views/you.js";
+import { authGoogle, authSubmit, exportBackup, exportSetTsv, generateSummary, googleAbortController, importBackupFile, openBillingPortal, openUpgradeSheet, refreshBilling, renderAuthGate, renderYou, startCheckout, toggleOpenInTab } from "./views/you.js";
 import { checkApply, startApply } from "./flows/apply.js";
 import { checkCode, codingNext, startCodingPractice } from "./flows/coding.js";
 import { startTeach, setTeachPersona, sendTeach, finishTeach } from "./flows/teach.js";
@@ -75,48 +75,13 @@ document.addEventListener("click", (e) => {
     case "compare-fork-cards": createForkCards(); break;
     case "flip": revealCard(); break;
     case "grade": gradeCard(Number((/** @type {any} */ (t)).dataset.g)); break;
-    case "billing-portal":
-      (/** @type {any} */ (t)).disabled = true;
-      t.textContent = "Opening…";
-      send({ type: "BILLING_PORTAL" }).then((res) => {
-        chrome.tabs.create({ url: res.url });
-        (/** @type {any} */ (t)).disabled = false;
-        t.textContent = "Manage subscription";
-      }).catch((e) => {
-        (/** @type {any} */ (t)).disabled = false;
-        t.textContent = "Manage subscription";
-        toast(e.message);
-      });
-      break;
-    case "billing-checkout": {
-        const plan = (/** @type {any} */ (t)).dataset.plan || "plus";
-        (/** @type {any} */ (t)).disabled = true;
-        t.textContent = "Opening\u2026";
-        const currentPlan = (/** @type {any} */ (t)).dataset.currentPlan || "free";
-        send({ type: "BILLING_CHECKOUT", plan }).then(async (res) => {
-          const { pollBilling } = await import("../sync/auth.js");
-          let activeTabId = null;
-          chrome.tabs.create({ url: res.url }, (tab) => {
-            if (tab) activeTabId = tab.id;
-          });
-          const ac = new AbortController();
-          try {
-            await pollBilling({ cancelSignal: ac.signal, fromPlan: currentPlan });
-            if (activeTabId) await chrome.tabs.remove(activeTabId).catch(() => {});
-            await renderYou();
-          } catch (e) {
-            toast(e.message);
-          } finally {
-            (/** @type {any} */ (t)).disabled = false;
-            t.textContent = plan === "pro" ? "Upgrade to Pro" : "Upgrade to Plus";
-          }
-        }).catch((e) => {
-          (/** @type {any} */ (t)).disabled = false;
-          t.textContent = plan === "pro" ? "Upgrade to Pro" : "Upgrade to Plus";
-          toast(e.message);
-        });
-        break;
-      }
+    // The You tab's Plan rows: only their trailing label shows "Opening…".
+    case "billing-portal": openBillingPortal(t); break;
+    case "billing-checkout": startCheckout(t); break;
+    case "you-upgrade": openUpgradeSheet(); break;
+    case "you-retry-plan": refreshBilling().catch(() => {}); break;
+    case "you-signin": renderAuthGate(); break;
+    case "open-in-tab": toggleOpenInTab(t, saveSettings); break;
     case "apply-card": startApply(); break;
     case "set-mode":
       (async () => {
@@ -286,12 +251,7 @@ document.addEventListener("change", (e) => {
       toast(ms ? "Exam date set. Cards will resurface before it." : "Exam date cleared");
       renderSetDetail((/** @type {any} */ (t)).dataset.session, "cards");
     }).catch(e => toast(e.message));
-  } else if ((/** @type {any} */ (t)).id === "openInTabCheck") {
-      const openInTab = !!(/** @type {any} */ (t)).checked;
-      saveSettings({ openInTab }).then(() => {
-        send({ type: "SET_OPEN_IN_TAB", value: openInTab }).catch(() => {});
-      }).catch(e => toast(e.message));
-    } else if ((/** @type {any} */ (t)).id === "backupFile" && (/** @type {any} */ (t)).files?.[0]) {
+  } else if ((/** @type {any} */ (t)).id === "backupFile" && (/** @type {any} */ (t)).files?.[0]) {
     importBackupFile((/** @type {any} */ (t)).files[0]);
     (/** @type {any} */ (t)).value = "";
   } else if ((/** @type {any} */ (t)).id === "importFile" && (/** @type {any} */ (t)).files?.[0]) {
