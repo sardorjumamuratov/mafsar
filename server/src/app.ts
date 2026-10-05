@@ -248,16 +248,16 @@ app.post("/v1/feedback", async (c, next) => {
     const state = c.req.query("state");
     const code = c.req.query("code");
     
-    if (!state) return c.html(`<style>body { font-family: system-ui; text-align: center; margin-top: 50px; }</style><h2>Sign-in failed</h2><p>Missing state parameter.</p>`);
+    if (!state) return c.html(`<style>body { font-family: system-ui; text-align: center; margin-top: 50px; } button, input, textarea, select { font: inherit; color: inherit; letter-spacing: inherit; }</style><h2>Sign-in failed</h2><p>Missing state parameter.</p>`);
     
     if (error === "access_denied") {
       await run(db, "UPDATE pending_logins SET status = 'error', error = 'Sign-in cancelled' WHERE id = ?", [state]);
-      return c.html(`<style>body { font-family: system-ui; text-align: center; margin-top: 50px; }</style><h2>Sign-in cancelled</h2><p>You can close this tab and try again.</p>`);
+      return c.html(`<style>body { font-family: system-ui; text-align: center; margin-top: 50px; } button, input, textarea, select { font: inherit; color: inherit; letter-spacing: inherit; }</style><h2>Sign-in cancelled</h2><p>You can close this tab and try again.</p>`);
     }
     
     const pending = await one<{ code_verifier: string }>(db, "SELECT code_verifier FROM pending_logins WHERE id = ? AND expires_at > ?", [state, nowISO()]);
     if (!pending) {
-      return c.html(`<style>body { font-family: system-ui; text-align: center; margin-top: 50px; }</style><h2>Link expired</h2><p>This sign-in request expired or was already used. Please try again.</p>`);
+      return c.html(`<style>body { font-family: system-ui; text-align: center; margin-top: 50px; } button, input, textarea, select { font: inherit; color: inherit; letter-spacing: inherit; }</style><h2>Link expired</h2><p>This sign-in request expired or was already used. Please try again.</p>`);
     }
 
     try {
@@ -270,11 +270,11 @@ app.post("/v1/feedback", async (c, next) => {
       
       await run(db, "UPDATE pending_logins SET status = 'ready', user_id = ?, access_token = ?, refresh_token = ?, email = ? WHERE id = ?", [user.id, accessToken, refreshToken, user.email, state]);
       
-      return c.html(`<style>body { font-family: system-ui; text-align: center; margin-top: 50px; }</style><h2>Success!</h2><p>You are signed in. You can close this tab and return to Mafsar.</p>`);
+      return c.html(`<style>body { font-family: system-ui; text-align: center; margin-top: 50px; } button, input, textarea, select { font: inherit; color: inherit; letter-spacing: inherit; }</style><h2>Success!</h2><p>You are signed in. You can close this tab and return to Mafsar.</p>`);
     } catch (e: any) {
       const msg = e.message ? String(e.message).substring(0, 100) : "Unknown error";
       await run(db, "UPDATE pending_logins SET status = 'error', error = ? WHERE id = ?", [msg, state]);
-      return c.html(`<style>body { font-family: system-ui; text-align: center; margin-top: 50px; }</style><h2>Sign-in failed</h2><p>Something went wrong. Please try again.</p>`);
+      return c.html(`<style>body { font-family: system-ui; text-align: center; margin-top: 50px; } button, input, textarea, select { font: inherit; color: inherit; letter-spacing: inherit; }</style><h2>Sign-in failed</h2><p>Something went wrong. Please try again.</p>`);
     }
   });
 
@@ -440,9 +440,9 @@ app.post("/v1/feedback", async (c, next) => {
   });
 
 
-  app.get("/billing/success", (c) => c.html(`<style>body { font-family: system-ui; text-align: center; margin-top: 50px; }</style><h2>Thank you!</h2><p>Your subscription is active. You can close this tab and return to Mafsar.</p>`));
-  app.get("/billing/cancel", (c) => c.html(`<style>body { font-family: system-ui; text-align: center; margin-top: 50px; }</style><h2>Checkout cancelled</h2><p>You can close this tab and return to Mafsar.</p>`));
-  app.get("/billing/return", (c) => c.html(`<style>body { font-family: system-ui; text-align: center; margin-top: 50px; }</style><h2>Portal Closed</h2><p>You can close this tab and return to Mafsar.</p>`));
+  app.get("/billing/success", (c) => c.html(`<style>body { font-family: system-ui; text-align: center; margin-top: 50px; } button, input, textarea, select { font: inherit; color: inherit; letter-spacing: inherit; }</style><h2>Thank you!</h2><p>Your subscription is active. You can close this tab and return to Mafsar.</p>`));
+  app.get("/billing/cancel", (c) => c.html(`<style>body { font-family: system-ui; text-align: center; margin-top: 50px; } button, input, textarea, select { font: inherit; color: inherit; letter-spacing: inherit; }</style><h2>Checkout cancelled</h2><p>You can close this tab and return to Mafsar.</p>`));
+  app.get("/billing/return", (c) => c.html(`<style>body { font-family: system-ui; text-align: center; margin-top: 50px; } button, input, textarea, select { font: inherit; color: inherit; letter-spacing: inherit; }</style><h2>Portal Closed</h2><p>You can close this tab and return to Mafsar.</p>`));
 
   // --- Phase 2: LLM proxy (server key, grounded in user-supplied source) ---
   // Every route below costs a real LLM call, so requireQuota(db) runs first on

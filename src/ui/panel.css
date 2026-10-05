@@ -1,4 +1,11 @@
 @font-face { font-family: "Geist"; src: url("../vendor/geist/Geist[wght].woff2") format("woff2"); font-weight: 100 900; font-display: block; }
+
+button, input, textarea, select {
+  font: inherit;
+  color: inherit;
+  letter-spacing: inherit;
+}
+
 /* ============================================================
    Mafsar — side panel design system
    Teal ink + one warm accent (streaks). Light/dark theme-aware.
