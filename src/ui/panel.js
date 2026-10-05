@@ -19,7 +19,7 @@ import { applyNext, goReturn, gradeCard, revealCard, startCardListReview, startG
 import { startChainDrill } from "./flows/chain-drill.js";
 import { confirmSheet } from "./confirm.js";
 import { dismissUpdateBanner } from "./update-banner.js";
-import { authGoogle, authSubmit, exportBackup, exportSetTsv, generateSummary, googleAbortController, importBackupFile, openBillingPortal, openUpgradeSheet, refreshBilling, renderAuthGate, renderYou, startCheckout, toggleOpenInTab } from "./views/you.js";
+import { authGoogle, exportBackup, exportSetTsv, generateSummary, googleAbortController, importBackupFile, openBillingPortal, openUpgradeSheet, refreshBilling, openForgotSheet, renderAuthGate, renderYou, startCheckout, toggleAuthMode, toggleOpenInTab } from "./views/you.js";
 import { checkApply, startApply } from "./flows/apply.js";
 import { checkCode, codingNext, startCodingPractice } from "./flows/coding.js";
 import { startTeach, setTeachPersona, sendTeach, finishTeach } from "./flows/teach.js";
@@ -175,9 +175,10 @@ document.addEventListener("click", (e) => {
     case "global-report": reportGlobal(t); break;
 
     case "import-backup": document.getElementById("backupFile")?.click(); break;
-    case "auth-signin": authSubmit("login", t); break;
-    case "auth-register": authSubmit("register", t); break;
-    case "auth-google": authGoogle(t); break;
+    // The sign-in form submits itself (Enter works); these are its other controls.
+    case "auth-mode": toggleAuthMode(); break;
+    case "auth-forgot": openForgotSheet(); break;
+    case "auth-google": authGoogle(); break;
     case "auth-google-cancel":
       if (googleAbortController) googleAbortController.abort();
       break;

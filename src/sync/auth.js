@@ -86,7 +86,11 @@ async function postJson(path, body) {
   });
   await noteIfOutdated(res);
   const data = await res.json().catch(() => ({}));
-  if (!res.ok) throw new Error(data.error || `Request failed (${res.status})`);
+  if (!res.ok) {
+    // `.message` stays what it always was (other callers show it); the code and
+    // the server's own sentence ride along for the sign-in screen to word.
+    throw Object.assign(new Error(data.error || `Request failed (${res.status})`), { code: data.error, serverMessage: data.message });
+  }
   return data;
 }
 
@@ -144,14 +148,19 @@ export async function authedFetch(path, opts = {}) {
 }
 
 export async function googleSignIn({ onTab, cancelSignal }) {
+  // Cancel reaches this request too: it used to be looked at only between
+  // polls, so Cancel while the request was still starting did nothing and the
+  // Google tab opened anyway.
   const res = await timedFetch(API_BASE + '/v1/auth/google/start', {
     method: 'POST',
-    headers: versionHeader()
+    headers: versionHeader(),
+    signal: cancelSignal
   });
   if (res.status === 501) throw new Error('google_unavailable');
   if (!res.ok) throw new Error('Could not start Google sign in');
-  
+
   const { authUrl, pollId, pollToken } = await res.json();
+  if (cancelSignal?.aborted) throw new Error('cancelled');
   onTab(authUrl);
 
   let delay = 1500;

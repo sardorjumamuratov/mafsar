@@ -18,7 +18,7 @@ const you = read("src/ui/views/you.js");
 const css = read("src/ui/panel.css");
 const panel = read("src/ui/panel.js");
 // The You screen's own markup: renderYou and its helpers, not the auth gate.
-const screen = you.slice(you.indexOf("// ===== YOU TAB"), you.indexOf("// --- account actions"));
+const screen = you.slice(you.indexOf("// ===== YOU TAB"), you.indexOf("// ===== SIGN-IN SCREEN"));
 
 test("the screen section is marked", () => assert.ok(screen.length > 500));
 
