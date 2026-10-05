@@ -57,9 +57,12 @@ under the "Sets" tab.
 
 Build note: no minifier, bundler, or transpiler is used on our code. Every file
 in this package is byte-identical to the public source at
-https://github.com/sardorjumamuratov/mafsar, with one exception:
+https://github.com/sardorjumamuratov/mafsar, with two exceptions:
 src/vendor/flatpickr.js is the unmodified, published build of flatpickr 4.6.13
-(MIT, https://github.com/flatpickr/flatpickr).
+(MIT, https://github.com/flatpickr/flatpickr), and
+src/vendor/geist/Geist[wght].woff2 is the unmodified Geist variable font from
+release v1.7.2 (SIL Open Font License 1.1,
+https://github.com/vercel/geist-font, fonts/Geist/webfonts/).
 
 A small script (tools/build.mjs) produces the package. Its only effect on
 content is removing three Chrome-only manifest keys that Firefox does not
