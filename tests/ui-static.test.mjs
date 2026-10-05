@@ -568,13 +568,14 @@ test("Ratings (prompt 07)", async () => {
   const format = fs.readFileSync("shared/format.js", "utf8");
   assert.ok(format.includes("toFixed(1)"), "average formatted with 1 decimal");
   
-  // text states, as 03-set-detail.html / logic.js word them (rating3Text)
-  assert.ok(detail.includes("`Your rating · ${rs.yourStars}`"), "private rated text");
-  assert.ok(detail.includes("Tap to rate"), "private unrated text");
+  // text states, as 03-set-detail.html / logic.js word the global ones. The
+  // private-set states ("Your rating", "Tap to rate") are gone on purpose:
+  // ratings are for global sets (tests/ratings-global-only.test.mjs).
+  assert.ok(!detail.includes("Tap to rate"), "no rating prompt on a private set");
   assert.ok(detail.includes("No ratings yet"), "global unrated text");
   assert.ok(detail.includes('`Avg ${formatAvg(rs.ratingAvg)} · ${formatCount(rs.ratingCount)} ${rs.ratingCount === 1 ? "rating" : "ratings"}`'), "global rated text");
   
   // SetRow meta
-  assert.ok(setRow.includes("yours"), "SetRow private suffix");
+  assert.ok(!setRow.includes("yours"), "a row shows no rating of your own, only a global set's average");
   assert.ok(setRow.includes("Global"), "SetRow global suffix");
 });

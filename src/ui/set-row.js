@@ -79,13 +79,16 @@ export function setViewModels(sessions, studySets) {
 /** A set row: 02-sets.html, also Home's "Continue". */
 export function SetRowHtml(set, ratings) {
   const r = ratings ? ratings[set.originSetId || set.id] : null;
-  const isGlobal = !!(set.isGlobal || r?.isGlobal);
+  // A copy is as global as its original: once the original is known to be
+  // unpublished the row stops saying "Global" (the set's page already does).
+  const isGlobal = set.originSetId && r ? !!r.isGlobal : !!(set.isGlobal || r?.isGlobal);
 
-  // "· ★ 4.8 (212)" for a global set, "· ★ 4 yours" for your own rating.
+  // "· ★ 4.8 (212)" on a global set, once someone has rated it. A private set
+  // shows no rating at all: ratings are for global sets.
   let ratingText = "";
-  const avg = r ? (r.isGlobal ? r.ratingAvg : r.yourStars) : null;
+  const avg = r?.isGlobal ? r.ratingAvg : null;
   if (avg) {
-    const suffix = r.isGlobal ? (r.ratingCount ? ` (${formatCount(r.ratingCount)})` : "") : " yours";
+    const suffix = r.ratingCount ? ` (${formatCount(r.ratingCount)})` : "";
     ratingText = `<span class="sr-rating"><span aria-hidden="true">·</span>${META_STAR}<span class="sr-avg">${esc(formatAvg(avg))}</span>${esc(suffix)}</span>`;
   }
   const globalText = isGlobal ? `<span class="sr-global"><span aria-hidden="true">·</span>${META_GLOBE}Global</span>` : "";

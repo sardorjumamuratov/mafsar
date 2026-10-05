@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
-import { openDB, migrate, type DB, run, one } from "../src/db.js";
+import { openDB, migrate, MIGRATIONS, type DB, run, one } from "../src/db.js";
 import { createApp } from "../src/app.js";
 import { register, signAccessToken } from "../src/auth.js";
 
@@ -11,6 +11,7 @@ describe("Ratings API (publish and copies)", () => {
   let app: ReturnType<typeof createApp>;
   let t1: string;
   let t2: string;
+  let t3: string;
 
   beforeEach(async () => {
     db = openDB(":memory:");
@@ -19,12 +20,16 @@ describe("Ratings API (publish and copies)", () => {
 
     const u1 = await register(db, "u1@t.com", "password1", "User 1");
     const u2 = await register(db, "u2@t.com", "password2", "User 2");
+    const u3 = await register(db, "u3@t.com", "password3", "User 3");
     t1 = await signAccessToken(u1.id);
     t2 = await signAccessToken(u2.id);
+    t3 = await signAccessToken(u3.id);
 
     await run(db, "INSERT INTO sets (id, user_id, title, is_global, created_at, updated_at) VALUES (?, ?, ?, 0, '2026-01-01', '2026-01-01')", ["set1", u1.id, "Private Set 1"]);
     await run(db, "INSERT INTO sets (id, user_id, title, is_global, created_at, updated_at) VALUES (?, ?, ?, 1, '2026-01-01', '2026-01-01')", ["set2", u1.id, "Global Set 1"]);
+    // Copies of u1's global set, made by two other learners.
     await run(db, "INSERT INTO sets (id, user_id, title, is_global, origin_set_id, created_at, updated_at) VALUES (?, ?, ?, 0, ?, '2026-01-01', '2026-01-01')", ["copy1", u2.id, "Copy of Global", "set2"]);
+    await run(db, "INSERT INTO sets (id, user_id, title, is_global, origin_set_id, created_at, updated_at) VALUES (?, ?, ?, 0, ?, '2026-01-01', '2026-01-01')", ["copy3", u3.id, "Copy of Global", "set2"]);
   });
 
   const req = async (method: string, path: string, token: string, body?: any) => {
@@ -36,19 +41,47 @@ describe("Ratings API (publish and copies)", () => {
     return { status: res.status, body: await res.json().catch(() => ({})) };
   };
 
-  it("private ratings aren't public, publishing makes the owner's rating count 1", async () => {
-    const r1 = await req("PUT", "/v1/sets/set1/rating", t1, { stars: 5 });
-    expect(r1.status).toBe(200);
-    expect(r1.body.yourStars).toBe(5);
-    expect(r1.body.count).toBe(1);
-    expect(r1.body.avg).toBe(5);
+  // Rating is for global sets, by someone who didn't make them. (An earlier
+  // rule let anyone rate any set of their own; the creator's own vote only
+  // inflated the average.)
+  it("you can't rate a set you made, private or global", async () => {
+    for (const id of ["set1", "set2"]) {
+      const r = await req("PUT", `/v1/sets/${id}/rating`, t1, { stars: 5 });
+      expect(r.status).toBe(403);
+      expect(r.body.error).toBe("own_set");
+      expect(r.body.message).toMatch(/set you made/i);
+    }
+    const s = await one<any>(db, "SELECT rating_count FROM sets WHERE id = 'set2'");
+    expect(s?.rating_count).toBe(0);
+    expect(Number((await one<any>(db, "SELECT COUNT(*) AS n FROM set_ratings"))?.n)).toBe(0);
+  });
 
-    const l1 = await req("POST", "/v1/ratings/lookup", t1, { ids: ["set1"] });
-    expect(l1.body.set1.ratingCount).toBe(1);
+  it("a copy of a set that isn't global can't be rated", async () => {
+    await run(db, "UPDATE sets SET is_global = 0 WHERE id = 'set2'");
+    const r = await req("PUT", "/v1/sets/copy1/rating", t2, { stars: 4 });
+    expect(r.status).toBe(403);
+    expect(r.body.error).toBe("not_global");
+  });
 
-    await run(db, "UPDATE sets SET is_global = 1 WHERE id = 'set1'");
-    const s = await one<any>(db, "SELECT rating_count FROM sets WHERE id = 'set1'");
-    expect(s?.rating_count).toBe(1);
+  it("a copy whose original was deleted can't be rated", async () => {
+    await run(db, "UPDATE sets SET deleted = 1 WHERE id = 'set2'");
+    const r = await req("PUT", "/v1/sets/copy1/rating", t2, { stars: 4 });
+    expect(r.status).toBe(404);
+  });
+
+  it("a copy of your own set is still your own set", async () => {
+    await run(db, "INSERT INTO sets (id, user_id, title, is_global, origin_set_id, created_at, updated_at) SELECT 'selfcopy', user_id, 'Mine again', 0, 'set2', '2026-01-01', '2026-01-01' FROM sets WHERE id = 'set2'");
+    const r = await req("PUT", "/v1/sets/selfcopy/rating", t1, { stars: 5 });
+    expect(r.status).toBe(403);
+    expect(r.body.error).toBe("own_set");
+  });
+
+  it("a rating left over from the old rule can still be cleared", async () => {
+    await run(db, "INSERT INTO set_ratings (set_root_id, user_id, stars, created_at, updated_at) SELECT 'set1', user_id, 5, '2026-01-01', '2026-01-01' FROM sets WHERE id = 'set1'");
+    const r = await req("DELETE", "/v1/sets/set1/rating", t1);
+    expect(r.status).toBe(200);
+    expect(r.body.yourStars).toBeNull();
+    expect(Number((await one<any>(db, "SELECT COUNT(*) AS n FROM set_ratings"))?.n)).toBe(0);
   });
 
   it("copies write to the root, upsert, change and clear update the aggregates", async () => {
@@ -63,7 +96,8 @@ describe("Ratings API (publish and copies)", () => {
     const r2 = await req("PUT", "/v1/sets/copy1/rating", t2, { stars: 2 });
     expect(r2.body.avg).toBe(2);
 
-    const r3 = await req("PUT", "/v1/sets/set2/rating", t1, { stars: 4 });
+    // A second learner's vote counts toward the same root.
+    const r3 = await req("PUT", "/v1/sets/copy3/rating", t3, { stars: 4 });
     expect(r3.body.avg).toBe(3);
     expect(r3.body.count).toBe(2);
 
@@ -128,11 +162,16 @@ describe("Ratings API (aggregates and lookup)", () => {
     await migrate(db);
     await run(db, "INSERT INTO users (id, email, password_hash, created_at) VALUES ('u1', 'a@b.com', 'x', '2024')");
     await run(db, "INSERT INTO users (id, email, password_hash, created_at) VALUES ('u2', 'b@b.com', 'x', '2024')");
+    await run(db, "INSERT INTO users (id, email, password_hash, created_at) VALUES ('u3', 'c@b.com', 'x', '2024')");
   });
 
   afterEach(() => {
     db.close();
   });
+
+  // A global set by u1, as the ratings apply only to global sets.
+  const globalRoot = (id: string) =>
+    run(db, "INSERT INTO sets (id, user_id, title, is_global, created_at, updated_at) VALUES (?, 'u1', 'title', 1, '2024', '2024')", [id]);
 
   async function mockReq(method: string, path: string, userId: string, body?: any) {
     const token = await signAccessToken(userId);
@@ -144,25 +183,26 @@ describe("Ratings API (aggregates and lookup)", () => {
   }
 
   it("upsert, change and clear update the aggregates in one batch", async () => {
-    await run(db, "INSERT INTO sets (id, user_id, title, created_at, updated_at) VALUES ('s1', 'u1', 'title', '2024', '2024')");
+    await globalRoot("s1");
+    await run(db, "INSERT INTO sets (id, user_id, origin_set_id, title, created_at, updated_at) VALUES ('s2', 'u2', 's1', 'title', '2024', '2024')");
+    await run(db, "INSERT INTO sets (id, user_id, origin_set_id, title, created_at, updated_at) VALUES ('s3', 'u3', 's1', 'title', '2024', '2024')");
 
-    const r1 = await mockReq("PUT", "/v1/sets/s1/rating", "u1", { stars: 4 });
+    const r1 = await mockReq("PUT", "/v1/sets/s2/rating", "u2", { stars: 4 });
     expect(r1.status).toBe(200);
     expect(await r1.json()).toEqual({ yourStars: 4, avg: 4, count: 1 });
 
-    const r2 = await mockReq("PUT", "/v1/sets/s1/rating", "u1", { stars: 5 });
+    const r2 = await mockReq("PUT", "/v1/sets/s2/rating", "u2", { stars: 5 });
     expect(await r2.json()).toEqual({ yourStars: 5, avg: 5, count: 1 });
 
-    await run(db, "INSERT INTO sets (id, user_id, origin_set_id, title, created_at, updated_at) VALUES ('s2', 'u2', 's1', 'title', '2024', '2024')");
-    const r3 = await mockReq("PUT", "/v1/sets/s2/rating", "u2", { stars: 1 });
+    const r3 = await mockReq("PUT", "/v1/sets/s3/rating", "u3", { stars: 1 });
     expect(await r3.json()).toEqual({ yourStars: 1, avg: 3, count: 2 });
 
-    const r4 = await mockReq("DELETE", "/v1/sets/s2/rating", "u2");
+    const r4 = await mockReq("DELETE", "/v1/sets/s3/rating", "u3");
     expect(await r4.json()).toEqual({ yourStars: null, avg: 5, count: 1 });
   });
 
   it("copies write to the root", async () => {
-    await run(db, "INSERT INTO sets (id, user_id, title, created_at, updated_at) VALUES ('root1', 'u1', 'title', '2024', '2024')");
+    await globalRoot("root1");
     await run(db, "INSERT INTO sets (id, origin_set_id, user_id, title, created_at, updated_at) VALUES ('copy1', 'root1', 'u2', 'title', '2024', '2024')");
 
     const res = await mockReq("PUT", "/v1/sets/copy1/rating", "u2", { stars: 4 });
@@ -190,13 +230,26 @@ describe("Ratings API (aggregates and lookup)", () => {
   });
 
   it("lookup returns fresh aggregates", async () => {
-    await run(db, "INSERT INTO sets (id, user_id, title, created_at, updated_at) VALUES ('s1', 'u1', 't', '1', '1')");
-    await mockReq("PUT", "/v1/sets/s1/rating", "u1", { stars: 4 });
+    await globalRoot("s1");
+    await run(db, "INSERT INTO sets (id, user_id, origin_set_id, title, created_at, updated_at) VALUES ('c1', 'u2', 's1', 't', '1', '1')");
+    await mockReq("PUT", "/v1/sets/c1/rating", "u2", { stars: 4 });
 
-    const res = await mockReq("POST", "/v1/ratings/lookup", "u1", { ids: ["s1"] });
+    const res = await mockReq("POST", "/v1/ratings/lookup", "u2", { ids: ["s1"] });
     expect(res.status).toBe(200);
     const body = (await res.json()) as Record<string, any>;
-    expect(body.s1).toEqual({ yourStars: 4, ratingAvg: 4, ratingCount: 1, isGlobal: false });
+    expect(body.s1).toEqual({ yourStars: 4, ratingAvg: 4, ratingCount: 1, isGlobal: true });
+
+    // The author sees the same aggregate, and never a vote of their own.
+    const mine = (await (await mockReq("POST", "/v1/ratings/lookup", "u1", { ids: ["s1"] })).json()) as Record<string, any>;
+    expect(mine.s1).toEqual({ yourStars: null, ratingAvg: 4, ratingCount: 1, isGlobal: true });
+  });
+
+  it("a private set of yours has no rating at all", async () => {
+    await run(db, "INSERT INTO sets (id, user_id, title, created_at, updated_at) VALUES ('p1', 'u1', 't', '1', '1')");
+    const res = await mockReq("PUT", "/v1/sets/p1/rating", "u1", { stars: 4 });
+    expect(res.status).toBe(403);
+    const body = (await (await mockReq("POST", "/v1/ratings/lookup", "u1", { ids: ["p1"] })).json()) as Record<string, any>;
+    expect(body.p1).toEqual({ yourStars: null, ratingAvg: null, ratingCount: 0, isGlobal: false });
   });
 
   it("lookup refuses more than 200 ids", async () => {
@@ -213,5 +266,36 @@ describe("Ratings API (aggregates and lookup)", () => {
     const row = await one(db, "SELECT rating_avg, rating_count FROM sets WHERE id = 's1'");
     expect(row?.rating_avg).toBeNull();
     expect(row?.rating_count).toBe(0);
+  });
+});
+
+// Ratings by a set's own author were allowed once, and they count toward the
+// average everyone sees. Migration 022 removes them and recomputes.
+describe("migration 022: drop self-ratings", () => {
+  it("removes an author's own votes, keeps everyone else's, and recomputes the aggregates", async () => {
+    const db = openDB(":memory:");
+    await migrate(db);
+    for (const u of ["a", "b", "c"]) await run(db, "INSERT INTO users (id, email, password_hash, created_at) VALUES (?, ?, 'x', '2024')", [u, `${u}@t.com`]);
+    // a's global set, rated by a (their own), b and c; a's private set, rated by a.
+    await run(db, "INSERT INTO sets (id, user_id, title, is_global, created_at, updated_at, rating_count, rating_sum, rating_avg) VALUES ('g1', 'a', 't', 1, '1', '1', 3, 11, 11.0/3)");
+    await run(db, "INSERT INTO sets (id, user_id, title, is_global, created_at, updated_at, rating_count, rating_sum, rating_avg) VALUES ('p1', 'a', 't', 0, '1', '1', 1, 5, 5)");
+    for (const [root, user, stars] of [["g1", "a", 5], ["g1", "b", 4], ["g1", "c", 2], ["p1", "a", 5]] as const) {
+      await run(db, "INSERT INTO set_ratings (set_root_id, user_id, stars, created_at, updated_at) VALUES (?, ?, ?, '1', '1')", [root, user, stars]);
+    }
+
+    const sql = MIGRATIONS[21];
+    expect(sql, "migration 022 must exist").toBeTruthy();
+    for (const stmt of sql.split(";").map((s) => s.trim()).filter(Boolean)) await db.execute(stmt);
+
+    const left = await db.execute("SELECT set_root_id, user_id FROM set_ratings ORDER BY set_root_id, user_id");
+    expect(left.rows.map((r) => `${r.set_root_id}:${r.user_id}`)).toEqual(["g1:b", "g1:c"]);
+    const g = await one<any>(db, "SELECT rating_count, rating_sum, rating_avg FROM sets WHERE id = 'g1'");
+    expect(Number(g?.rating_count)).toBe(2);
+    expect(Number(g?.rating_sum)).toBe(6);
+    expect(g?.rating_avg).toBe(3);
+    const p = await one<any>(db, "SELECT rating_count, rating_sum, rating_avg FROM sets WHERE id = 'p1'");
+    expect(Number(p?.rating_count)).toBe(0);
+    expect(p?.rating_avg).toBeNull();
+    db.close();
   });
 });

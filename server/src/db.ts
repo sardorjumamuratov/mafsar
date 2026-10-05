@@ -421,6 +421,21 @@ export const MIGRATIONS: string[] = [
   `
   ALTER TABLE sets ADD COLUMN description TEXT;
   ALTER TABLE set_ratings ADD COLUMN created_at TEXT;
+  `,
+  // Ratings are for global sets, by someone who didn't make them. Until now an
+  // author could rate their own set, and that vote counted toward the average
+  // everyone sees. Drop those votes and recompute the totals of every set that
+  // has any, bumping server_updated_at so clients pull the corrected numbers.
+  `
+  DELETE FROM set_ratings WHERE EXISTS (
+    SELECT 1 FROM sets s WHERE s.id = set_ratings.set_root_id AND s.user_id = set_ratings.user_id
+  );
+  UPDATE sets SET
+    rating_count = (SELECT COUNT(*) FROM set_ratings WHERE set_root_id = sets.id),
+    rating_sum = COALESCE((SELECT SUM(stars) FROM set_ratings WHERE set_root_id = sets.id), 0),
+    rating_avg = (SELECT CAST(SUM(stars) AS REAL) / COUNT(*) FROM set_ratings WHERE set_root_id = sets.id),
+    server_updated_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now')
+  WHERE rating_count > 0 OR rating_sum > 0;
   `
 ];
 

@@ -41,6 +41,22 @@ export function createRatingsApp(db: DB) {
     return set ? set.origin_set_id || id : null;
   }
 
+  /**
+   * Whether `userId` may rate the root set. Ratings are for global sets, by
+   * someone who didn't make them: an author's own vote only inflates the
+   * average everyone else sees, and a set that isn't published has no
+   * audience to rate it. Returns the refusal to send, or null.
+   */
+  async function refusal(rootId: string, userId: string) {
+    const root = await one<{ user_id: string; is_global: number; is_hidden: number; deleted: number }>(
+      db, "SELECT user_id, is_global, is_hidden, deleted FROM sets WHERE id = ?", [rootId]
+    );
+    if (!root || root.deleted) return { status: 404 as const, body: { error: "not_found", message: "That set is no longer available." } };
+    if (root.user_id === userId) return { status: 403 as const, body: { error: "own_set", message: "You can't rate a set you made." } };
+    if (!root.is_global || root.is_hidden) return { status: 403 as const, body: { error: "not_global", message: "Only sets shared in Discover can be rated." } };
+    return null;
+  }
+
   async function readAggregate(rootId: string) {
     const s = await one<{ rating_avg: number | null; rating_count: number | null }>(
       db, "SELECT rating_avg, rating_count FROM sets WHERE id = ?", [rootId]
@@ -54,6 +70,8 @@ export function createRatingsApp(db: DB) {
     if (!parsed.success) return c.json({ error: "bad_request", message: "Stars must be a whole number from 1 to 5." }, 400);
     const rootId = await resolveRoot(c.req.param("id") ?? "", userId);
     if (!rootId) return c.json({ error: "not_found", message: "No such set for this account." }, 404);
+    const no = await refusal(rootId, userId);
+    if (no) return c.json(no.body, no.status);
 
     const now = new Date().toISOString();
     await db.batch([
@@ -67,6 +85,9 @@ export function createRatingsApp(db: DB) {
     return c.json({ yourStars: parsed.data.stars, ...(await readAggregate(rootId)) });
   });
 
+  // Clearing is allowed on any of the learner's sets, not only rateable ones:
+  // it's how a vote left from before this rule (an author's own, or one on a set
+  // that was unpublished since) gets removed.
   app.delete("/sets/:id/rating", requireAuth(), rateLimit, async (c) => {
     const userId = c.get("userId");
     const rootId = await resolveRoot(c.req.param("id") ?? "", userId);
