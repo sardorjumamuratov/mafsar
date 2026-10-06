@@ -1,4 +1,4 @@
-import { XBTN, app, bundle, esc, send, setFor, setHTML, toast } from "../core.js";
+import { app, bundle, esc, send, setFor, setHTML, toast } from "../core.js";
 import { isDue } from "../../../shared/srs.js";
 import { setFocusReturn } from "../flows/review.js";
 import { showChrome } from "../nav.js";
@@ -6,6 +6,7 @@ import { appendReviewLog, bumpActivity, uid } from "../../storage/store.js";
 import {
   STUCK_TEXT, canFinish, coverageCount, mergeCoverage, personaOptions, pickPersona, reviewGradeFor, selectTeachCards, PERSONAS, personaInfo,
 } from "../../storage/teach.js";
+import { paintShell } from "./shell.js";
 
 // Teach it back (the Feynman technique). One sitting's state; goReturn() nulls it.
 // { sessionId, topic, cards, persona, messages, coverage, busy, done, token, evaluation }
@@ -20,7 +21,6 @@ export async function startTeach(sessionId) {
   const session = sessions.find((s) => s.id === sessionId);
   teachState = {
     sessionId,
-    // The worried-patient persona is only offered on a Medicine set.
     isMedicine: (set?.mode || "") === "medicine",
     topic: String(session?.title || set?.title || "this topic").slice(0, 200),
     cards,
@@ -37,108 +37,156 @@ export async function startTeach(sessionId) {
   paintTeachIntro();
 }
 
-function progressBar() {
-  const { covered, total } = coverageCount(teachState.coverage, teachState.cards);
-  return `
-      <div class="ahd" style="display:flex;align-items:center;padding:12px;gap:12px">
-        <button class="iconbtn" data-action="return-focus" aria-label="End session"><svg class="ic" viewBox="0 0 24 24" width="20" height="20" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg></button>
-        <div class="focus-track">
-          <div class="focus-fill" style="width:${Math.max(2, Math.round((covered / total) * 100))}%"></div>
-        </div>
-        <div style="font-size:13px;color:var(--text-muted);font-variant-numeric:tabular-nums">${esc(covered)} / ${esc(total)}</div>
-      </div>`;
-}
-
 export function paintTeachIntro() {
   const { topic, cards, persona } = teachState;
-  const option = (id, label) =>
-    `<button class="qlen${persona === id ? " on" : ""}" role="radio" aria-checked="${persona === id}" data-action="teach-persona" data-persona="${id}">${esc(label)}</button>`;
-  setHTML(app, `
-    ${progressBar()}
-    <div class="rev-body teach">
-      <div class="t-label">Teach it back</div>
-      <p class="teach-lead">Explain <b>${esc(topic)}</b> to someone who has never heard of it. They'll ask questions, and if you get stuck, ask for a hint.</p>
-      <div class="t-label" style="margin-top:14px">Ideas to get across</div>
-      <ul class="teach-ideas">${cards.map((c) => `<li>${esc(c.front)}</li>`).join("")}</ul>
-      <div class="t-label" style="margin-top:14px">Who are you teaching?</div>
-      <div class="qlens" role="radiogroup" aria-label="Who are you teaching?">
-        ${personaOptions(teachState.isMedicine).map((id) => option(id, PERSONAS[id].emoji + " " + PERSONAS[id].option)).join("")}
-      </div>
-      <textarea id="teachInput" class="sa-input" rows="6" placeholder="Start explaining in your own words…"></textarea>
-      <button class="btn-primary btn-block" data-action="teach-send">Start teaching</button>
-    </div>`);
-  wireInput();
+  
+  const ideasHTML = cards.map(c => `<div style="height:30px;padding:0 10px;border-radius:8px;border:1px solid var(--border-control,#27322f);font-size:13px;color:var(--text-secondary,#cfd9d6);display:flex;align-items:center">${esc(c.front)}</div>`).join("");
+  
+  // No emoji
+  const childLabel = "A curious 12-year-old";
+  const beginnerLabel = "A complete beginner";
+  
+  const body = `
+    <div style="margin-top:8px;font-size:15px;line-height:1.5;color:var(--text-muted,#9aa9a4)">They'll ask follow-up questions. Ask for a hint whenever you're stuck.</div>
+    <div style="margin-top:24px;font-size:13px;font-weight:600;color:var(--text-muted,#9aa9a4)">Ideas to cover</div>
+    <div style="margin-top:10px;display:flex;flex-wrap:wrap;gap:6px">${ideasHTML}</div>
+    
+    <div style="margin-top:24px;font-size:13px;font-weight:600;color:var(--text-muted,#9aa9a4)">Who are you teaching?</div>
+    <div style="margin-top:10px;height:44px;padding:3px;border-radius:12px;background:var(--bg-surface,#141d1b);border:1px solid var(--border-card,#222c2a);display:flex;gap:3px">
+      <button data-action="teach-persona" data-persona="child" style="flex:1;border:none;border-radius:9px;font-size:14px;font-weight:600;cursor:pointer;background:${persona==='child'?'var(--bg-segment-active,#243230)':'transparent'};color:${persona==='child'?'var(--text-primary,#e7eeec)':'var(--text-faint,#8b9a96)'}">${childLabel}</button>
+      <button data-action="teach-persona" data-persona="beginner" style="flex:1;border:none;border-radius:9px;font-size:14px;font-weight:600;cursor:pointer;background:${persona==='beginner'?'var(--bg-segment-active,#243230)':'transparent'};color:${persona==='beginner'?'var(--text-primary,#e7eeec)':'var(--text-faint,#8b9a96)'}">${beginnerLabel}</button>
+    </div>
+    
+    <textarea id="teachStartInput" style="margin-top:24px;min-height:120px;padding:12px 14px;border-radius:12px;border:0;background:var(--bg-surface,#141d1b);box-shadow:inset 0 0 0 1px var(--border-control,#27322f);font-size:15px;line-height:1.5;resize:none;width:100%" placeholder="Start explaining in your own words" oninput="document.getElementById('teachStartBtn').disabled = !this.value.trim(); this.style.boxShadow = 'inset 0 0 0 1px var(--accent,#34bcad)'" onblur="this.style.boxShadow = 'inset 0 0 0 1px var(--border-control,#27322f)'" onfocus="this.style.boxShadow = 'inset 0 0 0 1px var(--accent,#34bcad)'"></textarea>
+  `;
+  
+  const dock = `
+    <button id="teachStartBtn" data-action="teach-start-send" disabled style="width:100%;height:60px;border-radius:14px;background:var(--accent,#34bcad);color:var(--accent-on,#04211d);font-size:16px;font-weight:650;border:none;cursor:pointer;display:flex;align-items:center;justify-content:center">Start teaching</button>
+  `;
+  
+  setHTML(app, paintShell({
+    mode: "Teach it back",
+    prompt: `Explain ${topic} to someone who's never heard of it`,
+    progress: 33, // 2/6 example
+    counter: "0 / 0", // wait, will override counter with ideas covered
+    body,
+    dock,
+    promptClass: "prompt-teach"
+  }));
 }
 
 export function setTeachPersona(persona) {
   if (!teachState || teachState.messages.length) return;
   teachState.persona = pickPersona(persona, teachState.isMedicine);
-  app.querySelectorAll('[data-action="teach-persona"]').forEach((el) => {
-    const b = /** @type {HTMLElement} */ (el);
-    const on = b.dataset.persona === teachState.persona;
-    b.classList.toggle("on", on);
-    b.setAttribute("aria-checked", String(on));
-  });
+  paintTeachIntro(); // Repaint to show the selection
 }
 
-const bubble = (m) =>
-  `<div class="bubble ${m.role === "learner" ? "learner" : "student"}${m.kind === "hint" ? " hint" : ""}">${
-    m.kind === "hint" ? `<span class="bubble-tag">Hint</span>` : ""
-  }${esc(m.text)}</div>`;
+// Intercept "Start teaching" since we put the input in paintTeachIntro
+export function teachStartSend() {
+  const box = document.getElementById("teachStartInput");
+  const val = /** @type {HTMLTextAreaElement} */ (box)?.value.trim();
+  if (val) sendTeach(false, val);
+}
+
+function bubble(m, info) {
+  if (m.role === "learner") {
+    return `
+      <div style="align-self:flex-start;max-width:85%">
+        <div style="font-size:12px;font-weight:600;color:var(--text-faint,#8b9a96);margin-bottom:4px">${esc(info.short)}</div>
+        <div style="padding:10px 14px;border-radius:14px 14px 14px 4px;background:var(--bg-surface,#141d1b);border:1px solid var(--border-card,#222c2a);color:var(--text-secondary,#cfd9d6);font-size:15px;line-height:1.5;white-space:pre-wrap;overflow-wrap:anywhere">${esc(m.text)}</div>
+      </div>
+    `;
+  } else {
+    // Student (User)
+    return `
+      <div style="align-self:flex-end;max-width:85%;padding:10px 14px;border-radius:14px 14px 4px 14px;background:var(--bg-surface2,#1c2826);font-size:15px;line-height:1.5;color:var(--text-primary,#e7eeec);white-space:pre-wrap;overflow-wrap:anywhere">
+        ${esc(m.text)}
+      </div>
+    `;
+  }
+}
 
 export function paintTeachChat() {
-  const { topic, messages, busy, done, persona } = teachState;
+  const { topic, messages, busy, done, persona, cards, coverage } = teachState;
   const off = busy ? " disabled" : "";
   const info = personaInfo(persona);
-  const capitalizedShort = info.short.charAt(0).toUpperCase() + info.short.slice(1);
+  
+  const { covered, total } = coverageCount(coverage, cards);
+  
+  const ideasStrip = cards.map(c => {
+    const isCov = coverage[c.id];
+    if (isCov) {
+      return `<div style="height:28px;padding:0 9px;border-radius:8px;border:1px solid var(--accent-tint-border,#1f5a52);background:var(--accent-tint-bg,#133a35);color:var(--accent-text,#5fd3c5);font-size:13px;display:flex;align-items:center;gap:4px"><svg width="12" height="12" viewBox="0 0 24 24" stroke-width="3" style="stroke:currentColor;fill:none"><polyline points="20 6 9 17 4 12"></polyline></svg>${esc(c.front)}</div>`;
+    }
+    return `<div style="height:28px;padding:0 9px;border-radius:8px;border:1px solid var(--border-control,#27322f);background:transparent;color:var(--text-muted,#9aa9a4);font-size:13px;display:flex;align-items:center">${esc(c.front)}</div>`;
+  }).join("");
+  
+  // Custom shell rendering for the chat since it breaks the standard shell body
   setHTML(app, `
-    ${progressBar()}
-    <div class="rev-body teach">
-      <div class="teach-head">
-        <div class="t-label teach-topic">Teaching ${esc(topic)}</div>
-        <span class="teach-persona-chip tag" role="note" aria-label="You're teaching ${esc(info.long)}" title="Chosen at the start. To teach someone else, finish and start again.">${info.emoji} ${esc(capitalizedShort)}</span>
+    <div style="background:var(--bg-app,#0e1513);display:flex;flex-direction:column;height:100%">
+      <div style="height:56px;display:flex;align-items:center;gap:12px;padding:0 16px 0 8px;flex-shrink:0">
+        <button data-action="return-focus" aria-label="End session" style="width:40px;height:40px;border-radius:12px;background:transparent;border:none;color:var(--text-muted,#9aa9a4);display:flex;align-items:center;justify-content:center;padding:0;cursor:pointer"><svg style="width:20px;height:20px;stroke-width:2;fill:none;stroke:currentColor;stroke-linecap:round;stroke-linejoin:round" viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg></button>
+        <div style="flex:1;height:4px;border-radius:2px;background:var(--border-card,#222c2a);overflow:hidden"><div style="height:100%;background:var(--accent,#34bcad);width:${Math.max(2, Math.round((covered / total) * 100))}%"></div></div>
+        <div style="min-width:44px;text-align:right;font-size:13px;font-weight:600;color:var(--text-muted,#9aa9a4);font-variant-numeric:tabular-nums">${covered} / ${total}</div>
       </div>
-      <div class="teach-thread" id="teachThread" aria-live="polite">
-        ${messages.map(bubble).join("")}
-        ${busy ? `<div class="bubble student typing" aria-label="The ${esc(info.short)} is thinking"><span></span><span></span><span></span></div>` : ""}
+      
+      <div style="padding:4px 24px 14px;border-bottom:1px solid var(--border-divider,#1e2826);display:flex;flex-wrap:wrap;gap:4px">
+        ${ideasStrip}
       </div>
-      <textarea id="teachInput" class="sa-input" rows="3" placeholder="Answer the ${esc(info.short)}, or keep explaining…"${off}></textarea>
-      <div class="teach-actions">
-        <button class="btn-ghost" data-action="teach-hint"${off}>I'm stuck</button>
-        <button class="btn-primary" data-action="teach-send"${off}>Send</button>
+      
+      <div id="teachThread" aria-live="polite" style="flex:1;padding:20px 24px;display:flex;flex-direction:column;gap:16px;overflow-y:auto">
+        ${messages.map(m => bubble(m, info)).join("")}
+        ${busy ? `<div style="align-self:flex-start;max-width:85%;padding:10px 14px;border-radius:14px 14px 14px 4px;background:var(--bg-surface,#141d1b);border:1px solid var(--border-card,#222c2a);color:var(--text-secondary,#cfd9d6);font-size:15px;line-height:1.5">Thinking…</div>` : ""}
       </div>
-      <button class="btn-ghost btn-block" data-action="teach-finish"${busy || !(done || canFinish(messages)) ? " disabled" : ""}>Finish and see how I did</button>
-    </div>`);
+      
+      <div style="flex-shrink:0;padding:12px 16px 24px;border-top:1px solid var(--border-divider,#1e2826);display:flex;flex-direction:column;gap:10px">
+        <div style="display:flex;align-items:flex-end;gap:8px">
+          <textarea id="teachInput" style="flex:1;min-height:48px;padding:13px 14px;border-radius:12px;border:0;background:var(--bg-surface,#141d1b);box-shadow:inset 0 0 0 1px var(--border-control,#27322f);font-size:15px;line-height:1.5;resize:none;overflow:hidden" placeholder="Reply"${off}></textarea>
+          <button data-action="teach-send" style="width:48px;height:48px;border-radius:12px;background:var(--accent,#34bcad);color:var(--accent-on,#04211d);border:none;display:flex;align-items:center;justify-content:center;cursor:pointer"${off} aria-label="Send">
+            <svg width="20" height="20" viewBox="0 0 24 24" style="stroke-width:2;fill:none;stroke:currentColor;stroke-linecap:round;stroke-linejoin:round"><line x1="12" y1="19" x2="12" y2="5"></line><polyline points="5 12 12 5 19 12"></polyline></svg>
+          </button>
+        </div>
+        <div style="display:flex;justify-content:space-between;align-items:center">
+          <button data-action="teach-hint" style="height:32px;background:transparent;border:none;padding:0;display:flex;align-items:center;gap:6px;font-size:14px;font-weight:600;color:var(--accent-text,#5fd3c5);cursor:pointer"${off}>
+            <svg width="16" height="16" viewBox="0 0 24 24" style="stroke-width:2;fill:none;stroke:currentColor;stroke-linecap:round;stroke-linejoin:round"><path d="M9 18h6"></path><path d="M10 22h4"></path><path d="M12 2a7 7 0 0 0-7 7c0 2 1.5 4 3 5s1 3 1 3h6s0-2 1-3 3-3 3-5a7 7 0 0 0-7-7z"></path></svg>
+            Get a hint
+          </button>
+          <button data-action="teach-finish" style="height:32px;background:transparent;border:none;padding:0;font-size:14px;font-weight:600;color:var(--text-muted,#9aa9a4);cursor:pointer"${busy || !(done || canFinish(messages)) ? " disabled" : ""}>
+            Finish and review
+          </button>
+        </div>
+      </div>
+    </div>
+  `);
+  
   const thread = document.getElementById("teachThread");
   if (thread) thread.scrollTop = thread.scrollHeight;
   wireInput();
 }
 
-/** Enter sends; Shift+Enter makes a new line. */
 function wireInput() {
-  const box = /** @type {HTMLTextAreaElement|null} */ (document.getElementById("teachInput"));
+  const box = document.getElementById("teachInput");
   if (!box) return;
   box.addEventListener("keydown", (e) => {
     if (e.key !== "Enter" || e.shiftKey) return;
     e.preventDefault();
     sendTeach(false);
   });
-  if (!box.disabled) box.focus();
+  if (!(/** @type {HTMLTextAreaElement} */ (box)).disabled) box.focus();
 }
 
-export async function sendTeach(wantHint = false) {
+export async function sendTeach(wantHint = false, initialText = "") {
   const s = teachState;
   if (!s || s.busy) return;
-  const box = /** @type {HTMLTextAreaElement|null} */ (document.getElementById("teachInput"));
-  const typed = (box?.value || "").trim();
+  const box = document.getElementById("teachInput");
+  const typed = initialText || (/** @type {HTMLTextAreaElement} */ (box)?.value || "").trim();
   const text = typed || (wantHint ? STUCK_TEXT : "");
   if (!text) return toast("Write something first.");
 
   s.messages.push({ role: "learner", text: text.slice(0, 2000) });
   s.busy = true;
   paintTeachChat();
-  // A token per request: a slow reply must not paint over a session the learner
-  // restarted or left.
+  
   const token = (s.token = {});
   try {
     const r = await send({ type: "TEACH_TURN", topic: s.topic, persona: s.persona, cards: s.cards, messages: s.messages, wantHint });
@@ -152,12 +200,12 @@ export async function sendTeach(wantHint = false) {
     paintTeachChat();
   } catch (e) {
     if (teachState !== s || s.token !== token) return;
-    s.messages.pop(); // give them back what they wrote so they can resend it
+    s.messages.pop(); 
     s.busy = false;
     if (s.messages.length) paintTeachChat();
     else paintTeachIntro();
-    const again = /** @type {HTMLTextAreaElement|null} */ (document.getElementById("teachInput"));
-    if (again && text !== STUCK_TEXT) again.value = text;
+    const again = document.getElementById(s.messages.length ? "teachInput" : "teachStartInput");
+    if (again && text !== STUCK_TEXT) /** @type {HTMLTextAreaElement} */ (again).value = text;
     toast(e.message);
   }
 }
@@ -167,15 +215,20 @@ export async function finishTeach() {
   if (!s || s.busy) return;
   if (!s.done && !canFinish(s.messages)) return toast("Teach a little more first.");
   s.busy = true;
-  setHTML(app, `
-    ${progressBar()}
-    <div class="rev-body teach">
-      <div class="t-label">Teach it back</div>
+  // Use paintShell for loading
+  setHTML(app, paintShell({
+    mode: "Teach it back",
+    prompt: "",
+    progress: 100,
+    counter: "",
+    body: `
       <div style="display:flex;align-items:center;gap:10px;margin-top:8px">
-        <span class="spinner" style="border-color:var(--border-control);border-top-color:var(--accent)"></span>
-        <span style="font-size:13px;color:var(--text-muted)">Looking at how you taught ${esc(s.topic)} to ${esc(personaInfo(s.persona).long)}…</span>
+        <span class="spinner" style="border-color:var(--border-control,#27322f);border-top-color:var(--accent,#34bcad)"></span>
+        <span style="font-size:13px;color:var(--text-muted,#9aa9a4)">Looking at how you taught ${esc(s.topic)} to ${esc(personaInfo(s.persona).long)}…</span>
       </div>
-    </div>`);
+    `,
+    dock: ""
+  }));
   const token = (s.token = {});
   try {
     const r = await send({ type: "TEACH_EVALUATE", topic: s.topic, persona: s.persona, cards: s.cards, messages: s.messages });
@@ -202,8 +255,6 @@ async function recordTeaching(s) {
     if (grade === null) continue;
     const card = byId.get(idea.cardId);
     writes.push(appendReviewLog({
-      // "teach" rows are practice evidence, not scheduled reviews: they must not
-      // reschedule the card. Match the shape coding.js logs.
       kind: "teach", stability: card?.stability, difficulty: card?.difficulty,
       id: uid(), cardId: idea.cardId, sessionId: s.sessionId,
       grade, prevInterval: 0, newInterval: 0, reviewedAt,
@@ -232,7 +283,7 @@ export function paintTeachResult() {
     <div class="view teach-result">
       <div class="ahd">
         <div class="h-title" style="margin-bottom:2px">How you taught</div>
-        <div style="font-size:12px;color:var(--text-muted);font-weight:normal">${esc(teachState.topic)} · to ${esc(personaInfo(teachState.persona).long)}</div>
+        <div style="font-size:12px;color:var(--text-muted,#9aa9a4);font-weight:normal">${esc(teachState.topic)} — to ${esc(personaInfo(teachState.persona).long)}</div>
       </div>
       <div class="block teach-score">
         <div class="score tnum ${u >= 70 ? "ok" : "no"}">${esc(u)}</div>
@@ -250,6 +301,6 @@ export function paintTeachResult() {
         <div class="teach-jargon">${ev.jargon.map((j) => `<span class="tag">${esc(j)}</span>`).join("")}</div>` : ""}
       ${ev.improve ? `<div class="block tint"><div class="t-label">Next step</div><div style="margin-top:6px">${esc(ev.improve)}</div></div>` : ""}
       ${ev.modelExplanation ? `<div class="block"><div class="t-label">A simple way to say it</div><div class="teach-model">${esc(ev.modelExplanation)}</div></div>` : ""}
-      <button class="btn-primary btn-block" data-action="return-focus">Done</button>
+      <button class="btn btn-primary btn-block" data-action="return-focus">Done</button>
     </div>`);
 }
