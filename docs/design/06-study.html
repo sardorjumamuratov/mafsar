@@ -1,221 +1,288 @@
-<!--
-  PIXEL REFERENCE: 06 Study Flows
-  Generated from user screenshots.
-
-  How to read it:
-  - Every style="" value is final. Copy sizes, colors, radii, gaps, paddings, weights and line-heights 1:1.
-  - Font: Geist 400/500/600/650/700
-  If Implementation Prompts.md and this file ever disagree on a visual value, THIS FILE WINS.
--->
 <helmet>
 <meta name="design_doc_mode" content="canvas">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&display=swap" rel="stylesheet">
 <style>
-body{margin:0;background:#e8ebea;font-family:'Geist',system-ui,sans-serif;-webkit-font-smoothing:antialiased;padding:40px;display:flex;flex-wrap:wrap;gap:40px}
-a{color:#1f8f84}a:hover{color:#146b63}
-button{font-family:inherit}
+  body {
+    margin: 0; background: #0e1513; color: #e7eeec; font-family: 'Geist', system-ui, sans-serif;
+    -webkit-font-smoothing: antialiased; padding: 40px; display: flex; flex-wrap: wrap; gap: 40px;
+  }
+  * { box-sizing: border-box; }
+  
+  /* Tokens */
+  .bg { background: #0e1513; }
+  .surface { background: #141d1b; }
+  .surface-hover { background: #1c2826; }
+  .border { border: 1px solid #27322f; }
+  .border-accent { border: 1px solid #34bcad; }
+  .border-danger { border: 1px solid #f08a7a; }
+  
+  .text-primary { color: #e7eeec; }
+  .text-secondary { color: #9aa9a4; }
+  .text-muted { color: #6f7f7b; }
+  .text-accent { color: #34bcad; }
+  .text-danger { color: #f08a7a; }
+  
+  /* Components */
+  .screen {
+    width: 390px; height: 884px; background: #0e1513;
+    display: flex; flex-direction: column;
+    border: 1px solid #27322f;
+    position: relative; overflow-y: auto;
+  }
+  
+  /* Header */
+  .header {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 16px; border-bottom: 1px solid #27322f;
+  }
+  .icon-btn {
+    width: 32px; height: 32px; display: flex; align-items: center; justify-content: center;
+    background: transparent; border: none; color: #9aa9a4; cursor: pointer; border-radius: 6px;
+    padding: 0;
+  }
+  .icon-btn:hover { background: #141d1b; color: #e7eeec; }
+  .progress { font-size: 13px; font-weight: 500; color: #9aa9a4; font-variant-numeric: tabular-nums; }
+  
+  /* Content container */
+  .content { padding: 24px 16px; display: flex; flex-direction: column; gap: 24px; flex: 1; }
+  
+  /* Typography */
+  .section-label { font-size: 11px; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; color: #9aa9a4; margin-bottom: 8px; }
+  .h1 { font-size: 24px; font-weight: 600; color: #e7eeec; line-height: 1.2; margin: 0; }
+  .body-text { font-size: 15px; line-height: 1.5; color: #e7eeec; margin: 0; }
+  .body-secondary { font-size: 14px; line-height: 1.5; color: #9aa9a4; margin: 0; }
+  
+  /* Inputs */
+  .textarea {
+    width: 100%; min-height: 120px; padding: 12px 16px; font-family: inherit; font-size: 15px;
+    background: #0e1513; border: 1px solid #27322f; border-radius: 8px; color: #e7eeec; resize: none;
+    outline: none;
+  }
+  .textarea:focus { border-color: #34bcad; }
+  .textarea::placeholder { color: #6f7f7b; }
+  
+  /* Buttons */
+  .btn {
+    font-family: inherit; font-size: 14px; font-weight: 500;
+    padding: 10px 16px; border-radius: 8px; cursor: pointer;
+    display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+    border: 1px solid transparent; text-align: center;
+  }
+  .btn-primary { background: #e7eeec; color: #0e1513; } /* High contrast primary */
+  .btn-secondary { background: #141d1b; color: #e7eeec; border-color: #27322f; }
+  .btn-secondary:hover { background: #1c2826; }
+  .btn-ghost { background: transparent; color: #9aa9a4; }
+  .btn-ghost:hover { color: #e7eeec; }
+  .btn-block { width: 100%; }
+  
+  /* Segments */
+  .segment-group { display: flex; gap: 8px; }
+  .segment {
+    flex: 1; padding: 8px; font-size: 13px; font-weight: 500; text-align: center;
+    border: 1px solid #27322f; border-radius: 6px; background: transparent; color: #9aa9a4; cursor: pointer;
+  }
+  .segment.active { background: #141d1b; color: #e7eeec; border-color: #34514c; }
+  
+  /* Lists */
+  .clean-list { margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 12px; }
+  .list-item { display: flex; align-items: flex-start; gap: 12px; font-size: 14px; color: #e7eeec; line-height: 1.5; }
+  .list-bullet { width: 4px; height: 4px; border-radius: 2px; background: #34bcad; margin-top: 8px; flex-shrink: 0; }
+  
+  /* Option row (Quiz) */
+  .option {
+    display: flex; align-items: flex-start; gap: 12px; padding: 16px;
+    border: 1px solid #27322f; border-radius: 8px; cursor: pointer; background: #0e1513; text-align: left;
+  }
+  .option:hover { background: #141d1b; }
+  .letter {
+    width: 20px; height: 20px; display: flex; align-items: center; justify-content: center;
+    border-radius: 4px; background: #141d1b; color: #9aa9a4; font-size: 11px; font-weight: 600; flex-shrink: 0;
+  }
+  .option.correct { border-color: #34bcad; }
+  .option.correct .letter { background: #34bcad; color: #04211d; }
+  .option.incorrect { border-color: #f08a7a; }
+  .option.incorrect .letter { background: #27322f; color: #9aa9a4; }
+  
+  /* Grade Grid */
+  .grade-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
+  .grade-btn {
+    display: flex; flex-direction: column; align-items: center; gap: 4px;
+    padding: 12px 0; border: 1px solid #27322f; border-radius: 8px; background: transparent; cursor: pointer;
+  }
+  .grade-btn:hover { background: #141d1b; }
+  .g-label { font-size: 13px; font-weight: 500; }
+  .g-time { font-size: 11px; color: #6f7f7b; }
+  
+  /* Utilities */
+  .divider { height: 1px; background: #27322f; margin: 0; border: none; }
+  .mt-auto { margin-top: auto; }
 </style>
 </helmet>
 
 <!-- 1. TEACH IT BACK -->
-<div data-screen-label="06 Study: Teach It Back" style="display:flex;flex-direction:column;gap:12px;width:390px;margin-bottom:40px">
-  <div style="position:relative;width:390px;height:884px;border-radius:24px;overflow:hidden;background:#0e1513;color:#e7eeec;box-shadow:0 20px 50px rgba(10,20,18,.25);display:flex;flex-direction:column;padding:16px 20px">
-    <!-- Header -->
-    <div style="display:flex;align-items:center;gap:12px;margin-bottom:32px">
-      <button style="width:36px;height:36px;border-radius:10px;border:1px solid #27322f;background:transparent;display:flex;align-items:center;justify-content:center;color:#9aa9a4;padding:0;cursor:pointer">
-        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6L6 18M6 6l12 12"/></svg>
-      </button>
-      <div style="flex:1;height:4px;background:#27322f;border-radius:2px;overflow:hidden">
-        <div style="width:15%;height:100%;background:#34bcad"></div>
-      </div>
-      <div style="font-size:14px;color:#9aa9a4;font-weight:500">0 / 6</div>
-    </div>
-    
-    <!-- Content -->
-    <div style="font-size:12px;font-weight:600;letter-spacing:.04em;text-transform:uppercase;color:#9aa9a4;margin-bottom:16px">
-      TEACH IT BACK
-    </div>
-    
-    <div style="font-size:15px;line-height:1.5;color:#e7eeec;margin-bottom:24px">
-      Explain <strong style="font-weight:600">Just 78</strong> to someone who has never heard of it. They'll ask questions, and if you get stuck, ask for a hint.
-    </div>
-    
-    <div style="font-size:12px;font-weight:600;letter-spacing:.04em;text-transform:uppercase;color:#9aa9a4;margin-bottom:12px">
-      IDEAS TO GET ACROSS
-    </div>
-    
-    <ul style="margin:0 0 24px;padding-left:20px;font-size:15px;color:#9aa9a4;line-height:1.6;display:flex;flex-direction:column;gap:6px">
-      <li>to garnish</li>
-      <li>to pry</li>
-      <li>to extricate</li>
-      <li>silver lining</li>
-      <li>lapse</li>
-      <li>to devour</li>
-    </ul>
-    
-    <div style="font-size:12px;font-weight:600;letter-spacing:.04em;text-transform:uppercase;color:#9aa9a4;margin-bottom:12px">
-      WHO ARE YOU TEACHING?
-    </div>
-    
-    <div style="display:flex;gap:8px;margin-bottom:24px">
-      <button style="flex:1;display:flex;align-items:center;justify-content:center;gap:6px;padding:10px 0;background:rgba(52,188,173,0.1);border:1px solid #34bcad;border-radius:10px;color:#34bcad;font-size:14px;cursor:pointer">
-        <span>🧒</span> A curious 12-year-old
-      </button>
-      <button style="flex:1;display:flex;align-items:center;justify-content:center;gap:6px;padding:10px 0;background:transparent;border:1px solid #27322f;border-radius:10px;color:#9aa9a4;font-size:14px;cursor:pointer">
-        <span>🙋‍♂️</span> A complete beginner
-      </button>
-    </div>
-    
-    <textarea placeholder="Start explaining in your own words..." style="width:100%;box-sizing:border-box;min-height:140px;padding:14px;background:transparent;border:1px solid #34bcad;border-radius:12px;color:#e7eeec;font-size:15px;resize:none;outline:none;margin-bottom:16px"></textarea>
-    
-    <button style="width:100%;padding:14px;background:#34bcad;color:#04211d;font-size:15px;font-weight:600;border:none;border-radius:12px;cursor:pointer">
-      Start teaching
+<div class="screen" data-screen-label="06 Study: Teach It Back">
+  <div class="header">
+    <button class="icon-btn" aria-label="Close">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
     </button>
+    <div class="progress">0 / 6</div>
+    <div style="width:32px"></div> <!-- Spacer for balance -->
+  </div>
+  
+  <div class="content">
+    <div>
+      <div class="section-label">Teach it back</div>
+      <p class="body-text">Explain <b>Just 78</b> to someone who has never heard of it. They'll ask questions, and if you get stuck, ask for a hint.</p>
+    </div>
+    
+    <div>
+      <div class="section-label">Ideas to get across</div>
+      <ul class="clean-list">
+        <li class="list-item"><div class="list-bullet"></div>to garnish</li>
+        <li class="list-item"><div class="list-bullet"></div>to pry</li>
+        <li class="list-item"><div class="list-bullet"></div>to extricate</li>
+        <li class="list-item"><div class="list-bullet"></div>silver lining</li>
+      </ul>
+    </div>
+    
+    <div>
+      <div class="section-label">Persona</div>
+      <div class="segment-group">
+        <button class="segment active">12-year-old</button>
+        <button class="segment">Beginner</button>
+      </div>
+    </div>
+    
+    <div style="display:flex; flex-direction:column; gap:12px; margin-top:auto">
+      <textarea class="textarea" placeholder="Start explaining in your own words..."></textarea>
+      <button class="btn btn-primary btn-block">Start teaching</button>
+    </div>
   </div>
 </div>
 
 <!-- 2. FLASHCARDS -->
-<div data-screen-label="06 Study: Flashcards" style="display:flex;flex-direction:column;gap:12px;width:390px;margin-bottom:40px">
-  <div style="position:relative;width:390px;height:884px;border-radius:24px;overflow:hidden;background:#0e1513;color:#e7eeec;box-shadow:0 20px 50px rgba(10,20,18,.25);display:flex;flex-direction:column;padding:16px 20px">
-    <!-- Header -->
-    <div style="display:flex;align-items:center;gap:12px;margin-bottom:24px">
-      <button style="width:36px;height:36px;border-radius:10px;border:1px solid #27322f;background:transparent;display:flex;align-items:center;justify-content:center;color:#9aa9a4;padding:0;cursor:pointer">
-        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6L6 18M6 6l12 12"/></svg>
-      </button>
-      <div style="flex:1;height:4px;background:#27322f;border-radius:2px;overflow:hidden">
-        <div style="width:2%;height:100%;background:#34bcad"></div>
-      </div>
-      <div style="font-size:14px;color:#9aa9a4;font-weight:500">1 / 37</div>
-    </div>
-
-    <!-- Flashcard Box -->
-    <div style="background:#141d1b;border:1px solid #27322f;border-radius:16px;padding:32px 24px;display:flex;flex-direction:column;align-items:center;text-align:center;margin-bottom:24px">
-      <div style="font-size:11px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:#9aa9a4;margin-bottom:16px">
-        QUESTION
-      </div>
-      <div style="font-size:22px;font-weight:700;color:#e7eeec;margin-bottom:24px">
-        to garnish
-      </div>
-      <div style="width:100%;height:1px;background:#27322f;margin-bottom:24px"></div>
-      <div style="font-size:15px;color:#9aa9a4">
-        to garnish a lot of my time
-      </div>
-    </div>
-    
-    <!-- Grades -->
-    <div style="display:flex;gap:8px;margin-bottom:24px">
-      <button style="flex:1;padding:10px 0;background:transparent;border:1px solid #27322f;border-radius:12px;display:flex;flex-direction:row;align-items:center;justify-content:center;gap:4px;cursor:pointer">
-        <span style="font-size:14px;font-weight:600;color:#f08a7a">Again</span>
-        <span style="font-size:12px;font-weight:600;color:#f08a7a">1d</span>
-      </button>
-      <button style="flex:1;padding:10px 0;background:transparent;border:1px solid #27322f;border-radius:12px;display:flex;flex-direction:row;align-items:center;justify-content:center;gap:4px;cursor:pointer">
-        <span style="font-size:14px;font-weight:600;color:#fca048">Hard</span>
-        <span style="font-size:12px;font-weight:600;color:#fca048">1d</span>
-      </button>
-      <button style="flex:1;padding:10px 0;background:transparent;border:1px solid #27322f;border-radius:12px;display:flex;flex-direction:row;align-items:center;justify-content:center;gap:4px;cursor:pointer">
-        <span style="font-size:14px;font-weight:600;color:#34bcad">Good</span>
-        <span style="font-size:12px;font-weight:600;color:#34bcad">2d</span>
-      </button>
-      <button style="flex:1;padding:10px 0;background:transparent;border:1px solid #27322f;border-radius:12px;display:flex;flex-direction:row;align-items:center;justify-content:center;gap:4px;cursor:pointer">
-        <span style="font-size:14px;font-weight:600;color:#58d8db">Easy</span>
-        <span style="font-size:12px;font-weight:600;color:#58d8db">8d</span>
-      </button>
-    </div>
-    
-    <!-- Action -->
-    <button style="width:100%;padding:14px;background:#151e1c;border:1px solid #27322f;border-radius:12px;color:#e7eeec;font-size:14px;font-weight:600;display:flex;align-items:center;justify-content:center;gap:8px;cursor:pointer">
-      <span>🎯</span> Apply it — fresh scenario
+<div class="screen" data-screen-label="06 Study: Flashcards">
+  <div class="header">
+    <button class="icon-btn" aria-label="Close">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
     </button>
+    <div class="progress">1 / 37</div>
+    <div style="width:32px"></div>
+  </div>
+  
+  <div class="content">
+    <div>
+      <div class="section-label">Question</div>
+      <h1 class="h1">to garnish</h1>
+    </div>
+    
+    <hr class="divider">
+    
+    <p class="body-secondary">to garnish a lot of my time</p>
+    
+    <div class="mt-auto" style="display:flex; flex-direction:column; gap:16px">
+      <div>
+        <div class="section-label">Grade</div>
+        <div class="grade-grid">
+          <button class="grade-btn">
+            <span class="g-label text-danger">Again</span>
+            <span class="g-time">1d</span>
+          </button>
+          <button class="grade-btn">
+            <span class="g-label" style="color:#fca048">Hard</span>
+            <span class="g-time">1d</span>
+          </button>
+          <button class="grade-btn">
+            <span class="g-label text-accent">Good</span>
+            <span class="g-time">2d</span>
+          </button>
+          <button class="grade-btn">
+            <span class="g-label" style="color:#58d8db">Easy</span>
+            <span class="g-time">8d</span>
+          </button>
+        </div>
+      </div>
+      <button class="btn btn-secondary btn-block">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><circle cx="12" cy="12" r="6"></circle><circle cx="12" cy="12" r="2"></circle></svg>
+        Apply to fresh scenario
+      </button>
+    </div>
   </div>
 </div>
 
 <!-- 3. TYPE THE ANSWER -->
-<div data-screen-label="06 Study: Type the Answer" style="display:flex;flex-direction:column;gap:12px;width:390px;margin-bottom:40px">
-  <div style="position:relative;width:390px;height:884px;border-radius:24px;overflow:hidden;background:#0e1513;color:#e7eeec;box-shadow:0 20px 50px rgba(10,20,18,.25);display:flex;flex-direction:column;padding:16px 20px">
-    <!-- Header -->
-    <div style="display:flex;align-items:center;gap:12px;margin-bottom:32px">
-      <button style="width:36px;height:36px;border-radius:10px;border:1px solid #27322f;background:transparent;display:flex;align-items:center;justify-content:center;color:#9aa9a4;padding:0;cursor:pointer">
-        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6L6 18M6 6l12 12"/></svg>
-      </button>
-      <div style="flex:1;height:4px;background:#27322f;border-radius:2px;overflow:hidden">
-        <div style="width:10%;height:100%;background:#34bcad"></div>
+<div class="screen" data-screen-label="06 Study: Type the Answer">
+  <div class="header">
+    <button class="icon-btn" aria-label="Close">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+    </button>
+    <div class="progress">2 / 10</div>
+    <div style="width:32px"></div>
+  </div>
+  
+  <div class="content">
+    <div>
+      <div class="section-label">Type the answer</div>
+      <h1 class="h1">to garnish</h1>
+    </div>
+    
+    <div class="mt-auto" style="display:flex; flex-direction:column; gap:16px">
+      <textarea class="textarea" placeholder="Answer in your own words..."></textarea>
+      
+      <div style="display:flex; flex-direction:column; gap:12px">
+        <button class="btn btn-primary btn-block">Check answer</button>
+        <div class="body-secondary" style="text-align:center; font-size:13px">AI-graded against this card's answer.</div>
       </div>
-      <div style="font-size:14px;color:#9aa9a4;font-weight:500">1 / 10</div>
     </div>
-    
-    <div style="font-size:12px;font-weight:600;letter-spacing:.04em;text-transform:uppercase;color:#9aa9a4;margin-bottom:16px">
-      TYPE THE ANSWER
-    </div>
-    
-    <div style="font-size:18px;font-weight:700;color:#e7eeec;margin-bottom:16px">
-      to garnish
-    </div>
-    
-    <textarea placeholder="Answer in your own words..." style="width:100%;box-sizing:border-box;min-height:96px;padding:14px;background:#141d1b;border:1px solid #27322f;border-radius:12px;color:#e7eeec;font-size:15px;resize:none;outline:none;margin-bottom:16px"></textarea>
-    
-    <button style="width:100%;padding:14px;background:#34bcad;color:#04211d;font-size:15px;font-weight:600;border:none;border-radius:12px;cursor:pointer;margin-bottom:16px">
-      Check answer
-    </button>
-    
-    <button style="width:100%;padding:14px;background:#1c2826;color:#9aa9a4;font-size:14px;border:none;border-radius:12px;cursor:pointer">
-      AI-graded against this card's answer.
-    </button>
   </div>
 </div>
 
 <!-- 4. MULTIPLE CHOICE -->
-<div data-screen-label="06 Study: Multiple Choice" style="display:flex;flex-direction:column;gap:12px;width:390px;margin-bottom:40px">
-  <div style="position:relative;width:390px;height:884px;border-radius:24px;overflow:hidden;background:#0e1513;color:#e7eeec;box-shadow:0 20px 50px rgba(10,20,18,.25);display:flex;flex-direction:column;padding:16px 20px">
-    <!-- Header -->
-    <div style="display:flex;align-items:center;gap:12px;margin-bottom:32px">
-      <button style="width:36px;height:36px;border-radius:10px;border:1px solid #27322f;background:transparent;display:flex;align-items:center;justify-content:center;color:#9aa9a4;padding:0;cursor:pointer">
-        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6L6 18M6 6l12 12"/></svg>
-      </button>
-      <div style="flex:1;height:4px;background:#27322f;border-radius:2px;overflow:hidden">
-        <div style="width:20%;height:100%;background:#34bcad"></div>
-      </div>
-      <div style="font-size:14px;color:#9aa9a4;font-weight:500">1 / 5</div>
-    </div>
-    
-    <div style="font-size:12px;font-weight:600;letter-spacing:.04em;text-transform:uppercase;color:#9aa9a4;margin-bottom:16px">
-      MULTIPLE CHOICE
-    </div>
-    
-    <div style="font-size:17px;font-weight:600;line-height:1.4;color:#e7eeec;margin-bottom:24px">
-      Which term describes 'a slightly disrespectful remark made jokingly in a formal setting'?
-    </div>
-    
-    <div style="display:flex;flex-direction:column;gap:12px;margin-bottom:24px">
-      <button style="display:flex;align-items:center;gap:12px;width:100%;padding:12px;background:#141d1b;border:1px solid #27322f;border-radius:12px;cursor:pointer;text-align:left">
-        <div style="width:24px;height:24px;border-radius:6px;background:#1c2826;color:#9aa9a4;font-size:11px;font-weight:600;display:flex;align-items:center;justify-content:center">A</div>
-        <div style="font-size:15px;color:#e7eeec">snob</div>
-      </button>
-      
-      <!-- Correct selected -->
-      <button style="display:flex;align-items:center;gap:12px;width:100%;padding:12px;background:#141d1b;border:1px solid #34bcad;border-radius:12px;cursor:pointer;text-align:left">
-        <div style="width:24px;height:24px;border-radius:6px;background:#34bcad;color:#04211d;font-size:11px;font-weight:600;display:flex;align-items:center;justify-content:center">B</div>
-        <div style="font-size:15px;color:#e7eeec">sound flip</div>
-      </button>
-      
-      <button style="display:flex;align-items:center;gap:12px;width:100%;padding:12px;background:#141d1b;border:1px solid #27322f;border-radius:12px;cursor:pointer;text-align:left">
-        <div style="width:24px;height:24px;border-radius:6px;background:#1c2826;color:#9aa9a4;font-size:11px;font-weight:600;display:flex;align-items:center;justify-content:center">C</div>
-        <div style="font-size:15px;color:#e7eeec">gauche</div>
-      </button>
-      
-      <!-- Incorrect selected -->
-      <button style="display:flex;align-items:center;gap:12px;width:100%;padding:12px;background:#141d1b;border:1px solid #f08a7a;border-radius:12px;cursor:pointer;text-align:left">
-        <div style="width:24px;height:24px;border-radius:6px;background:#1c2826;color:#9aa9a4;font-size:11px;font-weight:600;display:flex;align-items:center;justify-content:center">D</div>
-        <div style="font-size:15px;color:#e7eeec">beat the piss out of</div>
-      </button>
-    </div>
-    
-    <div style="background:#1c2826;border-radius:12px;padding:16px;font-size:14px;line-height:1.5;color:#9aa9a4;margin-bottom:16px">
-      <strong style="color:#f08a7a;font-weight:600">Not quite.</strong> The definition for 'sound flip' matches this description.
-    </div>
-    
-    <button style="width:100%;padding:14px;background:#34bcad;color:#04211d;font-size:15px;font-weight:600;border:none;border-radius:12px;cursor:pointer">
-      Next question
+<div class="screen" data-screen-label="06 Study: Multiple Choice">
+  <div class="header">
+    <button class="icon-btn" aria-label="Close">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
     </button>
+    <div class="progress">3 / 5</div>
+    <div style="width:32px"></div>
+  </div>
+  
+  <div class="content">
+    <div>
+      <div class="section-label">Multiple Choice</div>
+      <p class="body-text" style="font-size:16px">Which term describes 'a slightly disrespectful remark made jokingly in a formal setting'?</p>
+    </div>
+    
+    <div style="display:flex; flex-direction:column; gap:8px">
+      <button class="option">
+        <div class="letter">A</div>
+        <div class="body-text">snob</div>
+      </button>
+      
+      <!-- Correct Option -->
+      <button class="option correct">
+        <div class="letter">B</div>
+        <div class="body-text">sound flip</div>
+      </button>
+      
+      <button class="option">
+        <div class="letter">C</div>
+        <div class="body-text">gauche</div>
+      </button>
+      
+      <!-- Incorrect Option -->
+      <button class="option incorrect">
+        <div class="letter">D</div>
+        <div class="body-text">beat the piss out of</div>
+      </button>
+    </div>
+    
+    <div class="mt-auto" style="display:flex; flex-direction:column; gap:16px">
+      <div style="padding:12px 16px; background:#141d1b; border-radius:8px; border:1px solid #27322f">
+        <p class="body-secondary"><span class="text-danger" style="font-weight:500">Not quite.</span> The definition for 'sound flip' matches this description.</p>
+      </div>
+      <button class="btn btn-primary btn-block">Next question</button>
+    </div>
   </div>
 </div>
