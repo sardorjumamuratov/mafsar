@@ -1,0 +1,320 @@
+<helmet>
+<meta name="design_doc_mode" content="canvas">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;650;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #0e1513;
+    --surface: #141d1b;
+    --surface-raised: #1c2826;
+    --selected: #243230;
+    --divider: #1e2826;
+    --border-card: #222c2a;
+    --border-control: #27322f;
+    --border-hover: #34514c;
+    --node-grey: #27322f;
+    --text: #e7eeec;
+    --answer: #cfd9d6;
+    --secondary: #9aa9a4;
+    --muted: #8b9a96;
+    --placeholder: #6d7c78;
+    --accent: #34bcad;
+    --accent-hover: #3fcabb;
+    --accent-text: #5fd3c5;
+    --on-accent: #04211d;
+    --accent-tint-bg: #133a35;
+    --accent-tint-border: #1f5a52;
+    --amber: #e3a246;
+  }
+  
+  body {
+    margin: 0; background: #e8ebea; font-family: 'Geist', system-ui, sans-serif;
+    -webkit-font-smoothing: antialiased; padding: 40px; display: flex; flex-wrap: wrap; gap: 40px;
+  }
+  * { box-sizing: border-box; }
+  button, input, textarea { font: inherit; color: inherit; letter-spacing: inherit; outline: none; }
+  
+  .screen {
+    width: 390px; height: 884px; background: var(--bg); color: var(--text);
+    display: flex; flex-direction: column; position: relative;
+    box-shadow: 0 20px 50px rgba(10,20,18,.25); border-radius: 24px; overflow: hidden;
+  }
+  
+  /* Top bar */
+  .top-bar {
+    height: 56px; display: flex; align-items: center; gap: 12px; padding: 0 16px 0 8px; flex-shrink: 0;
+  }
+  .close-btn {
+    width: 40px; height: 40px; border-radius: 12px; background: transparent; border: none; cursor: pointer;
+    display: flex; align-items: center; justify-content: center; color: var(--secondary); padding: 0;
+  }
+  .close-btn:hover { background: var(--surface); }
+  
+  .progress-track { flex: 1; height: 4px; border-radius: 2px; background: var(--border-card); overflow: hidden; }
+  .progress-fill { height: 100%; background: var(--accent); }
+  .counter { min-width: 44px; text-align: right; font-size: 13px; font-weight: 600; color: var(--secondary); font-variant-numeric: tabular-nums; }
+  
+  /* Body */
+  .body { flex: 1; overflow-y: auto; padding: 24px; display: flex; flex-direction: column; }
+  
+  .mode-label { font-size: 12px; font-weight: 600; letter-spacing: 0.04em; text-transform: uppercase; color: var(--muted); }
+  
+  /* Dock */
+  .dock { flex-shrink: 0; padding: 12px 16px 24px; border-top: 1px solid var(--divider); display: flex; gap: 8px; }
+  .btn-primary { 
+    height: 60px; border-radius: 14px; background: var(--accent); color: var(--on-accent); 
+    font-size: 16px; font-weight: 650; border: none; cursor: pointer; flex: 1;
+    display: flex; align-items: center; justify-content: center;
+  }
+  .btn-primary:disabled { opacity: 0.45; cursor: not-allowed; }
+  .btn-secondary {
+    height: 60px; border-radius: 14px; background: transparent; border: 1px solid var(--border-control);
+    color: var(--text); font-size: 15px; font-weight: 600; cursor: pointer; padding: 0 18px;
+    display: flex; align-items: center; justify-content: center;
+  }
+  
+  /* Utilities */
+  svg { stroke-width: 2; fill: none; stroke: currentColor; stroke-linecap: round; stroke-linejoin: round; }
+  .textfield {
+    padding: 12px 14px; border-radius: 12px; border: 0; background: var(--surface);
+    box-shadow: inset 0 0 0 1px var(--border-control); font-size: 15px; line-height: 1.5; resize: none; overflow: hidden;
+  }
+  .textfield:focus { box-shadow: inset 0 0 0 1px var(--accent); }
+</style>
+</helmet>
+
+<!-- 4a CHAIN DRILL (answering) -->
+<div class="screen" data-screen-label="4a Chain drill Answering">
+  <div class="top-bar">
+    <button class="close-btn" aria-label="End session">
+      <svg width="20" height="20" viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+    </button>
+    <div class="progress-track"><div class="progress-fill" style="width: 50%"></div></div>
+    <div class="counter">2 / 4</div>
+  </div>
+  
+  <div class="body">
+    <div class="mode-label">Chain drill · Asthma Exacerbation</div>
+    <div style="margin-top: 12px; font-size: 22px; font-weight: 650; letter-spacing: -0.015em; line-height: 1.3;">What directly causes the step below?</div>
+    
+    <div style="margin-top: 24px; display: flex; flex-direction: column;">
+      
+      <!-- Current (empty) -->
+      <div style="display: flex; gap: 14px;">
+        <div style="width: 16px; display: flex; flex-direction: column; align-items: center;">
+          <div style="width: 16px; height: 16px; border-radius: 8px; border: 2px solid var(--accent); margin-top: 2px; flex-shrink: 0;"></div>
+          <div style="width: 2px; flex: 1; background: var(--border-card); margin: 4px 0;"></div>
+        </div>
+        <div style="flex: 1; min-width: 0; padding-bottom: 20px; display: flex; flex-direction: column;">
+          <div style="font-size: 13px; font-weight: 600; color: var(--accent-text);">Your answer</div>
+          <textarea class="textfield" style="margin-top: 8px; min-height: 96px;" placeholder="What happens right before this?"></textarea>
+        </div>
+      </div>
+      
+      <!-- Solved -->
+      <div style="display: flex; gap: 14px;">
+        <div style="width: 16px; display: flex; flex-direction: column; align-items: center;">
+          <div style="width: 16px; height: 16px; border-radius: 8px; background: var(--accent); display: flex; align-items: center; justify-content: center; margin-top: 2px; flex-shrink: 0; color: var(--on-accent);">
+            <svg width="10" height="10" viewBox="0 0 24 24" stroke-width="4"><polyline points="20 6 9 17 4 12"/></svg>
+          </div>
+          <div style="width: 2px; flex: 1; background: var(--border-card); margin: 4px 0;"></div>
+        </div>
+        <div style="flex: 1; min-width: 0; padding-bottom: 20px; display: flex; flex-direction: column;">
+          <div style="font-size: 13px; font-weight: 600; color: var(--secondary);">Step 3</div>
+          <div style="margin-top: 4px; font-size: 15px; line-height: 1.5; color: var(--text);">Smooth muscle contraction and bronchoconstriction</div>
+        </div>
+      </div>
+      
+      <!-- Given end node -->
+      <div style="display: flex; gap: 14px;">
+        <div style="width: 16px; display: flex; flex-direction: column; align-items: center;">
+          <div style="width: 16px; height: 16px; border-radius: 8px; background: var(--node-grey); margin-top: 2px; flex-shrink: 0;"></div>
+        </div>
+        <div style="flex: 1; min-width: 0; display: flex; flex-direction: column;">
+          <div style="font-size: 13px; font-weight: 600; color: var(--secondary);">Symptoms</div>
+          <div style="margin-top: 4px; font-size: 15px; line-height: 1.5; color: var(--answer);">Wheezing and shortness of breath</div>
+        </div>
+      </div>
+      
+    </div>
+  </div>
+  
+  <div class="dock">
+    <button class="btn-secondary">Don't know</button>
+    <button class="btn-primary" disabled>Check</button>
+  </div>
+</div>
+
+<!-- 4b CHAIN DRILL (checked) -->
+<div class="screen" data-screen-label="4b Chain drill Checked">
+  <div class="top-bar">
+    <button class="close-btn" aria-label="End session">
+      <svg width="20" height="20" viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+    </button>
+    <div class="progress-track"><div class="progress-fill" style="width: 50%"></div></div>
+    <div class="counter">2 / 4</div>
+  </div>
+  
+  <div class="body">
+    <div class="mode-label">Chain drill · Asthma Exacerbation</div>
+    <div style="margin-top: 12px; font-size: 22px; font-weight: 650; letter-spacing: -0.015em; line-height: 1.3;">What directly causes the step below?</div>
+    
+    <div style="margin-top: 24px; display: flex; flex-direction: column;">
+      
+      <!-- Checked (Partly right) -->
+      <div style="display: flex; gap: 14px;">
+        <div style="width: 16px; display: flex; flex-direction: column; align-items: center;">
+          <div style="width: 16px; height: 16px; border-radius: 8px; border: 2px solid var(--accent); margin-top: 2px; flex-shrink: 0;"></div>
+          <div style="width: 2px; flex: 1; background: var(--border-card); margin: 4px 0;"></div>
+        </div>
+        <div style="flex: 1; min-width: 0; padding-bottom: 20px; display: flex; flex-direction: column;">
+          <div style="font-size: 13px; font-weight: 600; color: var(--accent-text);">Your answer</div>
+          
+          <div class="textfield" style="margin-top: 8px; min-height: 96px; box-shadow: inset 0 0 0 1px var(--amber);">Inflammation in the airways</div>
+          
+          <div style="margin-top: 4px; display: flex; flex-direction: column;">
+            <div style="display: flex; align-items: center; gap: 8px; font-size: 15px; font-weight: 650; color: var(--amber);">
+              <svg width="18" height="18" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><line x1="8" y1="12" x2="16" y2="12"/></svg>
+              Partly right
+            </div>
+            <div style="margin-top: 4px; font-size: 14px; line-height: 1.5; color: var(--secondary);">You have the right general idea, but specifically we are looking for the mast cell degranulation triggering the release of mediators.</div>
+          </div>
+        </div>
+      </div>
+      
+      <!-- Solved -->
+      <div style="display: flex; gap: 14px;">
+        <div style="width: 16px; display: flex; flex-direction: column; align-items: center;">
+          <div style="width: 16px; height: 16px; border-radius: 8px; background: var(--accent); display: flex; align-items: center; justify-content: center; margin-top: 2px; flex-shrink: 0; color: var(--on-accent);">
+            <svg width="10" height="10" viewBox="0 0 24 24" stroke-width="4"><polyline points="20 6 9 17 4 12"/></svg>
+          </div>
+          <div style="width: 2px; flex: 1; background: var(--border-card); margin: 4px 0;"></div>
+        </div>
+        <div style="flex: 1; min-width: 0; padding-bottom: 20px; display: flex; flex-direction: column;">
+          <div style="font-size: 13px; font-weight: 600; color: var(--secondary);">Step 3</div>
+          <div style="margin-top: 4px; font-size: 15px; line-height: 1.5; color: var(--text);">Smooth muscle contraction and bronchoconstriction</div>
+        </div>
+      </div>
+      
+      <!-- Given end node -->
+      <div style="display: flex; gap: 14px;">
+        <div style="width: 16px; display: flex; flex-direction: column; align-items: center;">
+          <div style="width: 16px; height: 16px; border-radius: 8px; background: var(--node-grey); margin-top: 2px; flex-shrink: 0;"></div>
+        </div>
+        <div style="flex: 1; min-width: 0; display: flex; flex-direction: column;">
+          <div style="font-size: 13px; font-weight: 600; color: var(--secondary);">Symptoms</div>
+          <div style="margin-top: 4px; font-size: 15px; line-height: 1.5; color: var(--answer);">Wheezing and shortness of breath</div>
+        </div>
+      </div>
+      
+    </div>
+  </div>
+  
+  <div class="dock">
+    <button class="btn-primary">Next step</button>
+  </div>
+</div>
+
+<!-- 4c CLINICAL CASE (assessment) -->
+<div class="screen" data-screen-label="4c Clinical case Assessment">
+  <div class="top-bar">
+    <button class="close-btn" aria-label="End session">
+      <svg width="20" height="20" viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+    </button>
+    <div class="progress-track"><div class="progress-fill" style="width: 33%"></div></div>
+    <div class="counter">1 / 3</div>
+  </div>
+  
+  <div class="body">
+    <div class="mode-label">Clinical case · Cardiology</div>
+    <div style="margin-top: 12px; font-size: 17px; line-height: 1.55; color: var(--text); text-wrap: pretty;">
+      A 65-year-old male presents with acute onset of severe, tearing chest pain radiating to his back. He has a history of poorly controlled hypertension. His blood pressure is 180/110 mmHg in the right arm and 140/90 mmHg in the left arm.
+    </div>
+    
+    <div style="margin-top: 20px; font-size: 13px; font-weight: 600; color: var(--secondary);">Available tests</div>
+    <div style="margin-top: 8px; display: flex; flex-wrap: wrap; gap: 6px;">
+      <div style="height: 30px; padding: 0 10px; border-radius: 8px; border: 1px solid var(--border-control); font-size: 13px; color: var(--answer); display: flex; align-items: center;">ECG</div>
+      <div style="height: 30px; padding: 0 10px; border-radius: 8px; border: 1px solid var(--border-control); font-size: 13px; color: var(--answer); display: flex; align-items: center;">Chest X-ray</div>
+      <div style="height: 30px; padding: 0 10px; border-radius: 8px; border: 1px solid var(--border-control); font-size: 13px; color: var(--answer); display: flex; align-items: center;">CT Angiography</div>
+      <div style="height: 30px; padding: 0 10px; border-radius: 8px; border: 1px solid var(--border-control); font-size: 13px; color: var(--answer); display: flex; align-items: center;">Troponin</div>
+    </div>
+    
+    <div style="height: 1px; background: var(--border-card); margin: 24px 0 20px;"></div>
+    
+    <div style="display: flex; flex-direction: column; gap: 18px;">
+      <label style="display: flex; flex-direction: column; gap: 8px;">
+        <div style="font-size: 13px; font-weight: 600; color: var(--secondary);">Leading diagnosis and why</div>
+        <textarea class="textfield" style="min-height: 96px;" placeholder="Reason it through before you see results"></textarea>
+      </label>
+      <label style="display: flex; flex-direction: column; gap: 8px;">
+        <div style="font-size: 13px; font-weight: 600; color: var(--secondary); display: flex; justify-content: space-between;">
+          <span>Tests you'd order and why</span>
+        </div>
+        <textarea class="textfield" style="min-height: 96px;" placeholder="Which tests, and what you expect"></textarea>
+      </label>
+    </div>
+  </div>
+  
+  <div class="dock">
+    <button class="btn-primary" disabled>Submit assessment</button>
+  </div>
+</div>
+
+<!-- 4d CLINICAL CASE (results) -->
+<div class="screen" data-screen-label="4d Clinical case Results">
+  <div class="top-bar">
+    <button class="close-btn" aria-label="End session">
+      <svg width="20" height="20" viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+    </button>
+    <div class="progress-track"><div class="progress-fill" style="width: 33%"></div></div>
+    <div class="counter">1 / 3</div>
+  </div>
+  
+  <div class="body">
+    <div class="mode-label">Clinical case · Cardiology</div>
+    <div style="margin-top: 12px; font-size: 17px; line-height: 1.55; color: var(--text); text-wrap: pretty; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden;">
+      A 65-year-old male presents with acute onset of severe, tearing chest pain radiating to his back. He has a history of poorly controlled hypertension. His blood pressure is 180/110 mmHg in the right arm and 140/90 mmHg in the left arm.
+    </div>
+    <button style="margin-top: 6px; font-size: 14px; font-weight: 600; color: var(--accent-text); background: transparent; border: none; padding: 0; cursor: pointer; text-align: left;">Show full case</button>
+    
+    <div style="margin-top: 24px; font-size: 13px; font-weight: 600; color: var(--secondary);">Results</div>
+    <div style="margin-top: 4px; display: flex; flex-direction: column;">
+      <div style="padding: 12px 0; border-bottom: 1px solid var(--divider); display: flex; flex-direction: column; gap: 2px;">
+        <div style="font-size: 14px; font-weight: 600; color: var(--text);">CT Angiography</div>
+        <div style="font-size: 14px; line-height: 1.45; color: var(--answer);">Intimal flap visualized in the descending aorta.</div>
+      </div>
+      <div style="padding: 12px 0; display: flex; flex-direction: column; gap: 2px;">
+        <div style="font-size: 14px; font-weight: 600; color: var(--text);">ECG</div>
+        <div style="font-size: 14px; line-height: 1.45; color: var(--answer);">Sinus tachycardia, no ischemic changes.</div>
+      </div>
+    </div>
+    
+    <div style="margin-top: 20px; font-size: 13px; font-weight: 600; color: var(--secondary);">Your assessment</div>
+    
+    <div style="margin-top: 10px; display: flex; flex-direction: column; gap: 16px;">
+      <!-- Verdict 1 -->
+      <div style="display: flex; flex-direction: column; gap: 4px;">
+        <div style="display: flex; align-items: center; gap: 8px; font-size: 15px; font-weight: 650; color: var(--accent-text);">
+          <svg width="18" height="18" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><line x1="9" y1="12" x2="11" y2="14"/><line x1="15" y1="9" x2="11" y2="14"/></svg>
+          Diagnosis: correct
+        </div>
+        <div style="font-size: 14px; line-height: 1.5; color: var(--secondary);">Spot on. The tearing pain and BP differential are classic.</div>
+      </div>
+      
+      <!-- Verdict 2 -->
+      <div style="display: flex; flex-direction: column; gap: 4px;">
+        <div style="display: flex; align-items: center; gap: 8px; font-size: 15px; font-weight: 650; color: var(--amber);">
+          <svg width="18" height="18" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><line x1="8" y1="12" x2="16" y2="12"/></svg>
+          Tests: partly right
+        </div>
+        <div style="font-size: 14px; line-height: 1.5; color: var(--secondary);">CT Angio is correct, but you should also order an ECG to rule out an MI.</div>
+      </div>
+    </div>
+    
+    <button style="margin-top: 16px; font-size: 14px; font-weight: 600; color: var(--accent-text); background: transparent; border: none; padding: 0; cursor: pointer; text-align: left;">See your answers</button>
+  </div>
+  
+  <div class="dock">
+    <button class="btn-primary">Next case</button>
+  </div>
+</div>
