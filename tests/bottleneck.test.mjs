@@ -25,7 +25,7 @@ test("handles empty and junk input", () => {
 
 test("the flow is readable by screen readers, not just drawn", () => {
   const flow = readFileSync(new URL("../src/ui/flows/bottleneck.js", import.meta.url), "utf8");
-  assert.ok(flow.includes('role="img" aria-label="Request flow:'), "the drawing needs a spoken description");
+  assert.ok(flow.includes('role="list" aria-label="Request flow, in order"'), "the flow is a labelled list a screen reader can walk, not just a drawing");
   assert.ok(!flow.includes("�") && !/"\? "/.test(readFileSync(new URL("../src/storage/bottleneck.js", import.meta.url), "utf8")), "no mangled arrow characters");
 });
 

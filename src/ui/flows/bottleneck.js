@@ -1,12 +1,13 @@
-
-import { XBTN, app, bundle, esc, send, setFor, setHTML, toast } from "../core.js";
-import { setFocusReturn } from "../flows/review.js";
+import { app, bundle, esc, send, setFor, toast } from "../core.js";
+import { goReturn, setFocusReturn } from "./review.js";
 import { showChrome } from "../nav.js";
 import { appendReviewLog, bumpActivity, uid } from "../../storage/store.js";
 import { drillLogEntry } from "../../storage/drill-log.js";
-import { renderArchitecture } from "../../storage/bottleneck.js";
+import { bindField, focusEnd, icon, paintShell, primaryBtn, verdictRow, waitRow } from "./shell.js";
 
-export let bottleneckState = null; // { sessionId, topic, cards, task, hint, result, step, token, usedHint, draft }
+// What breaks: a small architecture with one planted flaw. The learner says what
+// fails, under what load or failure, and how they'd fix it.
+export let bottleneckState = null; // { sessionId, topic, cards, task, hint, result, step, usedHint, draft, token }
 export function setBottleneckState(v) { bottleneckState = v; }
 
 export async function startBottleneckDrill(sessionId) {
@@ -15,34 +16,27 @@ export async function startBottleneckDrill(sessionId) {
   const cards = (set?.flashcards || []).filter((c) => c.front && c.back).slice(0, 50);
   if (!cards.length) return toast("This set has no cards to drill with yet.");
   const session = sessions.find((s) => s.id === sessionId);
-  
+
   bottleneckState = {
     sessionId,
     topic: String(session?.title || set?.title || "this topic").slice(0, 200),
-    cards: cards.map(c => ({ front: c.front, back: c.back })),
+    cards: cards.map((c) => ({ front: c.front, back: c.back })),
     task: null,
     hint: null,
     result: null,
     step: "generating",
     usedHint: false,
     draft: "",
+    token: null,
   };
   setFocusReturn("set:" + sessionId);
   showChrome(false);
-  paintBottleneckLoader("Designing an architecture...");
+  paintLoader("Designing an architecture…");
   requestBottleneckTask();
 }
 
-function paintBottleneckLoader(msg) {
-  setHTML(app, `
-    <div class="rev-top">${XBTN}</div>
-    <div class="rev-body teach">
-      <div class="t-label">Find the bottleneck</div>
-      <div style="display:flex;align-items:center;gap:10px;margin-top:8px">
-        <span class="spinner" style="border-color:var(--border-control);border-top-color:var(--accent)"></span>
-        <span style="font-size:13px;color:var(--text-muted)">${esc(msg)}</span>
-      </div>
-    </div>`);
+function paintLoader(msg) {
+  paintShell({ mode: "What breaks", progress: 0, counter: "0 / 1", body: waitRow(msg) });
 }
 
 async function requestBottleneckTask() {
@@ -57,115 +51,173 @@ async function requestBottleneckTask() {
   } catch (e) {
     if (bottleneckState !== s || s.token !== token) return;
     toast(e.message);
-    (/** @type {HTMLElement} */ (document.querySelector(".rev-top .xbtn")))?.click();
+    goReturn();
   }
+}
+
+/** "API servers (3x)" or "Cache: Redis" → the component and its detail, which reads in a quieter colour. */
+export function splitComponent(text) {
+  const t = String(text || "").trim();
+  const dash = t.match(/^(.+?)(?:\s+[—–-]\s+|:\s+)(.+)$/);
+  if (dash) return { name: dash[1], detail: dash[2] };
+  const paren = t.match(/^(.+?)\s*\((.+)\)$/);
+  if (paren) return { name: paren[1], detail: paren[2] };
+  return { name: t, detail: "" };
+}
+
+/** Which component the planted flaw lives in: the one whose name the flaw text mentions, else the best word overlap. */
+export function failingIndex(architecture, flaw) {
+  const text = String(flaw || "").toLowerCase();
+  if (!text) return -1;
+  const words = (str) => new Set(str.toLowerCase().split(/[^a-z0-9]+/).filter((w) => w.length >= 4));
+  let best = -1;
+  let bestScore = 0;
+  architecture.forEach((comp, i) => {
+    const { name } = splitComponent(comp);
+    const n = name.toLowerCase();
+    let score = text.includes(n) ? 100 : 0;
+    for (const w of words(name)) if (text.includes(w)) score++;
+    if (score > bestScore) { best = i; bestScore = score; }
+  });
+  return best;
+}
+
+function rail(architecture, amberIdx = -1) {
+  return `<div class="st-rail st-mt12" role="list" aria-label="Request flow, in order">${architecture.map((comp, i) => {
+    const { name, detail } = splitComponent(comp);
+    const last = i === architecture.length - 1;
+    return `<div class="st-row${last ? " last" : ""}" role="listitem">
+        <div class="st-rail-col"><div class="st-dot sm${i === amberIdx ? " amber" : ""}"></div>${last ? "" : '<div class="st-line"></div>'}</div>
+        <div class="st-cell sm">${esc(name)}${detail ? `<span class="detail"> · ${esc(detail)}</span>` : ""}</div>
+      </div>`;
+  }).join("")}</div>`;
 }
 
 export function paintBottleneckQuestion() {
   const s = bottleneckState;
-  
-  setHTML(app, `
-    <div class="rev-top">${XBTN}</div>
-    <div class="rev-body teach">
-      <div class="t-label">Scenario</div>
-      <p class="teach-lead" style="margin-bottom:16px;font-size:16px">${esc(s.task.narrative)}</p>
-      
-      <div class="t-label">Architecture</div>
-      <pre class="arch-flow" role="img" aria-label="Request flow: ${esc((s.task.architecture || []).join(", then "))}">${esc(renderArchitecture(s.task.architecture))}</pre>
-      
-      ${s.hint ? `<div class="t-label">Hint</div><div class="block tint" style="margin-bottom:16px">${esc(s.hint)}</div>` : `<button class="btn-ghost btn-sm" data-action="bottleneck-hint" style="margin-bottom:16px">Get a hint (costs half a point)</button>`}
-      
-      <div class="t-label">What breaks and why?</div>
-      <textarea id="bottleneckAnswer" class="sa-input" placeholder="What breaks, why (under what load or failure), and how you'd fix it." rows="6">${esc(s.draft)}</textarea>
-      <button class="btn-primary btn-block" data-action="bottleneck-submit" style="margin-top:12px">Submit</button>
-    </div>`);
+  if (!s) return;
+  s.step = "answering";
+  const hint = s.usedHint
+    ? `<button type="button" class="st-link" disabled>${icon("bulb", 16)}Hint used</button>`
+    : `<button type="button" class="st-link" data-action="bottleneck-hint">${icon("bulb", 16)}Hint<span class="dim"> −½ pt</span></button>`;
+  paintShell({
+    mode: "What breaks",
+    prompt: s.task.narrative,
+    promptClass: "text",
+    progress: 0,
+    counter: "0 / 1",
+    body: `
+      <div class="st-label st-mt20">Architecture</div>
+      ${rail(s.task.architecture || [])}
+      <div class="st-qrow"><span class="st-label">What breaks, and why?</span>${hint}</div>
+      ${s.hint ? `<div class="st-feedback" style="margin-top:8px">${esc(s.hint)}</div>` : ""}
+      <textarea id="bottleneckAnswer" class="st-field h140 st-mt8" placeholder="What fails, under what load or failure, and how you'd fix it" aria-label="What breaks, and why">${esc(s.draft)}</textarea>`,
+    dock: primaryBtn("bottleneck-submit", "Submit", 'id="bottleneckSubmit" disabled'),
+  });
+  const box = /** @type {HTMLTextAreaElement} */ (document.getElementById("bottleneckAnswer"));
+  bindField(box, {
+    btn: /** @type {HTMLButtonElement} */ (document.getElementById("bottleneckSubmit")),
+    onChange: (v) => { s.draft = v; },
+    onSubmit: () => submitBottleneck(),
+  });
+  if (!s.hint) focusEnd(box);
+}
+
+export function bottleneckAction(action) {
+  const s = bottleneckState;
+  if (!s) return;
+  if (action === "toggle-scenario") {
+    const el = document.getElementById("bnScenario");
+    const btn = document.getElementById("bnScenarioBtn");
+    if (!el || !btn) return;
+    const clamped = el.classList.toggle("st-clamp");
+    btn.textContent = clamped ? "Show full scenario" : "Hide full scenario";
+  } else if (action === "toggle-model") {
+    const el = document.getElementById("bnModel");
+    const btn = document.getElementById("bnModelBtn");
+    if (!el || !btn) return;
+    el.hidden = !el.hidden;
+    btn.textContent = el.hidden ? "See a model answer" : "Hide the model answer";
+  }
 }
 
 export async function requestBottleneckHint() {
   const s = bottleneckState;
-  if (s.usedHint) return;
+  if (!s || s.usedHint || s.step !== "answering") return;
   s.draft = /** @type {HTMLTextAreaElement|null} */ (document.getElementById("bottleneckAnswer"))?.value || "";
   s.usedHint = true;
-  paintBottleneckLoader("Getting a hint...");
+  const btn = /** @type {HTMLButtonElement|null} */ (app.querySelector('[data-action="bottleneck-hint"]'));
+  if (btn) btn.disabled = true;
   const token = (s.token = {});
   try {
     const res = await send({ type: "BOTTLENECK_HINT", state: s.task.state });
     if (bottleneckState !== s || s.token !== token) return;
     s.hint = res.hint;
-    paintBottleneckQuestion();
-  } catch(e) {
+  } catch (e) {
     if (bottleneckState !== s || s.token !== token) return;
+    s.usedHint = false; // no hint was given, so none is charged
     toast(e.message);
-    paintBottleneckQuestion();
   }
+  paintBottleneckQuestion();
 }
 
 export async function submitBottleneck() {
   const s = bottleneckState;
+  if (!s || s.step !== "answering") return;
   const box = document.getElementById("bottleneckAnswer");
-  const ans = ((/** @type {HTMLTextAreaElement|null} */ (box))?.value || "").trim();
-  if (!ans) return toast("Write an answer.");
-  
-  paintBottleneckLoader("Grading...");
+  const answer = (/** @type {HTMLTextAreaElement|null} */ (box))?.value.trim();
+  if (!answer) return;
+
+  s.draft = answer;
+  s.step = "grading";
+  paintLoader("Reviewing your answer…");
   const token = (s.token = {});
   try {
-    s.draft = ans;
-    const res = await send({ type: "BOTTLENECK_GRADE", state: s.task.state, answer: ans, usedHint: s.usedHint });
+    const res = await send({ type: "BOTTLENECK_GRADE", state: s.task.state, answer, usedHint: s.usedHint });
     if (bottleneckState !== s || s.token !== token) return;
     s.result = res;
-    
+    s.step = "checked";
     await Promise.all([
       bumpActivity(1),
       appendReviewLog(drillLogEntry({ kind: "bottleneck", sessionId: s.sessionId, fraction: (Number(res.score) || 0) / 3, id: uid() })),
     ]);
-    
-    s.step = "revealed";
-    paintBottleneckReveal();
-  } catch(e) {
+    paintBottleneckFeedback();
+  } catch (e) {
     if (bottleneckState !== s || s.token !== token) return;
     toast(e.message);
     paintBottleneckQuestion();
   }
 }
 
-function paintBottleneckReveal() {
+function paintBottleneckFeedback() {
   const s = bottleneckState;
   const r = s.result;
-  
-  const scoreBadge = (pass) => pass 
-    ? `<span class="idea-chip ok">Pass</span>`
-    : `<span class="idea-chip no">Miss</span>`;
-    
-  setHTML(app, `
-    <div class="rev-top">${XBTN}</div>
-    <div class="rev-body teach">
-      <div class="t-label">Score ${esc(r.score)} / 3${r.usedHint ? " (hint used)" : ""}</div>
-      <div class="block tint" style="margin-bottom:16px">${esc(r.feedback)}</div>
-      ${r.other_valid_issue ? `<div class="block" style="margin-bottom:16px"><b>Also a real problem you spotted:</b> ${esc(r.other_valid_issue)}</div>` : ""}
-      
-      <div style="display:flex;flex-direction:column;gap:8px;margin-bottom:20px">
-        <div style="display:flex;justify-content:space-between;align-items:center;background:var(--bg-surface2);padding:12px;border-radius:8px">
-          <span style="font-size:14px;font-weight:500">Found flaw</span>
-          ${scoreBadge(r.found_flaw)}
-        </div>
-        <div style="display:flex;justify-content:space-between;align-items:center;background:var(--bg-surface2);padding:12px;border-radius:8px">
-          <span style="font-size:14px;font-weight:500">Valid explanation</span>
-          ${scoreBadge(r.explanation_correct)}
-        </div>
-        <div style="display:flex;justify-content:space-between;align-items:center;background:var(--bg-surface2);padding:12px;border-radius:8px">
-          <span style="font-size:14px;font-weight:500">Fix works</span>
-          ${scoreBadge(r.fix_works)}
-        </div>
-      </div>
-      
-      <div class="t-label">The Planted Flaw</div>
-      <div style="background:var(--bg-surface2);padding:16px;border-radius:8px;margin-bottom:16px">
-        <p style="margin-bottom:8px;font-weight:600;color:var(--danger-text)">${esc(r.planted_flaw)}</p>
-        ${r.why_it_fails ? `<div style="font-size:14px;line-height:1.5;margin-bottom:8px">${esc(r.why_it_fails)}</div>` : ""}
-        <div style="font-size:14px;color:var(--text-primary);line-height:1.5"><b>A good fix:</b> ${esc(r.model_solution)}</div>
-      </div>
-      
-      <button class="btn-primary btn-block" data-action="return-focus" style="margin-top:16px">Done</button>
-    </div>`);
+  const parts = Number(!!r.found_flaw) + Number(!!r.explanation_correct) + Number(!!r.fix_works);
+  const kind = parts === 3 ? "ok" : parts > 0 ? "part" : "no";
+  const label = { ok: "Correct", part: "Partly right", no: "Not quite" }[kind];
+  const arch = s.task.architecture || [];
+  paintShell({
+    mode: "What breaks",
+    progress: 100,
+    counter: "1 / 1",
+    hasProgress: true,
+    promptHtml: `<div class="st-prompt text st-clamp" id="bnScenario">${esc(s.task.narrative)}</div>`,
+    body: `
+      <button type="button" class="st-link st-mt6" id="bnScenarioBtn" data-action="bottleneck-toggle-scenario">Show full scenario</button>
+      <div class="st-label st-mt20">Architecture</div>
+      ${rail(arch, failingIndex(arch, r.planted_flaw))}
+      <div class="st-mt24">${verdictRow(kind, label)}</div>
+      ${r.feedback ? `<div class="st-feedback">${esc(r.feedback)}</div>` : ""}
+      ${r.other_valid_issue ? `<div class="st-feedback">You also spotted a real problem: ${esc(r.other_valid_issue)}</div>` : ""}
+      ${r.usedHint ? `<div class="st-note">Score ${esc(r.score)} / 3, with the hint's half point taken off.</div>` : `<div class="st-note">Score ${esc(r.score)} / 3.</div>`}
+      <button type="button" class="st-link st-mt12" id="bnModelBtn" data-action="bottleneck-toggle-model">See a model answer</button>
+      <div id="bnModel" hidden>
+        <div class="st-label st-mt16">The flaw</div>
+        <div class="st-text15 st-mt4">${esc(r.planted_flaw)}</div>
+        ${r.why_it_fails ? `<div class="st-label st-mt16">Why it fails</div><div class="st-text15 st-mt4">${esc(r.why_it_fails)}</div>` : ""}
+        <div class="st-label st-mt16">A good fix</div>
+        <div class="st-text15 st-mt4">${esc(r.model_solution)}</div>
+      </div>`,
+    dock: primaryBtn("return-focus", "Finish"),
+  });
 }
-

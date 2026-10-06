@@ -227,13 +227,14 @@ test("the Chains tab shows gaps honestly and says it isn't medical advice", () =
   assert.ok(!/<ol[^>]*>[^]*?<div class="chain-arrow"/.test(detail), "arrows are list items, not divs inside <ol>");
 });
 
-test("the persona chip is quiet: the right emoji, not a button, styled in CSS", () => {
+test("the audience label is quiet: a note, not a button, styled in CSS", () => {
+  // The persona emoji stay in storage; the study screens show no emoji (docs/design/06-study.html).
   const teach = readSrc("../src/storage/teach.js");
   assert.ok(teach.includes('emoji: "🧒"') && teach.includes('emoji: "🙋"'));
   const flow = readSrc("../src/ui/flows/teach.js");
-  assert.ok(flow.includes('class="teach-persona-chip tag" role="note"'));
-  assert.ok(!/teach-persona-chip[^>]*style=/.test(flow), "styling lives in panel.css");
-  assert.ok(readSrc("../src/ui/panel.css").includes(".teach-persona-chip"));
+  assert.ok(flow.includes('class="who" role="note"'));
+  assert.ok(!/class="who"[^>]*style=/.test(flow), "styling lives in panel.css");
+  assert.ok(readSrc("../src/ui/panel.css").includes(".st-msg .who"));
 });
 
 test("the medicine suggestion reads the same field the worker saves", () => {
@@ -353,7 +354,7 @@ test("every drill screen opens with a header, and the chain drill has a way out"
     }
   }
   const drill = readSrc("../src/ui/flows/chain-drill.js");
-  assert.ok(drill.includes("return-focus"), "the chain drill needs the same close button as every other drill");
+  assert.ok(drill.includes("return-focus") || drill.includes("paintShell("), "the chain drill needs the same close button as every other drill");
 });
 
 test("YouTube and PDF capture: permission first, and no dead caption endpoint", () => {
@@ -492,6 +493,14 @@ test("Teams is reachable from You; Stats is its own tab", () => {
 });
 
 test("Focus-view headers all have an End session button", () => {
+  // Study modes share one header, which lives in shell.js: check it once there,
+  // and check that every study flow paints through it.
+  const shell = fs.readFileSync(new URL("../src/ui/flows/shell.js", import.meta.url), "utf8");
+  assert.ok(shell.includes('aria-label="End session"') && shell.includes('data-action="return-focus"'), "the shared study header needs its End session button");
+  for (const f of ["review", "typed", "quiz", "apply", "teach", "chain-drill", "clinical", "design", "estimation", "bottleneck"]) {
+    const src = fs.readFileSync(new URL(`../src/ui/flows/${f}.js`, import.meta.url), "utf8");
+    assert.ok(src.includes("paintShell("), f + " must paint on the shared study shell");
+  }
   for (const f of walkJs("../src/ui/flows/")) {
     const content = fs.readFileSync(new URL(f, import.meta.url), "utf8");
     if (!content.includes('class="view"')) continue; // Some files might not render views

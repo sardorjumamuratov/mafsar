@@ -641,7 +641,7 @@ findings or treatments the reference doesn't have.
 
 Map the learner's reasoning onto the reference chain: for each link, say whether they used it,
 skipped it, or got it wrong. Credit a sensible differential even when they landed elsewhere.
-"sections" holds one row each for Diagnosis, Tests requested, and Management. Finish with one
+"sections" holds one row each for Diagnosis, and Tests requested. Finish with one
 concrete thing to do next time.
 
 ${DRILL_RULES}
@@ -675,7 +675,7 @@ Respond with ONLY valid JSON:
         verdict: (VERDICTS as readonly string[]).includes(x?.verdict) ? x.verdict : "missing",
         note: str(x?.note, 1000),
       }));
-    return { rubric_evaluation, sections, next_time: str(parsed?.next_time, 500) };
+    return { rubric_evaluation, sections, next_time: str(parsed?.next_time, 500), results: state.tests, diagnosis: state.diagnosis, management: state.management };
   }
 
   const parts = [

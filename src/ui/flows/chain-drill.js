@@ -1,52 +1,200 @@
-
-import { XBTN, app, bundle, esc, setHTML, setFor, send, toast } from "../core.js";
+import { app, bundle, esc, setFor, send, toast } from "../core.js";
 import { appendReviewLog, bumpActivity, updateCard } from "../../storage/store.js";
 import { orderedSteps } from "../../storage/chains.js";
 import { showChrome } from "../nav.js";
-import { linkId } from "../../storage/chain-links.js";
-import { failedLinkIds, pickDrillChain, roundScore, shuffledOrder, EXERCISES } from "../../storage/chain-drill.js";
+import { failedLinkIds, pickDrillChain, roundScore } from "../../storage/chain-drill.js";
 import { drillLogEntry } from "../../storage/drill-log.js";
-import { renderSetDetail } from "../views/set-detail.js";
 import { review } from "../../../shared/srs.js";
+import { goReturn, setFocusReturn } from "./review.js";
+import { bindField, focusEnd, icon, paintShell, primaryBtn, secondaryBtn, verdictRow } from "./shell.js";
 
-const LABELS = { cause: "Cause", mechanism: "Mechanism", physiological: "Physiological change", symptoms: "Symptoms", signs: "Signs", tests: "Tests", diagnosis: "Diagnosis", treatment: "Treatment" };
-
+// Chain drill, working backwards: the effect is given at the bottom of a
+// vertical chain and the learner supplies the cause above it, one step at a
+// time. Solved steps stay on the rail, showing the mechanism being rebuilt.
 let cSetId = null;
+let cSetName = "";
 let cChain = null;
 let cSteps = [];
-let state = null;
+let state = null; // { currentIdx, status: "answering" | "checking" | "checked", inputText, result }
 
 export async function startChainDrill(sessionId) {
-  const { studySets, reviewLog } = await bundle();
+  const { sessions, studySets, reviewLog } = await bundle();
   const set = setFor(sessionId, studySets);
   if (!set || !set.chains) return;
-  
+
   const chain = pickDrillChain(set.chains, reviewLog, sessionId);
   if (!chain) return toast("Fill in at least two steps of a chain to drill it.");
 
+  const steps = orderedSteps(chain).filter((s) => s.step && s.step.statement);
+  if (steps.length < 2) return toast("Not enough filled steps in this chain.");
+
   cSetId = sessionId;
+  cSetName = String(sessions.find((s) => s.id === sessionId)?.title || set.title || "").slice(0, 80);
   cChain = chain;
-  showChrome(false); // a drill is a focus view, like every other drill
-  const ex = EXERCISES[Math.floor(Math.random() * EXERCISES.length)];
-  
-  cSteps = orderedSteps(cChain).filter(s => s.step && s.step.statement);
-  if (cSteps.length < 2) return toast("Not enough filled steps in this chain.");
-  
-  state = { type: ex };
-  cSteps.forEach(s => s.failed = false);
-  
+  cSteps = steps;
+  cSteps.forEach((s) => { s.failed = false; });
+  state = {
+    currentIdx: cSteps.length - 2, // the last step is given; start just above it
+    status: "answering",
+    inputText: "",
+    result: null,
+  };
+  setFocusReturn("set:" + sessionId);
+  showChrome(false);
   app.dataset.drillFlow = "active";
-  
-  if (ex === "rebuild") renderRebuild();
-  else if (ex === "gap") renderGap();
-  else if (ex === "backwards") renderBackwards();
+  renderDrill();
 }
 
-function finishDrill(failedLinks) {
+export function chainDrillAction(action) {
+  if (action === "check") checkAnswer();
+  else if (action === "dontknow") checkAnswer(true);
+  else if (action === "next") nextStep();
+  else if (action === "finish") finishDrill();
+}
+
+const dotSolved = () => `<div class="st-dot solved">${icon("check", 10, 4)}</div>`;
+
+function row(dot, cell, last, attrs = "") {
+  return `<div class="st-row${last ? " last" : ""}"${attrs}>
+      <div class="st-rail-col">${dot}${last ? "" : '<div class="st-line"></div>'}</div>
+      <div class="st-cell">${cell}</div>
+    </div>`;
+}
+
+function currentNode() {
+  if (state.status !== "checked") {
+    return row(`<div class="st-dot cur"></div>`, `
+      <div class="st-label" style="color:var(--accent-text)">Your answer</div>
+      <textarea id="chainInput" class="st-field h96 st-mt8" placeholder="What happens right before this?" aria-label="Your answer">${esc(state.inputText)}</textarea>`, false, ' id="chainCur"');
+  }
+  const r = state.result;
+  const target = cSteps[state.currentIdx];
+  if (r.dontknow) {
+    return row(`<div class="st-dot cur amber"></div>`, `
+      <div class="st-label" style="color:var(--st-amber-text)">Missed</div>
+      <div class="st-field h96 static amber st-mt8">${esc(target.step.statement)}</div>`, false, ' id="chainCur"');
+  }
+  return row(r.correct ? dotSolved() : `<div class="st-dot cur amber"></div>`, `
+    <div class="st-label" style="color:${r.correct ? "var(--accent-text)" : "var(--st-amber-text)"}">Your answer</div>
+    <div class="st-field h96 static ${r.correct ? "ok" : "amber"} st-mt8">${esc(state.inputText)}</div>
+    <div class="st-mt4">${verdictRow(r.correct ? "ok" : "no", r.correct ? "Correct" : "Not quite")}</div>
+    ${r.feedback ? `<div class="st-feedback">${esc(r.feedback)}</div>` : ""}`, false, ' id="chainCur"');
+}
+
+function renderDrill() {
+  const last = cSteps.length - 1;
+  const total = last;
+  const solved = last - 1 - state.currentIdx + (state.status === "checked" && state.result?.correct ? 1 : 0);
+
+  let rows = "";
+  for (let i = state.currentIdx; i <= last; i++) {
+    const s = cSteps[i];
+    if (i === state.currentIdx) rows += currentNode();
+    else if (i < last) {
+      rows += row(dotSolved(), `
+        <div class="st-label">Step ${i + 1}</div>
+        <div class="st-step">${esc(s.step.statement)}</div>`, false);
+    } else {
+      rows += row(`<div class="st-dot given"></div>`, `
+        <div class="st-label">${esc(s.label)}</div>
+        <div class="st-step given">${esc(s.step.statement)}</div>`, true);
+    }
+  }
+
+  const answering = state.status !== "checked";
+  const finishing = state.currentIdx === 0;
+  paintShell({
+    mode: `Chain drill${cSetName ? ` · ${cSetName}` : ""}`,
+    prompt: "What directly causes the step below?",
+    promptClass: "q",
+    progress: (solved / total) * 100,
+    counter: `${solved} / ${total}`,
+    hasProgress: solved > 0 || state.status === "checked",
+    body: `<div class="st-rail st-mt24">${rows}</div>`,
+    dock: answering
+      ? `${secondaryBtn("chain-dontknow", "Don't know")}${primaryBtn("chain-check", "Check", 'id="chainCheck" disabled')}`
+      : primaryBtn(finishing ? "chain-finish" : "chain-next", finishing ? "Finish" : "Next step"),
+    keys: answering ? null : (e) => {
+      if (e.key !== "Enter") return;
+      e.preventDefault();
+      chainDrillAction(finishing ? "finish" : "next");
+    },
+  });
+
+  if (answering) {
+    const box = /** @type {HTMLTextAreaElement} */ (document.getElementById("chainInput"));
+    bindField(box, { btn: /** @type {HTMLButtonElement} */ (document.getElementById("chainCheck")), onSubmit: () => checkAnswer() });
+    focusEnd(box);
+  }
+}
+
+/** After Next step: put the new Current node under the prompt when the chain has grown past the screen. */
+function scrollToCurrent() {
+  const body = document.getElementById("stBody");
+  const cur = document.getElementById("chainCur");
+  const prompt = body?.querySelector(".st-prompt");
+  if (!body || !cur || !prompt) return;
+  const b = body.getBoundingClientRect();
+  if (cur.getBoundingClientRect().bottom <= b.bottom - 8) return;
+  const gap = cur.getBoundingClientRect().top - prompt.getBoundingClientRect().bottom;
+  body.scrollTop += gap - 16;
+}
+
+async function checkAnswer(dontknow = false) {
+  if (!state || state.status !== "answering") return;
+  const inputEl = /** @type {HTMLTextAreaElement|null} */ (document.getElementById("chainInput"));
+  const input = dontknow ? "" : (inputEl?.value.trim() || "");
+  if (!dontknow && !input) return;
+
+  const idx = state.currentIdx;
+  state.inputText = input;
+  if (dontknow) {
+    cSteps[idx].failed = true;
+    state.result = { dontknow: true, correct: false };
+    state.status = "checked";
+    return renderDrill();
+  }
+
+  state.status = "checking";
+  document.querySelectorAll(".st-dock button").forEach((b) => { /** @type {HTMLButtonElement} */ (b).disabled = true; });
+  const btn = document.getElementById("chainCheck");
+  if (btn) btn.textContent = "Checking…";
+  try {
+    const target = cSteps[idx];
+    const prev = idx > 0 ? cSteps[idx - 1].step.statement : "None";
+    const next = cSteps[idx + 1].step.statement;
+    const q = `In a medical mechanism chain, what is the ${target.label} step? The previous step is "${prev}" and the next step is "${next}".`;
+    const res = await send({ type: "GRADE_ANSWER", question: q, reference: target.step.statement, answer: input });
+    if (!state || state.currentIdx !== idx || state.status !== "checking") return;
+    state.result = { correct: !!res.grading.correct, feedback: res.grading.feedback };
+    if (!res.grading.correct) cSteps[idx].failed = true;
+    state.status = "checked";
+    renderDrill();
+  } catch (e) {
+    if (!state || state.status !== "checking") return;
+    state.status = "answering";
+    renderDrill();
+    toast(e.message);
+  }
+}
+
+function nextStep() {
+  if (!state || state.status !== "checked" || state.currentIdx <= 0) return;
+  state.currentIdx--;
+  state.status = "answering";
+  state.inputText = "";
+  state.result = null;
+  renderDrill();
+  scrollToCurrent();
+}
+
+function finishDrill() {
+  if (!state || state.status !== "checked") return;
+  const failedLinks = failedLinkIds(cChain, cSteps);
   if (failedLinks && failedLinks.length > 0) {
     penalizeLinks(failedLinks).catch(console.error);
   }
-  
+
   bumpActivity(1).catch(() => {});
   // Through drillLogEntry: a row without a grade, or with an empty cardId,
   // fails validation for the whole sync batch (server/src/schema.ts).
@@ -57,34 +205,8 @@ function finishDrill(failedLinks) {
     fraction: roundScore(cSteps),
     id: `cd-${Date.now()}`,
   })).catch(() => {});
-  
-  const takeaway = failedLinks?.length ? "Keep at it! Some links need a bit more practice." : "Perfect! You nailed this chain.";
-  
-  setHTML(app, `
-    <div class="view" style="padding:16px; overflow-y:auto; padding-bottom:100px;">
-      <div class="ahd" style="display:flex;align-items:center;padding:12px;gap:12px"><button class="iconbtn" data-action="return-focus" aria-label="End session"><svg class="ic" viewBox="0 0 24 24" width="20" height="20" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg></button><div class="h-title">Drill complete</div></div>
-      <div class="help" style="margin-bottom:16px">${esc(takeaway)}</div>
-      <div class="block chain">
-        <ol class="chain-steps">
-          ${cSteps.map((s, i) => {
-             const arrow = i ? `<li class="chain-arrow" aria-hidden="true">↓</li>` : "";
-             const failedStyle = s.failed ? `style="border:1px solid var(--danger-text);"` : "";
-             return `${arrow}<li class="chain-step" ${failedStyle}>
-                 <span class="chain-label">${esc(s.label)}</span>
-                 <details class="chain-body" open>
-                   <summary class="chain-text">${esc(s.step.statement)}</summary>
-                   <div class="chain-why">${s.step.why ? esc(s.step.why) : "No explanation of this link in your source."}</div>
-                 </details>
-               </li>`;
-          }).join("")}
-        </ol>
-      </div>
-      <div style="display:flex;gap:10px;margin-top:20px">
-        <button class="btn-ghost" style="flex:1" data-drill-action="done">Done</button>
-        <button class="btn-primary" style="flex:2" data-drill-action="another">Another round</button>
-      </div>
-    </div>
-  `);
+  state = null;
+  goReturn();
 }
 
 async function penalizeLinks(linkIds) {
@@ -92,247 +214,11 @@ async function penalizeLinks(linkIds) {
   const set = setFor(cSetId, studySets);
   if (!set) return;
   for (const linkId of linkIds) {
-    const card = set.flashcards?.find(c => c.id === linkId);
+    const card = set.flashcards?.find((c) => c.id === linkId);
     if (card) {
-       const upd = review(card, 0, Date.now(), set.examDate);
-       Object.assign(card, upd);
-       await updateCard(cSetId, card.id, upd);
+      const upd = review(card, 0, Date.now(), set.examDate);
+      Object.assign(card, upd);
+      await updateCard(cSetId, card.id, upd);
     }
   }
 }
-
-function renderRebuild() {
-  if (!state.placed) {
-    state.placed = [];
-    state.remaining = shuffledOrder(cSteps.length);
-    state.errorIdx = null;
-    state.revealIdx = null;
-  }
-  
-  const placedHtml = state.placed.map((i, idx) => {
-    const arrow = idx ? `<div class="chain-arrow" aria-hidden="true">↓</div>` : "";
-    return `${arrow}<div class="chain-step"><span class="chain-label">${esc(cSteps[i].label)}</span><div class="chain-text">${esc(cSteps[i].step.statement)}</div></div>`;
-  }).join("");
-  
-  const remainingHtml = state.remaining.map(i => {
-    const isError = state.errorIdx === i;
-    const isReveal = state.revealIdx === i;
-    let style = "text-align:left;width:100%;margin-bottom:8px;";
-    if (isError) style += "border-color:var(--danger-text);transform:translateX(5px);";
-    if (isReveal) style += "border-color:var(--status-mastered);background-color:rgba(0,255,0,0.1);";
-    return `<button class="chain-step linkbtn" data-drill-action="rebuild-pick" data-idx="${i}" style="${style}">
-      <div class="chain-text">${esc(cSteps[i].step.statement)}</div>
-    </button>`;
-  }).join("");
-  
-  setHTML(app, `
-    <div class="ahd" style="display:flex;align-items:center;padding:12px;gap:12px"><button class="iconbtn" data-action="return-focus" aria-label="End session"><svg class="ic" viewBox="0 0 24 24" width="20" height="20" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg></button></div>
-    <div class="rev-body" style="padding-bottom:100px;">
-      <div class="h-title" style="margin-bottom:16px">Rebuild the chain</div>
-      <div class="help">Tap the next step in the sequence.</div>
-      <div class="block chain" style="margin-bottom:20px;min-height:40px;border:1px dashed var(--border-control);padding:10px;border-radius:8px">
-        ${placedHtml || `<div class="empty" style="text-align:center;color:var(--text-faint)">Sequence starts here</div>`}
-      </div>
-      <div>
-        ${remainingHtml}
-      </div>
-    </div>
-  `);
-}
-
-function handleRebuildPick(idx) {
-  const nextExpected = state.placed.length;
-  if (idx === nextExpected) {
-    state.remaining = state.remaining.filter(i => i !== idx);
-    state.placed.push(idx);
-    state.errorIdx = null;
-    state.revealIdx = null;
-    if (state.placed.length === cSteps.length) {
-       finishDrill(failedLinkIds(cChain, cSteps));
-    } else {
-       renderRebuild();
-    }
-  } else {
-    state.errorIdx = idx;
-    state.revealIdx = nextExpected;
-    cSteps[nextExpected].failed = true;
-    renderRebuild();
-    setTimeout(() => {
-      if (state && state.type === "rebuild") {
-        state.errorIdx = null;
-        state.revealIdx = null;
-        renderRebuild();
-      }
-    }, 1500);
-  }
-}
-
-function renderGap() {
-  if (state.blankIdx === undefined) {
-    state.blankIdx = Math.floor(Math.random() * cSteps.length);
-    state.submitting = false;
-    state.result = null;
-  }
-  
-  const stepsHtml = cSteps.map((s, i) => {
-    const arrow = i ? `<div class="chain-arrow" aria-hidden="true">↓</div>` : "";
-    if (i === state.blankIdx) {
-      if (state.result) {
-         const cl = state.result.correct ? "" : `border:1px solid var(--danger-text);`;
-         return `${arrow}<div class="chain-step" style="${cl}">
-           <span class="chain-label">${esc(s.label)}</span>
-           <div class="chain-text">${esc(s.step.statement)}</div>
-           ${s.step.why ? `<div class="chain-why">${esc(s.step.why)}</div>` : ""}
-         </div>`;
-      } else {
-         return `${arrow}<div class="chain-step" style="padding:10px">
-           <span class="chain-label">${esc(s.label)}</span>
-           <textarea id="gapInput" rows="2" style="width:100%;margin-top:8px" placeholder="Type the ${esc(s.label)}..."></textarea>
-           <button class="btn-primary" data-drill-action="gap-submit" style="margin-top:8px;width:100%" ${state.submitting ? "disabled" : ""}>Check</button>
-         </div>`;
-      }
-    }
-    return `${arrow}<div class="chain-step"><span class="chain-label">${esc(s.label)}</span><div class="chain-text">${esc(s.step.statement)}</div></div>`;
-  }).join("");
-
-  setHTML(app, `
-    <div class="ahd" style="display:flex;align-items:center;padding:12px;gap:12px"><button class="iconbtn" data-action="return-focus" aria-label="End session"><svg class="ic" viewBox="0 0 24 24" width="20" height="20" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg></button></div>
-    <div class="rev-body" style="padding-bottom:100px;">
-      <div class="h-title" style="margin-bottom:16px">Fill the gap</div>
-      <div class="block chain">
-        ${stepsHtml}
-      </div>
-      ${state.result ? `<button class="btn-primary btn-block" style="margin-top:20px" data-drill-action="gap-next">Continue</button>` : ""}
-    </div>
-  `);
-  
-  if (!state.result && !state.submitting) document.getElementById("gapInput")?.focus();
-}
-
-async function handleGapSubmit() {
-  const input = (/** @type {any} */ (document.getElementById("gapInput")))?.value.trim();
-  if (!input) return toast("Type an answer first");
-  
-  state.submitting = true;
-  renderGap();
-  
-  try {
-    const target = cSteps[state.blankIdx];
-    const prev = state.blankIdx > 0 ? cSteps[state.blankIdx-1].step.statement : "None";
-    const next = state.blankIdx < cSteps.length - 1 ? cSteps[state.blankIdx+1].step.statement : "None";
-    const q = `In a medical mechanism chain, what is the ${target.label} step? The previous step is "${prev}" and the next step is "${next}".`;
-    
-    const res = await send({ type: "GRADE_ANSWER", question: q, reference: target.step.statement, answer: input });
-    
-    state.submitting = false;
-    state.result = { correct: res.grading.correct };
-    if (!res.grading.correct) cSteps[state.blankIdx].failed = true;
-    renderGap();
-  } catch (e) {
-    state.submitting = false;
-    renderGap();
-    toast(e.message);
-  }
-}
-
-function renderBackwards() {
-  if (state.startIdx === undefined) {
-    state.startIdx = Math.floor(Math.random() * (cSteps.length - 1)) + 1;
-    state.currentIndex = state.startIdx - 1;
-    state.history = [];
-    state.submitting = false;
-  }
-  
-  const stepsHtml = [];
-  for (let i = state.currentIndex; i <= state.startIdx; i++) {
-    const arrow = i < state.startIdx ? `<div class="chain-arrow" aria-hidden="true">↓</div>` : "";
-    if (i === state.currentIndex) {
-       stepsHtml.push(`<div class="chain-step" style="padding:10px">
-           <span class="chain-label">Upstream: ${esc(cSteps[i].label)}</span>
-           <textarea id="backInput" rows="2" style="width:100%;margin-top:8px" placeholder="What precedes the next step?"></textarea>
-           <button class="btn-primary" data-drill-action="backwards-submit" style="margin-top:8px;width:100%" ${state.submitting ? "disabled" : ""}>Check</button>
-         </div>${arrow}`);
-    } else {
-       const hist = state.history.find(h => h.idx === i);
-       const cl = hist && !hist.correct ? `border:1px solid var(--danger-text);` : "";
-       stepsHtml.push(`<div class="chain-step" style="${cl}">
-           <span class="chain-label">${esc(cSteps[i].label)}</span>
-           <div class="chain-text">${esc(cSteps[i].step.statement)}</div>
-         </div>${arrow}`);
-    }
-  }
-
-  setHTML(app, `
-    <div class="ahd" style="display:flex;align-items:center;padding:12px;gap:12px"><button class="iconbtn" data-action="return-focus" aria-label="End session"><svg class="ic" viewBox="0 0 24 24" width="20" height="20" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg></button></div>
-    <div class="rev-body" style="padding-bottom:100px;">
-      <div class="h-title" style="margin-bottom:16px">Work backwards</div>
-      <div class="help">What directly causes or precedes the step below?</div>
-      <div class="block chain">
-        ${stepsHtml.join("")}
-      </div>
-    </div>
-  `);
-  
-  if (!state.submitting) document.getElementById("backInput")?.focus();
-}
-
-async function handleBackwardsSubmit() {
-  const input = (/** @type {any} */ (document.getElementById("backInput")))?.value.trim();
-  if (!input) return toast("Type an answer first");
-  
-  state.submitting = true;
-  renderBackwards();
-  
-  try {
-    const target = cSteps[state.currentIndex];
-    const next = cSteps[state.currentIndex + 1];
-    const q = `In a medical mechanism chain, what is the ${target.label} step that directly precedes "${next.step.statement}"?`;
-    
-    const res = await send({ type: "GRADE_ANSWER", question: q, reference: target.step.statement, answer: input });
-    
-    state.submitting = false;
-    state.history.push({ idx: state.currentIndex, correct: res.grading.correct });
-    if (!res.grading.correct) cSteps[state.currentIndex].failed = true;
-    
-    if (state.currentIndex === 0) {
-       const failedLinks = [];
-       for (let i = 0; i <= state.startIdx; i++) {
-         if (cSteps[i].failed && i < cSteps.length - 1) failedLinks.push(linkId(cChain.id, cSteps[i].key, cSteps[i + 1].key));
-       }
-       finishDrill(failedLinks);
-    } else {
-       state.currentIndex--;
-       renderBackwards();
-    }
-  } catch (e) {
-    state.submitting = false;
-    renderBackwards();
-    toast(e.message);
-  }
-}
-
-document.addEventListener("click", (e) => {
-  const t = (/** @type {any} */ (e.target)).closest("[data-drill-action]");
-  if (!t) return;
-  const a = t.dataset.drillAction;
-  
-  if (a === "done") {
-    renderSetDetail(cSetId, "chains");
-  } else if (a === "another") {
-    startChainDrill(cSetId);
-  } else if (a === "rebuild-pick") {
-    handleRebuildPick(Number(t.dataset.idx));
-  } else if (a === "gap-submit") {
-    handleGapSubmit();
-  } else if (a === "gap-next") {
-    const failedLinks = [];
-    if (cSteps[state.blankIdx].failed) {
-       if (state.blankIdx > 0) failedLinks.push(linkId(cChain.id, cSteps[state.blankIdx - 1].key, cSteps[state.blankIdx].key));
-       if (state.blankIdx < cSteps.length - 1) failedLinks.push(linkId(cChain.id, cSteps[state.blankIdx].key, cSteps[state.blankIdx + 1].key));
-    }
-    finishDrill(failedLinks);
-  } else if (a === "backwards-submit") {
-    handleBackwardsSubmit();
-  }
-});
-

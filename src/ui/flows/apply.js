@@ -1,31 +1,27 @@
-import { paintReviewCard, qIdx, queue, setQIdx } from "../flows/review.js";
-import { XBTN, app, esc, send, setHTML, toast } from "../core.js";
+import { applyNext, paintReviewCard, qIdx, queue, setQIdx } from "../flows/review.js";
+import { app, esc, send, toast } from "../core.js";
 import { appendReviewLog, bumpActivity, uid } from "../../storage/store.js";
-import { review } from "../../../shared/srs.js";
+import { bindField, focusEnd, paintShell, primaryBtn, verdictRow, waitRow } from "./shell.js";
 
 export let applyState = null; // { item, hypothetical, phase }
+export function setApplyState(v) { applyState = v; }
+
+function shellFor(extra) {
+  paintShell({
+    mode: "Apply it",
+    progress: (qIdx / queue.length) * 100,
+    counter: `${qIdx + 1} / ${queue.length}`,
+    hasProgress: true,
+    ...extra,
+  });
+}
 
 export async function startApply() {
   const item = queue[qIdx];
   if (!item || !item.card.back) return paintReviewCard();
   const token = Math.random();
   applyState = { item, phase: "loading", token };
-  setHTML(app, `
-    
-      <div class="ahd" style="display:flex;align-items:center;padding:12px;gap:12px">
-        <button class="iconbtn" data-action="return-focus" aria-label="End session"><svg class="ic" viewBox="0 0 24 24" width="20" height="20" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg></button>
-        <div class="focus-track">
-          <div class="focus-fill" style="width:${Math.max(2, Math.round((qIdx / queue.length) * 100))}%"></div>
-        </div>
-        <div style="font-size:13px;color:var(--text-muted);font-variant-numeric:tabular-nums">${qIdx + 1} / ${queue.length}</div>
-      </div>
-    <div class="rev-body">
-      <div class="t-label">Apply it</div>
-      <div style="display:flex;align-items:center;gap:10px;margin-top:8px">
-        <span class="spinner" style="border-color:var(--border-control);border-top-color:var(--accent)"></span>
-        <span style="font-size:13px;color:var(--text-muted)">Writing a fresh scenario…</span>
-      </div>
-    </div>`);
+  shellFor({ body: waitRow("Writing a fresh scenario…") });
   try {
     const r = await send({
       type: "GENERATE_HYPOTHETICAL",
@@ -45,30 +41,26 @@ export async function startApply() {
 
 export function paintApplyAnswer() {
   const { hypothetical } = applyState;
-  setHTML(app, `
-    
-      <div class="ahd" style="display:flex;align-items:center;padding:12px;gap:12px">
-        <button class="iconbtn" data-action="return-focus" aria-label="End session"><svg class="ic" viewBox="0 0 24 24" width="20" height="20" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg></button>
-        <div class="focus-track">
-          <div class="focus-fill" style="width:${Math.max(2, Math.round((qIdx / queue.length) * 100))}%"></div>
-        </div>
-        <div style="font-size:13px;color:var(--text-muted);font-variant-numeric:tabular-nums">${qIdx + 1} / ${queue.length}</div>
-      </div>
-    <div class="rev-body">
-      <div class="t-label">Apply it — new scenario</div>
-      <div class="hypothetical">${esc(hypothetical.scenario)}</div>
-      <textarea id="applyAnswer" class="sa-input" rows="4" placeholder="Type your answer…"></textarea>
-      <button class="btn-primary btn-block" data-action="apply-check">Check answer</button>
-    </div>`);
+  shellFor({
+    prompt: hypothetical.scenario,
+    promptClass: "text",
+    body: `<textarea id="applyAnswer" class="st-field h132 st-mt24" placeholder="Type your answer" aria-label="Your answer"></textarea>
+      <div class="st-note">Checked by AI against a hidden rubric.</div>`,
+    dock: primaryBtn("apply-check", "Check answer", 'id="applyCheck" disabled'),
+  });
+  const box = /** @type {HTMLTextAreaElement} */ (document.getElementById("applyAnswer"));
+  bindField(box, { btn: /** @type {HTMLButtonElement} */ (document.getElementById("applyCheck")), onSubmit: () => checkApply() });
+  focusEnd(box);
 }
 
 export async function checkApply() {
-  const answer = /** @type {HTMLInputElement} */ (document.getElementById("applyAnswer"))?.value.trim();
-  if (!answer) return toast("Type an answer first.");
+  const answer = /** @type {HTMLTextAreaElement|null} */ (document.getElementById("applyAnswer"))?.value.trim();
+  if (!answer) return;
   const { item, hypothetical } = applyState;
-  const btn = app.querySelector('[data-action="apply-check"]');
-  /** @type {HTMLButtonElement} */ (btn).disabled = true;
-  btn.textContent = "Grading…";
+  const btn = /** @type {HTMLButtonElement|null} */ (app.querySelector('[data-action="apply-check"]'));
+  if (!btn || btn.disabled && btn.textContent === "Checking…") return;
+  btn.disabled = true;
+  btn.textContent = "Checking…";
   try {
     const r = await send({
       type: "GRADE_ANSWER",
@@ -86,36 +78,28 @@ export async function checkApply() {
         reviewedAt: new Date().toISOString(),
       }),
     ]);
-    paintGraded(r.grading, "apply-next");
+    paintApplyGraded(answer, r.grading);
   } catch (e) {
     toast(e.message);
-    /** @type {HTMLButtonElement} */ (btn).disabled = false;
+    btn.disabled = false;
     btn.textContent = "Check answer";
   }
 }
 
-/** Shared score + feedback panel for AI-graded typed answers. */
-export function paintGraded(grading, nextAction) {
-  const box = document.createElement("div");
-  box.className = "graded";
-  setHTML(box, `
-    <div class="score-row">
-      <div class="score tnum ${grading.correct ? "ok" : "no"}">${grading.score}</div>
-      <div><b style="color:${grading.correct ? "var(--status-mastered)" : "var(--danger-text)"}">${grading.correct ? "Correct" : "Needs work"}</b>
-        <div class="feedback">${esc(grading.feedback)}</div></div>
-    </div>
-    <button class="btn-primary btn-block" data-action="${nextAction}">Continue</button>`);
-  const body = app.querySelector(".rev-body");
-  if (body) {
-    body.querySelector(".sa-input")?.remove();
-    body.querySelector('[data-action="apply-check"]')?.remove();
-    body.querySelector('[data-action="typed-check"]')?.remove();
-    body.appendChild(box);
-  }
+function paintApplyGraded(answer, grading) {
+  const kind = grading.correct ? "ok" : Number(grading.score) >= 40 ? "part" : "no";
+  const label = { ok: "Correct", part: "Partly right", no: "Not quite" }[kind];
+  shellFor({
+    prompt: applyState.hypothetical.scenario,
+    promptClass: "text",
+    body: `<div class="st-field h132 static st-mt24 ${kind === "ok" ? "ok" : "amber"}">${esc(answer)}</div>
+      <div class="st-mt16">${verdictRow(kind, label)}</div>
+      ${grading.feedback ? `<div class="st-feedback mt6">${esc(grading.feedback)}</div>` : ""}`,
+    dock: primaryBtn("apply-next", "Next"),
+    keys: (e) => {
+      if (e.key !== "Enter") return;
+      e.preventDefault();
+      applyNext();
+    },
+  });
 }
-
-// --- Coding practice: a standalone session started from the set ------------
-// A peer of typed practice, NOT part of the review queue — each exercise is
-// an LLM round trip plus real writing time, so sessions are short (5) and
-// never block grading. The starter stub keeps exercises small; length is only
-// ever a system cap (see storage/coding.js).

@@ -1,8 +1,8 @@
-import { focusReturn, setFocusReturn } from "../flows/review.js";
+import { setFocusReturn } from "../flows/review.js";
 import { showChrome } from "../nav.js";
-import { app, esc, setHTML } from "../core.js";
+import { esc } from "../core.js";
 import { quickQuizLen, shuffled, shuffleQuiz } from "../../../shared/quiz.js";
-import { paintShell } from "./shell.js";
+import { icon, paintDone, paintShell, primaryBtn, typing } from "./shell.js";
 
 export { quickQuizLen, shuffled, shuffleQuiz };
 
@@ -10,112 +10,89 @@ export { quickQuizLen, shuffled, shuffleQuiz };
 export let quizSet = null,
   quizIdx = 0,
   quizScore = 0;
+let picked = null; // index the learner chose on this question, null until they answer
 
 export function startQuiz(studySet, ret, limit) {
   const qs = shuffleQuiz(studySet.quiz || []);
   quizSet = { quiz: limit > 0 ? qs.slice(0, limit) : qs };
   quizIdx = 0;
   quizScore = 0;
+  picked = null;
   setFocusReturn(ret);
   showChrome(false);
   paintQuizQ();
 }
 
+function optionHtml(o, i, q) {
+  const key = String.fromCharCode(65 + i);
+  let cls = "";
+  let tile = key;
+  if (picked !== null) {
+    if (i === q.answer) { cls = " right"; tile = icon("check", 16, 3); }
+    else if (i === picked) { cls = " wrong"; tile = icon("close", 14, 3); }
+    else cls = " dim";
+  }
+  return `<button type="button" class="st-opt${cls}" data-action="quiz-opt" data-i="${i}"${picked !== null ? " disabled" : ""}>
+      <span class="key">${tile}</span><span class="txt">${esc(o)}</span>
+    </button>`;
+}
+
 export function paintQuizQ() {
   if (quizIdx >= quizSet.quiz.length) return paintQuizDone();
   const q = quizSet.quiz[quizIdx];
-  const progress = (quizIdx / quizSet.quiz.length) * 100;
-  
-  const body = `
-    <div id="opts" style="margin-top:24px;display:flex;flex-direction:column;gap:8px">
-      ${q.options.map((o, i) => `
-        <button class="opt" data-action="quiz-opt" data-i="${i}" style="width:100%;min-height:56px;padding:12px 14px;border-radius:12px;border:1px solid var(--border-card);background:var(--bg-surface);display:flex;align-items:center;gap:12px;cursor:pointer;text-align:left">
-          <div class="key-tile" style="width:28px;height:28px;border-radius:8px;border:1px solid var(--border-control);display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:650;color:var(--text-secondary);flex-shrink:0">${String.fromCharCode(65 + i)}</div>
-          <div style="font-size:15px;line-height:1.4;color:var(--text-primary)">${esc(o)}</div>
-        </button>
-      `).join("")}
-    </div>
-    <div id="quizFeedback"></div>
-  `;
-  
-  const dock = `
-    <div id="quizDock" style="height:60px;display:flex;align-items:center;justify-content:center;font-size:13px;color:var(--text-muted);width:100%">Pick an answer, or press A–D</div>
-  `;
-  
-  setHTML(app, paintShell({
+  const answered = picked !== null;
+  const right = picked === q.answer;
+  const last = quizIdx + 1 >= quizSet.quiz.length;
+  const scroll = document.getElementById("stBody")?.scrollTop || 0;
+  paintShell({
     mode: "Quiz",
     prompt: q.q,
-    progress,
+    promptClass: "q",
+    progress: (quizIdx / quizSet.quiz.length) * 100,
     counter: `${quizIdx + 1} / ${quizSet.quiz.length}`,
-    body,
-    dock,
-    promptClass: "prompt-full"
-  }));
+    hasProgress: quizIdx > 0 || answered,
+    body: `
+      <div class="st-opts">${q.options.map((o, i) => optionHtml(o, i, q)).join("")}</div>
+      ${answered ? `<div class="st-quizfb"><b class="${right ? "ok" : "amber"}">${right ? "Correct." : "Not quite."}</b> ${esc(q.explain || "")}</div>` : ""}`,
+    dock: answered
+      ? primaryBtn("quiz-next", last ? "See results" : "Next question")
+      : `<div class="st-dock-note">Pick an answer, or press A–D</div>`,
+    keys: (e) => {
+      if (typing(e) || e.ctrlKey || e.metaKey) return;
+      if (picked !== null) {
+        if (e.key !== "Enter") return;
+        e.preventDefault();
+        quizNext();
+        return;
+      }
+      const i = e.key.length === 1 ? e.key.toUpperCase().charCodeAt(0) - 65 : -1;
+      if (i < 0 || i >= q.options.length) return;
+      e.preventDefault();
+      answerQuiz(i);
+    },
+  });
+  const body = document.getElementById("stBody");
+  if (body && scroll) body.scrollTop = scroll;
 }
 
 export function answerQuiz(i) {
+  if (picked !== null) return; // options lock once answered
   const q = quizSet.quiz[quizIdx];
-  const opts = app.querySelectorAll("#opts .opt");
-  opts.forEach((el, bi) => {
-    const b = /** @type {HTMLElement & {disabled: boolean}} */ (el);
-    b.disabled = true;
-    b.style.cursor = "default";
-    const tile = /** @type {HTMLElement} */ (b.querySelector('.key-tile'));
-    if (bi === q.answer) {
-      b.style.borderColor = "var(--accent)";
-      if (tile) {
-        tile.style.border = "1px solid var(--accent)";
-        tile.style.background = "var(--accent)";
-        tile.style.color = "var(--accent-on)";
-        tile.innerHTML = '<svg width="16" height="16" viewBox="0 0 24 24" stroke-width="3" style="stroke:currentColor;fill:none;stroke-linecap:round;stroke-linejoin:round"><polyline points="20 6 9 17 4 12"></polyline></svg>';
-      }
-    } else if (bi === i) {
-      b.style.borderColor = "var(--status-learning)";
-      if (tile) {
-        tile.style.border = "1px solid var(--status-learning)";
-        tile.style.background = "var(--status-learning)";
-        tile.style.color = "var(--accent-on)";
-        tile.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" stroke-width="3" style="stroke:currentColor;fill:none;stroke-linecap:round;stroke-linejoin:round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>';
-      }
-    } else {
-      b.style.opacity = "0.45";
-    }
-  });
-  
+  picked = i;
   if (i === q.answer) quizScore++;
-  
-  const feedbackEl = document.getElementById("quizFeedback");
-  if (feedbackEl) {
-    feedbackEl.style.marginTop = "16px";
-    feedbackEl.style.fontSize = "15px";
-    feedbackEl.style.lineHeight = "1.5";
-    feedbackEl.style.color = "var(--text-muted)";
-    const lead = i === q.answer 
-      ? `<span style="color:var(--accent-text);font-weight:650">Correct.</span>`
-      : `<span style="color:var(--status-learning);font-weight:650">Not quite.</span>`;
-    feedbackEl.innerHTML = `${lead} ${esc(q.explain || "")}`;
-  }
-  
-  const dock = document.getElementById("quizDock");
-  if (dock) {
-    const nextText = quizIdx + 1 >= quizSet.quiz.length ? "See results" : "Next question";
-    dock.outerHTML = `<button data-action="quiz-next" style="width:100%;height:60px;border-radius:14px;background:var(--accent);color:var(--accent-on);font-size:16px;font-weight:650;border:none;cursor:pointer;display:flex;align-items:center;justify-content:center">${nextText}</button>`;
-  }
+  paintQuizQ();
 }
 
 export function paintQuizDone() {
   showChrome(false);
-  const pct = Math.round((quizScore / quizSet.quiz.length) * 100);
-  setHTML(app, `
-    <div class="view">
-      <div class="done-msg"><div class="big">${pct >= 80 ? "🏆" : pct >= 50 ? "👍" : "🤔"}</div>
-        <div style="font-size:30px;font-weight:750;color:var(--text-primary)" class="tnum">${quizScore}/${quizSet.quiz.length}</div>
-        <div style="margin-top:4px">${pct}% correct</div>
-      </div>
-      <button class="btn btn-primary btn-block" data-action="return-focus">Done</button>
-    </div>`);
+  const n = quizSet.quiz.length;
+  const pct = Math.round((quizScore / n) * 100);
+  paintDone({ mode: "Quiz", title: "Quiz complete", detail: `${quizScore} of ${n} correct · ${pct}%` });
 }
 
-export function quizNext() { quizIdx++; paintQuizQ(); }
-
-// aria-label="End session" needed for tests
+export function quizNext() {
+  if (picked === null) return;
+  picked = null;
+  quizIdx++;
+  paintQuizQ();
+}

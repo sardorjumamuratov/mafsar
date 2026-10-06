@@ -32,9 +32,10 @@ test("the answer is assembled under the clinical titles, in order", () => {
 
 console.log("wiring");
 test("clinical mode and the case state reach the server", () => {
-  const flow = read("../src/ui/flows/design.js");
-  assert.ok(flow.includes("mode: s.mode"), "the flow sends its mode");
-  assert.ok(flow.includes("state: s.encryptedState"), "and the encrypted case");
+  // Clinical cases have their own flow now; the design flow no longer sends a mode.
+  const flow = read("../src/ui/flows/clinical.js");
+  assert.ok(flow.includes('mode: "clinical"'), "the flow sends its mode");
+  assert.ok(flow.includes("state: s.task.state"), "and the encrypted case");
   const sw = read("../src/background/service-worker.js");
   for (const msg of ["DESIGN_TASK", "DESIGN_GRADE", "DESIGN_CURVEBALL"]) {
     const block = sw.slice(sw.indexOf(`case "${msg}"`), sw.indexOf(`case "${msg}"`) + 500);
@@ -43,7 +44,8 @@ test("clinical mode and the case state reach the server", () => {
 });
 
 test("a clinical case is logged as its own kind, not as a design drill", () => {
-  assert.ok(read("../src/ui/flows/design.js").includes(`s.mode === "clinical" ? "clinical" : "design"`));
+  assert.ok(read("../src/ui/flows/clinical.js").includes('kind: "clinical"'));
+  assert.ok(read("../src/ui/flows/design.js").includes('kind: "design"'));
   const row = drillLogEntry({ kind: "clinical", sessionId: "sess1", fraction: 0.8, id: "r1" });
   assert.equal(row.kind, "clinical");
   assert.ok(row.cardId.length > 0);

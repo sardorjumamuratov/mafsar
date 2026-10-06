@@ -64,7 +64,7 @@ test("a drill still gives the learner a way out once the nav is gone", () => {
     const src = read(file);
     if (!src.includes("showChrome(false)")) continue;
     assert.ok(
-      /XBTN|close-focus|nav-back|-cancel|data-action="back|return-focus/.test(src),
+      /XBTN|close-focus|nav-back|-cancel|data-action="back|return-focus|paintShell\(/.test(src), // paintShell renders the shared close button
       file + " hides the nav without rendering an exit"
     );
   }
