@@ -172,6 +172,26 @@
                 expectedLines: 12,
                 rubric: ["balance is private", "deposit rejects negative amounts"],
               } }),
+              // Study modes. Shapes follow server/src/llm.ts, so the screens see what the real backend sends.
+              GRADE_ANSWER: () => ({ ok: true, grading: { score: 55, correct: false, feedback: "You named duty and breach but left out causation and damages, so the claim isn't complete." } }),
+              GENERATE_HYPOTHETICAL: () => ({ ok: true, hypothetical: { scenario: "A cyclist is hit by a van whose driver was texting. Which elements of negligence can the cyclist show?", rubric: "Duty, breach, causation, damages." } }),
+              TEACH_TURN: (m) => ({ ok: true, turn: { reply: m.wantHint ? "Think about what the person owes everyone else on the road." : "Okay, but why does that matter? What happens if someone ignores it?", kind: "question", focusCardId: "c1", coverage: { c1: "covered" }, done: false } }),
+              TEACH_EVALUATE: () => ({ ok: true, evaluation: { scores: { understanding: 78, accuracy: 82, completeness: 64, simplicity: 90 }, strengths: "You kept it concrete and used one clear example.", ideas: [{ cardId: "c1", front: "Elements of negligence", status: "taught", note: "All four elements, in order." }, { cardId: "c2", front: "Res ipsa loquitur", status: "not_covered", note: "" }], jargon: ["causation"], improve: "Say what each element means in one plain sentence.", modelExplanation: "Negligence is carelessness that hurts someone, and four things must be shown." } }),
+              DESIGN_TASK: (m) => m.mode === "clinical"
+                ? ({ ok: true, brief: "A 24-year-old woman presents with three weeks of episodic wheeze and a dry cough, worse at night and after exercise. She has eczema and her father has hay fever. Examination shows a prolonged expiratory phase with scattered expiratory wheeze; oxygen saturation is 97% on air.", rubric: ["Peak expiratory flow", "Spirometry with bronchodilator reversibility", "Chest X-ray", "Full blood count"], state: "harness-state" })
+                : ({ ok: true, brief: "Design a URL shortener. It takes 5k writes a second, reads are 100 times writes, and links never expire. Redirects must stay under 50 ms at the 99th percentile, and the service has to survive the loss of a single data centre without losing any link that was already created. Keep the design to what you could explain in fifteen minutes.", rubric: ["States the read/write ratio", "Chooses a code generation scheme", "Caches hot links", "Names the single-primary bottleneck"] }),
+              DESIGN_GRADE: (m) => m.mode === "clinical"
+                ? ({ ok: true, rubric_evaluation: [], sections: [{ section: "Diagnosis", verdict: "strong", note: "Asthma fits the atopy, nocturnal symptoms and reversible wheeze." }, { section: "Tests requested", verdict: "weak", note: "Spirometry is right, but a chest X-ray isn't indicated here." }], next_time: "Ask what the test result would change.", results: [{ name: "Peak expiratory flow", result: "Variable, 20% below predicted in the morning." }, { name: "Spirometry with bronchodilator reversibility", result: "FEV1/FVC 0.64, rising to 0.78 after salbutamol." }, { name: "Chest X-ray", result: "Normal." }, { name: "Full blood count", result: "Eosinophils mildly raised." }], diagnosis: "Asthma", management: "Inhaled corticosteroid with a reliever." })
+                : ({ ok: true, rubric_evaluation: [{ point: "States the read/write ratio", status: "covered", note: "Said 100:1." }, { point: "Chooses a code generation scheme", status: "partial", note: "Counter, but no collision story." }, { point: "Caches hot links", status: "missed", note: "" }, { point: "Names the single-primary bottleneck", status: "missed", note: "" }], sections: [{ section: "Requirements", verdict: "strong", note: "Clear numbers and a latency target." }, { section: "Estimates", verdict: "ok", note: "Storage is right; bandwidth is missing." }, { section: "API", verdict: "weak", note: "Only one endpoint named." }], next_time: "Say what you would cache and why." }),
+              ESTIMATION_TASK: () => ({ ok: true, questions: [
+                { question: "A service gets 50M daily users making 20 requests each. What is the average QPS?", reference_value: 11574, reference_unit: "QPS", worked_solution: "50M x 20 = 1B requests a day\n1B / 86,400 s is about 11,574\nSo roughly 12k QPS on average." },
+                { question: "Storing 1 KB for each of 500M links, how much storage is that?", reference_value: 500, reference_unit: "GB", worked_solution: "500M x 1 KB = 500 GB\nBefore replication." },
+                { question: "A 2 MB image served 1,000 times a second needs how much bandwidth?", reference_value: 2, reference_unit: "GB/s", worked_solution: "2 MB x 1,000 = 2,000 MB/s\nThat is 2 GB/s." },
+              ] }),
+              ESTIMATION_SUMMARY: () => ({ ok: true, habit_to_fix: "Convert per-day numbers to per-second before sizing anything." }),
+              BOTTLENECK_TASK: () => ({ ok: true, narrative: "A photo app sends every upload through three API servers to one PostgreSQL primary. Traffic is 8k uploads a second at peak, across four regions, and each upload writes a metadata row and updates the owner's counters.", architecture: ["CDN", "Load balancer", "API servers (3x)", "Cache: Redis", "PostgreSQL primary", "Object storage"], state: "harness-state" }),
+              BOTTLENECK_HINT: () => ({ ok: true, hint: "Follow one write all the way to disk, and count how many places it can happen." }),
+              BOTTLENECK_GRADE: () => ({ ok: true, found_flaw: true, explanation_correct: true, fix_works: false, other_valid_issue: "", feedback: "You found the single write primary and explained the load, but sharding alone doesn't fix cross-region latency.", score: 2, usedHint: false, planted_flaw: "All writes from four regions go to one PostgreSQL primary.", why_it_fails: "At 8k writes a second the primary saturates and cross-region round trips dominate latency.", model_solution: "Shard by user id and keep a regional primary per shard; accept eventual consistency for counters." }),
               SHARE_CREATE: () => ({ ok: true, code: '7KX2M9QRTA' }),
               SHARE_FETCH: () => ({ ok: true, title: 'Torts basics (shared)', cards: [
                 { front: 'Duty of care', back: 'Obligation to avoid foreseeable harm' },
@@ -197,7 +217,7 @@
                 feedback: "Field encapsulation is right; add a guard in deposit.",
               } }),
             }[msg && msg.type];
-            setTimeout(() => cb && cb(fake ? fake() : { ok: false, error: "harness: no service worker" }), 0);
+            setTimeout(() => cb && cb(fake ? fake(msg) : { ok: false, error: "harness: no service worker" }), 0);
           },
           openOptionsPage() {},
           getURL: (p) => p,

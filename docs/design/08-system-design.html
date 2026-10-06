@@ -1,0 +1,318 @@
+<helmet>
+<meta name="design_doc_mode" content="canvas">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;650;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #0e1513;
+    --surface: #141d1b;
+    --surface-raised: #1c2826;
+    --selected: #243230;
+    --divider: #1e2826;
+    --border-card: #222c2a;
+    --border-control: #27322f;
+    --border-hover: #34514c;
+    --node-grey: #27322f;
+    --text: #e7eeec;
+    --answer: #cfd9d6;
+    --secondary: #9aa9a4;
+    --muted: #8b9a96;
+    --placeholder: #6d7c78;
+    --accent: #34bcad;
+    --accent-hover: #3fcabb;
+    --accent-text: #5fd3c5;
+    --on-accent: #04211d;
+    --accent-tint-bg: #133a35;
+    --accent-tint-border: #1f5a52;
+    --amber: #e3a246;
+  }
+  
+  body {
+    margin: 0; background: #e8ebea; font-family: 'Geist', system-ui, sans-serif;
+    -webkit-font-smoothing: antialiased; padding: 40px; display: flex; flex-wrap: wrap; gap: 40px;
+  }
+  * { box-sizing: border-box; }
+  button, input, textarea { font: inherit; color: inherit; letter-spacing: inherit; outline: none; }
+  
+  .screen {
+    width: 390px; height: 884px; background: var(--bg); color: var(--text);
+    display: flex; flex-direction: column; position: relative;
+    box-shadow: 0 20px 50px rgba(10,20,18,.25); border-radius: 24px; overflow: hidden;
+  }
+  
+  /* Top bar */
+  .top-bar {
+    height: 56px; display: flex; align-items: center; gap: 12px; padding: 0 16px 0 8px; flex-shrink: 0;
+  }
+  .close-btn {
+    width: 40px; height: 40px; border-radius: 12px; background: transparent; border: none; cursor: pointer;
+    display: flex; align-items: center; justify-content: center; color: var(--secondary); padding: 0;
+  }
+  .close-btn:hover { background: var(--surface); }
+  
+  .progress-track { flex: 1; height: 4px; border-radius: 2px; background: var(--border-card); overflow: hidden; }
+  .progress-fill { height: 100%; background: var(--accent); }
+  .counter { min-width: 44px; text-align: right; font-size: 13px; font-weight: 600; color: var(--secondary); font-variant-numeric: tabular-nums; }
+  
+  /* Body */
+  .body { flex: 1; overflow-y: auto; padding: 24px; display: flex; flex-direction: column; }
+  
+  .mode-label { font-size: 12px; font-weight: 600; letter-spacing: 0.04em; text-transform: uppercase; color: var(--muted); }
+  
+  /* Dock */
+  .dock { flex-shrink: 0; padding: 12px 16px 24px; border-top: 1px solid var(--divider); display: flex; gap: 8px; }
+  .btn-primary { 
+    height: 60px; border-radius: 14px; background: var(--accent); color: var(--on-accent); 
+    font-size: 16px; font-weight: 650; border: none; cursor: pointer; flex: 1;
+    display: flex; align-items: center; justify-content: center;
+  }
+  .btn-primary:disabled { opacity: 0.45; cursor: not-allowed; }
+  .btn-secondary {
+    height: 60px; border-radius: 14px; background: transparent; border: 1px solid var(--border-control);
+    color: var(--text); font-size: 15px; font-weight: 600; cursor: pointer; padding: 0 18px;
+    display: flex; align-items: center; justify-content: center;
+  }
+  
+  /* Utilities */
+  svg { stroke-width: 2; fill: none; stroke: currentColor; stroke-linecap: round; stroke-linejoin: round; }
+  .textfield {
+    padding: 12px 14px; border-radius: 12px; border: 0; background: var(--surface);
+    box-shadow: inset 0 0 0 1px var(--border-control); font-size: 15px; line-height: 1.5; resize: none; overflow: hidden;
+  }
+  .textfield:focus { box-shadow: inset 0 0 0 1px var(--accent); }
+</style>
+</helmet>
+
+<!-- 5a DESIGN BRIEF (writing) -->
+<div class="screen" data-screen-label="5a Design brief Writing">
+  <div class="top-bar">
+    <button class="close-btn" aria-label="End session">
+      <svg width="20" height="20" viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+    </button>
+    <div class="progress-track"><div class="progress-fill" style="width: 16%"></div></div>
+    <div class="counter">1 / 6</div>
+  </div>
+  
+  <div class="body" style="overflow-x: hidden;">
+    <div class="mode-label">Design brief · ~15 min</div>
+    <div style="margin-top: 12px; font-size: 17px; line-height: 1.55; color: var(--text); text-wrap: pretty; display: -webkit-box; -webkit-line-clamp: 4; -webkit-box-orient: vertical; overflow: hidden;">
+      Design a scalable notification system that delivers alerts across push, SMS, and email. The system must support delayed notifications, rate limiting per user, and retry mechanisms for failed deliveries. It should handle up to 1 million notifications per minute during peak events.
+    </div>
+    <button style="margin-top: 6px; font-size: 14px; font-weight: 600; color: var(--accent-text); background: transparent; border: none; padding: 0; cursor: pointer; text-align: left;">Show full brief</button>
+    
+    <div style="margin-top: 20px; display: flex; gap: 6px; margin-left: -24px; margin-right: -24px; padding: 0 24px; overflow-x: auto; scrollbar-width: none;">
+      <!-- Has text -->
+      <button style="height: 32px; padding: 0 11px; border-radius: 8px; flex-shrink: 0; display: flex; align-items: center; gap: 5px; font-size: 13px; font-weight: 500; background: var(--accent-tint-bg); border: 1px solid var(--accent-tint-border); color: var(--accent-text);">
+        <svg width="12" height="12" viewBox="0 0 24 24" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg>
+        Requirements
+      </button>
+      <!-- Current -->
+      <button style="height: 32px; padding: 0 11px; border-radius: 8px; flex-shrink: 0; display: flex; align-items: center; font-size: 13px; font-weight: 600; background: var(--selected); border: 1px solid var(--border-hover); color: var(--text);">
+        Estimates
+      </button>
+      <!-- Empty -->
+      <button style="height: 32px; padding: 0 11px; border-radius: 8px; flex-shrink: 0; display: flex; align-items: center; font-size: 13px; font-weight: 500; background: transparent; border: 1px solid var(--border-control); color: var(--secondary);">
+        API
+      </button>
+      <button style="height: 32px; padding: 0 11px; border-radius: 8px; flex-shrink: 0; display: flex; align-items: center; font-size: 13px; font-weight: 500; background: transparent; border: 1px solid var(--border-control); color: var(--secondary);">
+        Data model
+      </button>
+      <button style="height: 32px; padding: 0 11px; border-radius: 8px; flex-shrink: 0; display: flex; align-items: center; font-size: 13px; font-weight: 500; background: transparent; border: 1px solid var(--border-control); color: var(--secondary);">
+        Components
+      </button>
+      <button style="height: 32px; padding: 0 11px; border-radius: 8px; flex-shrink: 0; display: flex; align-items: center; font-size: 13px; font-weight: 500; background: transparent; border: 1px solid var(--border-control); color: var(--secondary);">
+        Trade-offs
+      </button>
+    </div>
+    
+    <!-- Active section -->
+    <div style="margin-top: 24px;">
+      <div style="display: flex; justify-content: space-between; align-items: baseline;">
+        <div style="font-size: 17px; font-weight: 650; color: var(--text);">Estimates</div>
+        <!-- (12px muted limit text goes here when > 1600) -->
+      </div>
+      <div style="margin-top: 4px; font-size: 14px; line-height: 1.5; color: var(--muted);">Rough numbers: connection rate, table size, memory per entry.</div>
+      <textarea class="textfield" style="margin-top: 12px; min-height: 180px; width: 100%;" placeholder="e.g. Assuming 1M users, QPS = 1M/60s ≈ 16k..."></textarea>
+    </div>
+  </div>
+  
+  <div class="dock">
+    <button class="btn-secondary">Submit now</button>
+    <button class="btn-primary">Next: API</button>
+  </div>
+</div>
+
+<!-- 5b DESIGN BRIEF (feedback) -->
+<div class="screen" data-screen-label="5b Design brief Feedback">
+  <div class="top-bar">
+    <button class="close-btn" aria-label="End session">
+      <svg width="20" height="20" viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+    </button>
+    <div class="progress-track"><div class="progress-fill" style="width: 100%"></div></div>
+    <div class="counter">6 / 6</div>
+  </div>
+  
+  <div class="body">
+    <div class="mode-label">Design brief · ~15 min</div>
+    <div style="margin-top: 12px; font-size: 17px; line-height: 1.55; color: var(--text); text-wrap: pretty; display: -webkit-box; -webkit-line-clamp: 4; -webkit-box-orient: vertical; overflow: hidden;">
+      Design a scalable notification system that delivers alerts across push, SMS, and email. The system must support delayed notifications, rate limiting per user, and retry mechanisms for failed deliveries. It should handle up to 1 million notifications per minute during peak events.
+    </div>
+    <button style="margin-top: 6px; font-size: 14px; font-weight: 600; color: var(--accent-text); background: transparent; border: none; padding: 0; cursor: pointer; text-align: left;">Show full brief</button>
+    
+    <div style="margin-top: 24px; font-size: 13px; font-weight: 600; color: var(--secondary);">Feedback</div>
+    
+    <div style="margin-top: 4px; display: flex; flex-direction: column;">
+      <!-- Row 1 -->
+      <div style="padding: 14px 0; border-bottom: 1px solid var(--divider);">
+        <div style="display: flex; align-items: center; gap: 8px; font-size: 15px; font-weight: 650; color: var(--text);">
+          <svg width="18" height="18" viewBox="0 0 24 24" style="color: var(--accent-text);"><circle cx="12" cy="12" r="10"/><line x1="9" y1="12" x2="11" y2="14"/><line x1="15" y1="9" x2="11" y2="14"/></svg>
+          Requirements
+        </div>
+        <div style="margin-top: 4px; font-size: 14px; line-height: 1.5; color: var(--secondary);">You correctly identified the need for at-least-once delivery semantics.</div>
+      </div>
+      <!-- Row 2 -->
+      <div style="padding: 14px 0; border-bottom: 1px solid var(--divider);">
+        <div style="display: flex; align-items: center; gap: 8px; font-size: 15px; font-weight: 650; color: var(--text);">
+          <svg width="18" height="18" viewBox="0 0 24 24" style="color: var(--amber);"><circle cx="12" cy="12" r="10"/><line x1="8" y1="12" x2="16" y2="12"/></svg>
+          Estimates
+        </div>
+        <div style="margin-top: 4px; font-size: 14px; line-height: 1.5; color: var(--secondary);">Your bandwidth estimate is missing the retry payload overhead.</div>
+      </div>
+      <!-- Row 3 (Skipped) -->
+      <div style="padding: 14px 0; border-bottom: 1px solid var(--divider);">
+        <div style="display: flex; align-items: center; gap: 8px; font-size: 15px; font-weight: 650; color: var(--muted);">
+          <svg width="18" height="18" viewBox="0 0 24 24" stroke-dasharray="3 3"><circle cx="12" cy="12" r="10"/></svg>
+          API · skipped
+        </div>
+      </div>
+    </div>
+    
+    <button style="margin-top: 12px; font-size: 14px; font-weight: 600; color: var(--accent-text); background: transparent; border: none; padding: 0; cursor: pointer; text-align: left;">See a model answer</button>
+  </div>
+  
+  <div class="dock">
+    <button class="btn-primary">Done</button>
+  </div>
+</div>
+
+<!-- 5c ESTIMATE (answering) -->
+<div class="screen" data-screen-label="5c Estimate Answering">
+  <div class="top-bar">
+    <button class="close-btn" aria-label="End session">
+      <svg width="20" height="20" viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+    </button>
+    <div class="progress-track"><div class="progress-fill" style="width: 20%"></div></div>
+    <div class="counter">1 / 5</div>
+  </div>
+  
+  <div class="body">
+    <div class="mode-label">Estimate</div>
+    <div style="margin-top: 12px; font-size: 22px; font-weight: 650; letter-spacing: -0.015em; line-height: 1.3;">What is the approximate latency to read 1 MB sequentially from memory?</div>
+    
+    <input type="text" style="margin-top: 24px; height: 56px; padding: 0 14px; border-radius: 12px; border: 0; background: var(--surface); box-shadow: inset 0 0 0 1px var(--border-control); font-size: 17px; font-variant-numeric: tabular-nums; width: 100%;" placeholder="e.g. 300 TB, 12k QPS, 2.5 GB/s">
+    <div style="margin-top: 10px; font-size: 13px; color: var(--muted);">The right order of magnitude counts.</div>
+  </div>
+  
+  <div class="dock">
+    <button class="btn-secondary">Don't know</button>
+    <button class="btn-primary" disabled>Check</button>
+  </div>
+</div>
+
+<!-- 5d ESTIMATE (checked) -->
+<div class="screen" data-screen-label="5d Estimate Checked">
+  <div class="top-bar">
+    <button class="close-btn" aria-label="End session">
+      <svg width="20" height="20" viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+    </button>
+    <div class="progress-track"><div class="progress-fill" style="width: 20%"></div></div>
+    <div class="counter">1 / 5</div>
+  </div>
+  
+  <div class="body">
+    <div class="mode-label">Estimate</div>
+    <div style="margin-top: 12px; font-size: 22px; font-weight: 650; letter-spacing: -0.015em; line-height: 1.3;">What is the approximate latency to read 1 MB sequentially from memory?</div>
+    
+    <div style="margin-top: 24px; height: 56px; padding: 0 14px; border-radius: 12px; background: var(--surface); box-shadow: inset 0 0 0 1px var(--accent); font-size: 17px; font-variant-numeric: tabular-nums; display: flex; align-items: center;">250 us</div>
+    
+    <div style="margin-top: 16px; display: flex; align-items: center; gap: 8px; font-size: 15px; font-weight: 650; color: var(--text);">
+      <svg width="18" height="18" viewBox="0 0 24 24" style="color: var(--accent-text);"><circle cx="12" cy="12" r="10"/><line x1="9" y1="12" x2="11" y2="14"/><line x1="15" y1="9" x2="11" y2="14"/></svg>
+      Correct · within 10%
+    </div>
+    
+    <div class="mode-label" style="margin-top: 24px;">Working</div>
+    <div style="margin-top: 8px; display: flex; flex-direction: column; gap: 6px;">
+      <div style="font-size: 15px; line-height: 1.5; color: var(--answer); font-variant-numeric: tabular-nums;">Memory bandwidth is ~4 GB/s = 4 MB/ms.</div>
+      <div style="font-size: 15px; line-height: 1.5; color: var(--answer); font-variant-numeric: tabular-nums;">1 MB / 4 MB/ms = 0.25 ms.</div>
+      <div style="font-size: 15px; line-height: 1.5; color: var(--answer); font-variant-numeric: tabular-nums;">0.25 ms = 250 μs.</div>
+    </div>
+    <div style="margin-top: 6px; font-size: 15px; line-height: 1.5; color: var(--secondary);">This is an order of magnitude faster than a network round trip inside the same datacenter (500 μs).</div>
+  </div>
+  
+  <div class="dock">
+    <button class="btn-primary">Next</button>
+  </div>
+</div>
+
+<!-- 5e WHAT BREAKS -->
+<div class="screen" data-screen-label="5e What breaks">
+  <div class="top-bar">
+    <button class="close-btn" aria-label="End session">
+      <svg width="20" height="20" viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+    </button>
+    <div class="progress-track"><div class="progress-fill" style="width: 50%"></div></div>
+    <div class="counter">2 / 4</div>
+  </div>
+  
+  <div class="body">
+    <div class="mode-label">What breaks</div>
+    <div style="margin-top: 12px; font-size: 17px; line-height: 1.55; color: var(--text);">You launch a feature letting users upload 100MB videos. Traffic spikes 5x. Users complain the upload fails at 99%.</div>
+    
+    <div style="margin-top: 20px; font-size: 13px; font-weight: 600; color: var(--secondary);">Architecture</div>
+    <div style="margin-top: 12px; display: flex; flex-direction: column;">
+      <!-- Row 1 -->
+      <div style="display: flex; gap: 14px;">
+        <div style="width: 16px; display: flex; flex-direction: column; align-items: center;">
+          <div style="width: 12px; height: 12px; border-radius: 6px; background: var(--node-grey); margin-top: 4px; flex-shrink: 0;"></div>
+          <div style="width: 2px; flex: 1; background: var(--border-card); margin: 4px 0;"></div>
+        </div>
+        <div style="flex: 1; min-width: 0; padding-bottom: 14px; font-size: 15px; line-height: 1.45; color: var(--text);">
+          LB <span style="color: var(--muted);">· Nginx</span>
+        </div>
+      </div>
+      <!-- Row 2 -->
+      <div style="display: flex; gap: 14px;">
+        <div style="width: 16px; display: flex; flex-direction: column; align-items: center;">
+          <div style="width: 12px; height: 12px; border-radius: 6px; background: var(--node-grey); margin-top: 4px; flex-shrink: 0;"></div>
+          <div style="width: 2px; flex: 1; background: var(--border-card); margin: 4px 0;"></div>
+        </div>
+        <div style="flex: 1; min-width: 0; padding-bottom: 14px; font-size: 15px; line-height: 1.45; color: var(--text);">
+          API Server <span style="color: var(--muted);">· Node.js, 1GB memory</span>
+        </div>
+      </div>
+      <!-- Row 3 -->
+      <div style="display: flex; gap: 14px;">
+        <div style="width: 16px; display: flex; flex-direction: column; align-items: center;">
+          <div style="width: 12px; height: 12px; border-radius: 6px; background: var(--node-grey); margin-top: 4px; flex-shrink: 0;"></div>
+        </div>
+        <div style="flex: 1; min-width: 0; padding-bottom: 0px; font-size: 15px; line-height: 1.45; color: var(--text);">
+          Storage <span style="color: var(--muted);">· S3 Standard</span>
+        </div>
+      </div>
+    </div>
+    
+    <div style="margin-top: 24px; display: flex; justify-content: space-between; align-items: baseline;">
+      <div style="font-size: 13px; font-weight: 600; color: var(--secondary);">What breaks, and why?</div>
+      <button style="background: transparent; border: none; padding: 0; display: flex; align-items: center; gap: 4px; font-size: 14px; font-weight: 600; color: var(--accent-text); cursor: pointer;">
+        <svg width="16" height="16" viewBox="0 0 24 24"><path d="M9 18h6"/><path d="M10 22h4"/><path d="M12 2a7 7 0 0 0-7 7c0 2 1.5 4 3 5s1 3 1 3h6s0-2 1-3 3-3 3-5a7 7 0 0 0-7-7z"/></svg>
+        Hint <span style="font-weight: 500; color: var(--muted);">−½ pt</span>
+      </button>
+    </div>
+    
+    <textarea class="textfield" style="margin-top: 8px; min-height: 140px; width: 100%;" placeholder="What fails, under what load or failure, and how you'd fix it"></textarea>
+  </div>
+  
+  <div class="dock">
+    <button class="btn-primary" disabled>Submit</button>
+  </div>
+</div>

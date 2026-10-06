@@ -1,0 +1,378 @@
+<helmet>
+<meta name="design_doc_mode" content="canvas">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;650;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #0e1513;
+    --surface: #141d1b;
+    --surface-raised: #1c2826;
+    --selected: #243230;
+    --divider: #1e2826;
+    --border-card: #222c2a;
+    --border-control: #27322f;
+    --border-hover: #34514c;
+    --text: #e7eeec;
+    --answer: #cfd9d6;
+    --secondary: #9aa9a4;
+    --muted: #8b9a96;
+    --placeholder: #6d7c78;
+    --accent: #34bcad;
+    --accent-hover: #3fcabb;
+    --accent-text: #5fd3c5;
+    --on-accent: #04211d;
+    --accent-tint-bg: #133a35;
+    --accent-tint-border: #1f5a52;
+    --amber: #e3a246;
+  }
+  
+  body {
+    margin: 0; background: #e8ebea; font-family: 'Geist', system-ui, sans-serif;
+    -webkit-font-smoothing: antialiased; padding: 40px; display: flex; flex-wrap: wrap; gap: 40px;
+  }
+  * { box-sizing: border-box; }
+  button, input, textarea { font: inherit; color: inherit; letter-spacing: inherit; outline: none; }
+  
+  .screen {
+    width: 390px; height: 884px; background: var(--bg); color: var(--text);
+    display: flex; flex-direction: column; position: relative;
+    box-shadow: 0 20px 50px rgba(10,20,18,.25); border-radius: 24px; overflow: hidden;
+  }
+  
+  /* Top bar */
+  .top-bar {
+    height: 56px; display: flex; align-items: center; gap: 12px; padding: 0 16px 0 8px; flex-shrink: 0;
+  }
+  .close-btn {
+    width: 40px; height: 40px; border-radius: 12px; background: transparent; border: none; cursor: pointer;
+    display: flex; align-items: center; justify-content: center; color: var(--secondary); padding: 0;
+  }
+  .close-btn:hover { background: var(--surface); }
+  
+  .progress-track { flex: 1; height: 4px; border-radius: 2px; background: var(--border-card); overflow: hidden; }
+  .progress-fill { height: 100%; background: var(--accent); }
+  .counter { min-width: 44px; text-align: right; font-size: 13px; font-weight: 600; color: var(--secondary); font-variant-numeric: tabular-nums; }
+  
+  /* Body */
+  .body { flex: 1; overflow-y: auto; padding: 24px; display: flex; flex-direction: column; }
+  
+  .mode-label { font-size: 12px; font-weight: 600; letter-spacing: 0.04em; text-transform: uppercase; color: var(--muted); }
+  .prompt { margin-top: 12px; font-weight: 650; letter-spacing: -0.02em; text-wrap: pretty; margin-bottom: 0; }
+  .prompt-short { font-size: 30px; line-height: 1.2; }
+  .prompt-full { font-size: 22px; line-height: 1.3; }
+  .prompt-teach { font-size: 24px; line-height: 1.25; }
+  
+  /* Dock */
+  .dock { flex-shrink: 0; padding: 12px 16px 24px; border-top: 1px solid var(--divider); }
+  .btn-primary { 
+    height: 60px; border-radius: 14px; background: var(--accent); color: var(--on-accent); 
+    font-size: 16px; font-weight: 650; border: none; cursor: pointer; width: 100%;
+    display: flex; align-items: center; justify-content: center;
+  }
+  .btn-primary:hover { background: var(--accent-hover); }
+  .btn-primary:disabled { opacity: 0.45; cursor: not-allowed; }
+  .btn-secondary {
+    height: 60px; border-radius: 14px; background: transparent; border: 1px solid var(--border-control);
+    color: var(--text); font-size: 15px; font-weight: 600; cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+  }
+  
+  /* SVG icons */
+  svg { stroke-width: 2; fill: none; stroke: currentColor; stroke-linecap: round; stroke-linejoin: round; }
+</style>
+</helmet>
+
+<!-- 3a FLASHCARDS (front) -->
+<div class="screen" data-screen-label="3a Flashcards Front">
+  <div class="top-bar">
+    <button class="close-btn" aria-label="End session">
+      <svg width="20" height="20" viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+    </button>
+    <div class="progress-track"><div class="progress-fill" style="width: 2%"></div></div>
+    <div class="counter">1 / 37</div>
+  </div>
+  <div class="body">
+    <div class="mode-label">Flashcards</div>
+    <div class="prompt prompt-short">to garnish</div>
+    <div style="margin-top: 12px; font-size: 14px; color: var(--muted);">Recall the answer, then reveal it.</div>
+  </div>
+  <div class="dock">
+    <button class="btn-primary">Show answer</button>
+  </div>
+</div>
+
+<!-- 3b FLASHCARDS (revealed) -->
+<div class="screen" data-screen-label="3b Flashcards Revealed">
+  <div class="top-bar">
+    <button class="close-btn" aria-label="End session">
+      <svg width="20" height="20" viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+    </button>
+    <div class="progress-track"><div class="progress-fill" style="width: 2%"></div></div>
+    <div class="counter">1 / 37</div>
+  </div>
+  <div class="body">
+    <div class="mode-label">Flashcards</div>
+    <div class="prompt prompt-short">to garnish</div>
+    <div style="height: 1px; background: var(--border-card); margin: 20px 0;"></div>
+    <div style="font-size: 18px; line-height: 1.5; color: var(--answer);">to garnish a lot of my time</div>
+    <button style="margin-top: 20px; background: transparent; border: none; padding: 0; display: flex; align-items: center; gap: 6px; font-size: 14px; font-weight: 600; color: var(--accent-text); cursor: pointer;">
+      Apply it in a new scenario
+      <svg width="16" height="16" viewBox="0 0 24 24"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg>
+    </button>
+  </div>
+  <div class="dock">
+    <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px;">
+      <button style="height: 60px; border-radius: 12px; border: 1px solid var(--border-control); background: var(--surface); display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; cursor: pointer;">
+        <div style="font-size: 15px; font-weight: 600; color: var(--text);">Again</div>
+        <div style="font-size: 12px; font-weight: 500; color: var(--muted);">1d</div>
+      </button>
+      <button style="height: 60px; border-radius: 12px; border: 1px solid var(--border-control); background: var(--surface); display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; cursor: pointer;">
+        <div style="font-size: 15px; font-weight: 600; color: var(--text);">Hard</div>
+        <div style="font-size: 12px; font-weight: 500; color: var(--muted);">1d</div>
+      </button>
+      <button style="height: 60px; border-radius: 12px; border: 1px solid var(--border-control); background: var(--surface); display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; cursor: pointer;">
+        <div style="font-size: 15px; font-weight: 600; color: var(--text);">Good</div>
+        <div style="font-size: 12px; font-weight: 500; color: var(--muted);">2d</div>
+      </button>
+      <button style="height: 60px; border-radius: 12px; border: 1px solid var(--border-control); background: var(--surface); display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; cursor: pointer;">
+        <div style="font-size: 15px; font-weight: 600; color: var(--text);">Easy</div>
+        <div style="font-size: 12px; font-weight: 500; color: var(--muted);">8d</div>
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- 3c TYPE ANSWERS (writing) -->
+<div class="screen" data-screen-label="3c Type Answers Writing">
+  <div class="top-bar">
+    <button class="close-btn" aria-label="End session">
+      <svg width="20" height="20" viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+    </button>
+    <div class="progress-track"><div class="progress-fill" style="width: 20%"></div></div>
+    <div class="counter">2 / 10</div>
+  </div>
+  <div class="body">
+    <div class="mode-label">Type the answer</div>
+    <div class="prompt prompt-short">to garnish</div>
+    
+    <textarea placeholder="Type what you remember" style="margin-top: 24px; min-height: 132px; padding: 12px 14px; border-radius: 12px; border: 0; background: var(--surface); box-shadow: inset 0 0 0 1px var(--border-control); font-size: 15px; line-height: 1.5; resize: none; overflow: hidden;"></textarea>
+    
+    <div style="margin-top: 10px; font-size: 13px; color: var(--muted);">Checked by AI against the card's answer.</div>
+  </div>
+  <div class="dock" style="display: flex; gap: 8px;">
+    <button class="btn-secondary" style="padding: 0 18px;">Don't know</button>
+    <button class="btn-primary" style="flex: 1;" disabled>Check answer</button>
+  </div>
+</div>
+
+<!-- 3d TYPE ANSWERS (checked) -->
+<div class="screen" data-screen-label="3d Type Answers Checked">
+  <div class="top-bar">
+    <button class="close-btn" aria-label="End session">
+      <svg width="20" height="20" viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+    </button>
+    <div class="progress-track"><div class="progress-fill" style="width: 20%"></div></div>
+    <div class="counter">2 / 10</div>
+  </div>
+  <div class="body">
+    <div class="mode-label">Type the answer</div>
+    <div class="prompt prompt-short">to garnish</div>
+    
+    <!-- Readonly block -->
+    <div style="margin-top: 24px; min-height: 132px; padding: 12px 14px; border-radius: 12px; background: var(--surface); box-shadow: inset 0 0 0 1px var(--amber); font-size: 15px; line-height: 1.5;">
+      to garnish my time
+    </div>
+    
+    <div style="margin-top: 16px; display: flex; align-items: center; gap: 8px; font-size: 15px; font-weight: 650; color: var(--amber);">
+      <svg width="18" height="18" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><line x1="8" y1="12" x2="16" y2="12"/></svg>
+      Partly right
+    </div>
+    <div style="margin-top: 6px; font-size: 14px; line-height: 1.5; color: var(--secondary);">You missed that it usually means taking up a lot of time.</div>
+    
+    <div class="mode-label" style="margin-top: 24px;">Card answer</div>
+    <div style="margin-top: 8px; font-size: 15px; line-height: 1.5; color: var(--answer);">to garnish a lot of my time</div>
+  </div>
+  <div class="dock" style="display: flex; gap: 8px;">
+    <button class="btn-secondary" style="padding: 0 18px;">I was right</button>
+    <button class="btn-primary" style="flex: 1;">Next</button>
+  </div>
+</div>
+
+<!-- 3e TEACH IT BACK (start) -->
+<div class="screen" data-screen-label="3e Teach it back Start">
+  <div class="top-bar">
+    <button class="close-btn" aria-label="End session">
+      <svg width="20" height="20" viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+    </button>
+    <div class="progress-track"><div class="progress-fill" style="width: 33%"></div></div>
+    <div class="counter">2 / 6</div>
+  </div>
+  <div class="body">
+    <div class="mode-label">Teach it back</div>
+    <div class="prompt prompt-teach">Explain Just 78 to someone who's never heard of it</div>
+    <div style="margin-top: 8px; font-size: 15px; line-height: 1.5; color: var(--secondary);">They'll ask follow-up questions. Ask for a hint whenever you're stuck.</div>
+    
+    <div style="margin-top: 24px; font-size: 13px; font-weight: 600; color: var(--secondary);">Ideas to cover</div>
+    <div style="margin-top: 10px; display: flex; flex-wrap: wrap; gap: 6px;">
+      <div style="height: 30px; padding: 0 10px; border-radius: 8px; border: 1px solid var(--border-control); font-size: 13px; color: var(--answer); display: flex; align-items: center;">to garnish</div>
+      <div style="height: 30px; padding: 0 10px; border-radius: 8px; border: 1px solid var(--border-control); font-size: 13px; color: var(--answer); display: flex; align-items: center;">to pry</div>
+      <div style="height: 30px; padding: 0 10px; border-radius: 8px; border: 1px solid var(--border-control); font-size: 13px; color: var(--answer); display: flex; align-items: center;">to extricate</div>
+      <div style="height: 30px; padding: 0 10px; border-radius: 8px; border: 1px solid var(--border-control); font-size: 13px; color: var(--answer); display: flex; align-items: center;">silver lining</div>
+    </div>
+    
+    <div style="margin-top: 24px; font-size: 13px; font-weight: 600; color: var(--secondary);">Who are you teaching?</div>
+    <div style="margin-top: 10px; height: 44px; padding: 3px; border-radius: 12px; background: var(--surface); border: 1px solid var(--border-card); display: flex; gap: 3px;">
+      <button style="flex: 1; border: none; radius: 9px; border-radius: 9px; font-size: 14px; font-weight: 600; background: var(--selected); color: var(--text); cursor: pointer;">A curious 12-year-old</button>
+      <button style="flex: 1; border: none; radius: 9px; border-radius: 9px; font-size: 14px; font-weight: 600; background: transparent; color: var(--muted); cursor: pointer;">A complete beginner</button>
+    </div>
+    
+    <textarea placeholder="Start explaining in your own words" style="margin-top: 24px; min-height: 120px; padding: 12px 14px; border-radius: 12px; border: 0; background: var(--surface); box-shadow: inset 0 0 0 1px var(--border-control); font-size: 15px; line-height: 1.5; resize: none;"></textarea>
+  </div>
+  <div class="dock">
+    <button class="btn-primary" disabled>Start teaching</button>
+  </div>
+</div>
+
+<!-- 3f TEACH IT BACK (conversation) -->
+<div class="screen" data-screen-label="3f Teach it back Conversation">
+  <div class="top-bar">
+    <button class="close-btn" aria-label="End session">
+      <svg width="20" height="20" viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+    </button>
+    <div class="progress-track"><div class="progress-fill" style="width: 33%"></div></div>
+    <div class="counter">2 / 6</div>
+  </div>
+  
+  <div style="padding: 4px 24px 14px; border-bottom: 1px solid var(--divider); display: flex; flex-wrap: wrap; gap: 4px;">
+    <div style="height: 28px; padding: 0 9px; border-radius: 8px; border: 1px solid var(--accent-tint-border); background: var(--accent-tint-bg); color: var(--accent-text); font-size: 13px; display: flex; align-items: center; gap: 4px;">
+      <svg width="12" height="12" viewBox="0 0 24 24" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg>
+      to garnish
+    </div>
+    <div style="height: 28px; padding: 0 9px; border-radius: 8px; border: 1px solid var(--border-control); background: transparent; color: var(--secondary); font-size: 13px; display: flex; align-items: center;">
+      to pry
+    </div>
+  </div>
+  
+  <div style="flex: 1; padding: 20px 24px; display: flex; flex-direction: column; gap: 16px; overflow-y: auto;">
+    <!-- User message -->
+    <div style="align-self: flex-end; max-width: 85%; padding: 10px 14px; border-radius: 14px 14px 4px 14px; background: var(--surface-raised); font-size: 15px; line-height: 1.5; color: var(--text);">
+      It's when something takes up a lot of your time.
+    </div>
+    
+    <!-- Learner message -->
+    <div style="align-self: flex-start; max-width: 85%;">
+      <div style="font-size: 12px; font-weight: 600; color: var(--muted); margin-bottom: 4px;">A curious 12-year-old</div>
+      <div style="padding: 10px 14px; border-radius: 14px 14px 14px 4px; background: var(--surface); border: 1px solid var(--border-card); color: var(--answer); font-size: 15px; line-height: 1.5;">
+        Oh, like homework! But how is it different from just saying "it takes up time"?
+      </div>
+    </div>
+  </div>
+  
+  <div class="dock" style="display: flex; flex-direction: column; gap: 10px;">
+    <div style="display: flex; align-items: flex-end; gap: 8px;">
+      <textarea placeholder="Reply" style="flex: 1; min-height: 48px; padding: 13px 14px; border-radius: 12px; border: 0; background: var(--surface); box-shadow: inset 0 0 0 1px var(--border-control); font-size: 15px; line-height: 1.5; resize: none; overflow: hidden;"></textarea>
+      <button style="width: 48px; height: 48px; border-radius: 12px; background: var(--accent); color: var(--on-accent); border: none; display: flex; align-items: center; justify-content: center; cursor: pointer;" aria-label="Send">
+        <svg width="20" height="20" viewBox="0 0 24 24"><line x1="12" y1="19" x2="12" y2="5"/><polyline points="5 12 12 5 19 12"/></svg>
+      </button>
+    </div>
+    <div style="display: flex; justify-content: space-between; align-items: center;">
+      <button style="height: 32px; background: transparent; border: none; padding: 0; display: flex; align-items: center; gap: 6px; font-size: 14px; font-weight: 600; color: var(--accent-text); cursor: pointer;">
+        <svg width="16" height="16" viewBox="0 0 24 24"><path d="M9 18h6"/><path d="M10 22h4"/><path d="M12 2a7 7 0 0 0-7 7c0 2 1.5 4 3 5s1 3 1 3h6s0-2 1-3 3-3 3-5a7 7 0 0 0-7-7z"/></svg>
+        Get a hint
+      </button>
+      <button style="height: 32px; background: transparent; border: none; padding: 0; font-size: 14px; font-weight: 600; color: var(--secondary); cursor: pointer;">
+        Finish and review
+      </button>
+    </div>
+  </div>
+</div>
+
+
+<!-- 3g QUIZ (question) -->
+<div class="screen" data-screen-label="3g Quiz Question">
+  <div class="top-bar">
+    <button class="close-btn" aria-label="End session">
+      <svg width="20" height="20" viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+    </button>
+    <div class="progress-track"><div class="progress-fill" style="width: 20%"></div></div>
+    <div class="counter">1 / 5</div>
+  </div>
+  <div class="body">
+    <div class="mode-label">Quiz</div>
+    <div class="prompt prompt-full">Which term describes 'a slightly disrespectful remark made jokingly in a formal setting'?</div>
+    
+    <div style="margin-top: 24px; display: flex; flex-direction: column; gap: 8px;">
+      <button style="width: 100%; min-height: 56px; padding: 12px 14px; border-radius: 12px; border: 1px solid var(--border-card); background: var(--surface); display: flex; align-items: center; gap: 12px; cursor: pointer; text-align: left;">
+        <div style="width: 28px; height: 28px; border-radius: 8px; border: 1px solid var(--border-control); display: flex; align-items: center; justify-content: center; font-size: 13px; font-weight: 650; color: var(--secondary); flex-shrink: 0;">A</div>
+        <div style="font-size: 15px; line-height: 1.4; color: var(--text);">snob</div>
+      </button>
+      <button style="width: 100%; min-height: 56px; padding: 12px 14px; border-radius: 12px; border: 1px solid var(--border-card); background: var(--surface); display: flex; align-items: center; gap: 12px; cursor: pointer; text-align: left;">
+        <div style="width: 28px; height: 28px; border-radius: 8px; border: 1px solid var(--border-control); display: flex; align-items: center; justify-content: center; font-size: 13px; font-weight: 650; color: var(--secondary); flex-shrink: 0;">B</div>
+        <div style="font-size: 15px; line-height: 1.4; color: var(--text);">sound flip</div>
+      </button>
+      <button style="width: 100%; min-height: 56px; padding: 12px 14px; border-radius: 12px; border: 1px solid var(--border-card); background: var(--surface); display: flex; align-items: center; gap: 12px; cursor: pointer; text-align: left;">
+        <div style="width: 28px; height: 28px; border-radius: 8px; border: 1px solid var(--border-control); display: flex; align-items: center; justify-content: center; font-size: 13px; font-weight: 650; color: var(--secondary); flex-shrink: 0;">C</div>
+        <div style="font-size: 15px; line-height: 1.4; color: var(--text);">gauche</div>
+      </button>
+      <button style="width: 100%; min-height: 56px; padding: 12px 14px; border-radius: 12px; border: 1px solid var(--border-card); background: var(--surface); display: flex; align-items: center; gap: 12px; cursor: pointer; text-align: left;">
+        <div style="width: 28px; height: 28px; border-radius: 8px; border: 1px solid var(--border-control); display: flex; align-items: center; justify-content: center; font-size: 13px; font-weight: 650; color: var(--secondary); flex-shrink: 0;">D</div>
+        <div style="font-size: 15px; line-height: 1.4; color: var(--text);">beat the piss out of</div>
+      </button>
+    </div>
+  </div>
+  <div class="dock">
+    <div style="height: 60px; display: flex; align-items: center; justify-content: center; font-size: 13px; color: var(--muted);">Pick an answer, or press A–D</div>
+  </div>
+</div>
+
+<!-- 3h QUIZ (answered) -->
+<div class="screen" data-screen-label="3h Quiz Answered">
+  <div class="top-bar">
+    <button class="close-btn" aria-label="End session">
+      <svg width="20" height="20" viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+    </button>
+    <div class="progress-track"><div class="progress-fill" style="width: 20%"></div></div>
+    <div class="counter">1 / 5</div>
+  </div>
+  <div class="body">
+    <div class="mode-label">Quiz</div>
+    <div class="prompt prompt-full">Which term describes 'a slightly disrespectful remark made jokingly in a formal setting'?</div>
+    
+    <div style="margin-top: 24px; display: flex; flex-direction: column; gap: 8px;">
+      <!-- Opacity 0.45 -->
+      <button style="width: 100%; min-height: 56px; padding: 12px 14px; border-radius: 12px; border: 1px solid var(--border-card); background: var(--surface); display: flex; align-items: center; gap: 12px; cursor: default; text-align: left; opacity: 0.45;">
+        <div style="width: 28px; height: 28px; border-radius: 8px; border: 1px solid var(--border-control); display: flex; align-items: center; justify-content: center; font-size: 13px; font-weight: 650; color: var(--secondary); flex-shrink: 0;">A</div>
+        <div style="font-size: 15px; line-height: 1.4; color: var(--text);">snob</div>
+      </button>
+      
+      <!-- Correct Option -->
+      <button style="width: 100%; min-height: 56px; padding: 12px 14px; border-radius: 12px; border: 1px solid var(--accent); background: var(--surface); display: flex; align-items: center; gap: 12px; cursor: default; text-align: left;">
+        <div style="width: 28px; height: 28px; border-radius: 8px; border: 1px solid var(--accent); background: var(--accent); display: flex; align-items: center; justify-content: center; flex-shrink: 0; color: var(--on-accent);">
+          <svg width="16" height="16" viewBox="0 0 24 24" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg>
+        </div>
+        <div style="font-size: 15px; line-height: 1.4; color: var(--text);">sound flip</div>
+      </button>
+      
+      <!-- Opacity 0.45 -->
+      <button style="width: 100%; min-height: 56px; padding: 12px 14px; border-radius: 12px; border: 1px solid var(--border-card); background: var(--surface); display: flex; align-items: center; gap: 12px; cursor: default; text-align: left; opacity: 0.45;">
+        <div style="width: 28px; height: 28px; border-radius: 8px; border: 1px solid var(--border-control); display: flex; align-items: center; justify-content: center; font-size: 13px; font-weight: 650; color: var(--secondary); flex-shrink: 0;">C</div>
+        <div style="font-size: 15px; line-height: 1.4; color: var(--text);">gauche</div>
+      </button>
+      
+      <!-- Wrong Pick -->
+      <button style="width: 100%; min-height: 56px; padding: 12px 14px; border-radius: 12px; border: 1px solid var(--amber); background: var(--surface); display: flex; align-items: center; gap: 12px; cursor: default; text-align: left;">
+        <div style="width: 28px; height: 28px; border-radius: 8px; border: 1px solid var(--amber); background: var(--amber); display: flex; align-items: center; justify-content: center; flex-shrink: 0; color: var(--on-accent);">
+          <svg width="14" height="14" viewBox="0 0 24 24" stroke-width="3"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+        </div>
+        <div style="font-size: 15px; line-height: 1.4; color: var(--text);">beat the piss out of</div>
+      </button>
+    </div>
+    
+    <div style="margin-top: 16px; font-size: 15px; line-height: 1.5; color: var(--secondary);">
+      <span style="color: var(--amber); font-weight: 650;">Not quite.</span> The definition for 'sound flip' matches this description.
+    </div>
+  </div>
+  <div class="dock">
+    <button class="btn-primary">Next question</button>
+  </div>
+</div>

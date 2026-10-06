@@ -1,9 +1,10 @@
 import { renderStats, openFeedback } from "./views/stats.js";
 import { saveSettings } from "../storage/store.js";
 import { startCompare, selectComparePair, toggleCompareSame, createForkCards } from "./flows/compare.js";
-import { finishDesignDrill, requestDesignCurveball, startDesignDrill, submitDesign, submitDesignCurveball } from "./flows/design.js";
-import { estimationNext, startEstimationDrill, submitEstimation } from "./flows/estimation.js";
-import { requestBottleneckHint, startBottleneckDrill, submitBottleneck } from "./flows/bottleneck.js";
+import { startDesignDrill, submitDesign, designAction } from "./flows/design.js";
+import { startClinicalCase, clinicalCaseAction } from "./flows/clinical.js";
+import { estimationNext, startEstimationDrill, submitEstimation, estimationAction } from "./flows/estimation.js";
+import { requestBottleneckHint, startBottleneckDrill, submitBottleneck, bottleneckAction } from "./flows/bottleneck.js";
 import { cancelChainEdit, dismissMedicineSuggestion, openChainStepEdit, removeChainStep, saveChainStep } from "./flows/chains.js";
 import { confirmDeleteAccount, renderDeleteAccount } from "./views/delete-account.js";
 import { doImport, previewImport, renderImport, lookupShare, importSharedSet } from "./views/import.js";
@@ -15,18 +16,18 @@ import { confirmLeaveEdit, currentDetail, makeSet, openDetailTab, openSetExamEdi
 import { captureCurrent, captureLastAnswer, refreshCaptureDock, openAddMenu } from "./capture.js";
 import { deleteCard, restoreCard, deleteSession, updateStudySet, setExamDate } from "../storage/store.js";
 import { review } from "../../shared/srs.js";
-import { applyNext, goReturn, gradeCard, revealCard, startCardListReview, startGlobalReview, startSetReview } from "./flows/review.js";
-import { startChainDrill } from "./flows/chain-drill.js";
+import { applyNext, exitStudy, goReturn, gradeCard, revealCard, startCardListReview, startGlobalReview, startSetReview } from "./flows/review.js";
+import { startChainDrill, chainDrillAction } from "./flows/chain-drill.js";
 import { confirmSheet } from "./confirm.js";
 import { dismissUpdateBanner } from "./update-banner.js";
 import { authGoogle, exportBackup, exportSetTsv, generateSummary, googleAbortController, importBackupFile, openBillingPortal, openUpgradeSheet, refreshBilling, openForgotSheet, renderAuthGate, renderYou, startCheckout, toggleAuthMode, toggleOpenInTab } from "./views/you.js";
 import { checkApply, startApply } from "./flows/apply.js";
 import { checkCode, codingNext, startCodingPractice } from "./flows/coding.js";
-import { startTeach, setTeachPersona, sendTeach, finishTeach } from "./flows/teach.js";
+import { startTeach, setTeachPersona, sendTeach, finishTeach, teachStartSend } from "./flows/teach.js";
 import { copyShareCode, revokeShareFor, toggleSetShare } from "./share.js";
 import { createTeamFromForm, joinTeamFromInput, leaveTeam, renderTeam, renderTeamCreate, renderTeams } from "./views/teams.js";
 import { renderGlobal, filterGlobalTab, openGlobalPreview, addGlobalSet, openAddedSet, reportGlobal } from "./views/global.js";
-import { checkTyped, startTypedPractice, typedNext } from "./flows/typed.js";
+import { checkTyped, startTypedPractice, typedNext, typedRight } from "./flows/typed.js";
 import { getAuth, login, logout, register } from "../sync/auth.js";
 import { getFadingRefs, renderHome, setHomeExamEditing } from "./views/home.js";
 import { answerQuiz, quickQuizLen, quizNext, startQuiz } from "./flows/quiz.js";
@@ -69,6 +70,10 @@ document.addEventListener("click", (e) => {
     case "home-fading-review": startCardListReview(getFadingRefs()); break;
     case "set-review": startSetReview(id); break;
     case "start-chain-drill": startChainDrill(id); break;
+    case "chain-dontknow": chainDrillAction("dontknow"); break;
+    case "chain-check": chainDrillAction("check"); break;
+    case "chain-next": chainDrillAction("next"); break;
+    case "chain-finish": chainDrillAction("finish"); break;
     case "start-compare": startCompare(id); break;
     case "compare-select": selectComparePair((/** @type {any} */ (t)).dataset.id1, (/** @type {any} */ (t)).dataset.id2); break;
     case "compare-toggle": toggleCompareSame((/** @type {any} */ (t)).dataset.key); break;
@@ -96,18 +101,25 @@ document.addEventListener("click", (e) => {
       })().catch(e => toast(e.message));
       break;
     case "start-coding": startCodingPractice(id); break;
-    case "start-clinical-case": startDesignDrill(id, "clinical"); break;
+    case "start-clinical-case": startClinicalCase(id); break;
     case "start-design": startDesignDrill(id); break;
     case "design-submit": submitDesign(); break;
-    case "design-curveball": requestDesignCurveball(); break;
-    case "design-submit-curveball": submitDesignCurveball(); break;
-    case "design-finish": finishDesignDrill().catch((e) => toast(e.message)); break;
+    case "design-nav": designAction("nav", (/** @type {any} */ (t)).dataset.key); break;
+    case "design-toggle-brief": designAction("toggle-brief"); break;
+    case "design-toggle-model": designAction("toggle-model"); break;
+    case "clinical-submit": clinicalCaseAction("submit"); break;
+    case "clinical-next": clinicalCaseAction("next"); break;
+    case "clinical-toggle-answers": clinicalCaseAction("toggle-answers"); break;
+    case "clinical-toggle-full-case": clinicalCaseAction("toggle-full-case"); break;
     case "start-estimation": startEstimationDrill(id); break;
     case "estimation-submit": submitEstimation(); break;
     case "estimation-next": estimationNext(); break;
+    case "estimation-dontknow": estimationAction("dontknow"); break;
     case "start-bottleneck": startBottleneckDrill(id); break;
     case "bottleneck-hint": requestBottleneckHint(); break;
     case "bottleneck-submit": submitBottleneck(); break;
+    case "bottleneck-toggle-scenario": bottleneckAction("toggle-scenario"); break;
+    case "bottleneck-toggle-model": bottleneckAction("toggle-model"); break;
     case "chain-edit": openChainStepEdit(id, (/** @type {any} */ (t)).dataset.chain, (/** @type {any} */ (t)).dataset.key); break;
     case "chain-edit-save": saveChainStep().catch((e) => toast(e.message)); break;
     case "chain-edit-remove": removeChainStep().catch((e) => toast(e.message)); break;
@@ -116,6 +128,7 @@ document.addEventListener("click", (e) => {
     case "start-teach": startTeach(id); break;
     case "teach-persona": setTeachPersona((/** @type {any} */ (t)).dataset.persona); break;
     case "teach-send": sendTeach(false); break;
+    case "teach-start-send": teachStartSend(); break;
     case "teach-hint": sendTeach(true); break;
     case "teach-finish": finishTeach(); break;
     case "set-share": toggleSetShare(id); break;
@@ -144,6 +157,8 @@ document.addEventListener("click", (e) => {
     case "start-typed": startTypedPractice(id); break;
     case "typed-check": checkTyped(); break;
     case "typed-next": typedNext(); break;
+    case "typed-dontknow": checkTyped(true); break;
+    case "typed-right": typedRight(); break;
     case "clear-exam": setExamDate(id, null).then(() => renderSetDetail(id, "cards")).catch(e => toast(e.message)); break;
     case "add-card": promptAddCard(); break;
     case "card-edit": setEditingCardId(id); paintDetail(true, true); break;
@@ -239,8 +254,8 @@ document.addEventListener("click", (e) => {
     case "import-preview": previewImport(); break;
     case "import-save": doImport(); break;
     case "import-file": document.getElementById("importFile")?.click(); break;
-    case "close-focus":
-    case "return-focus": goReturn(); break;
+    case "close-focus": goReturn(); break;
+    case "return-focus": exitStudy(t); break;
   }
 });
 

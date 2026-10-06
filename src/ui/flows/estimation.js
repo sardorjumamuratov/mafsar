@@ -1,13 +1,17 @@
-
-import { XBTN, app, bundle, esc, send, setFor, setHTML, toast } from "../core.js";
-import { isDue } from "../../../shared/srs.js";
-import { setFocusReturn } from "../flows/review.js";
+import { esc, bundle, send, setFor, toast } from "../core.js";
+import { goReturn, setFocusReturn } from "./review.js";
 import { showChrome } from "../nav.js";
 import { appendReviewLog, bumpActivity, uid } from "../../storage/store.js";
 import { drillLogEntry } from "../../storage/drill-log.js";
 import { gradeEstimation, mismatchNote, parseEstimation, parseReference } from "../../storage/estimation.js";
+import { bindField, focusEnd, paintShell, primaryBtn, secondaryBtn, verdictRow, waitRow } from "./shell.js";
 
-export let estimationState = null; // { sessionId, topic, cards, task, idx, results, step, token }
+// Estimate: back-of-the-envelope numbers. The model writes the questions and the
+// reference answers; the learner's number is graded on this side of the wire.
+export let estimationState = null; // { sessionId, topic, cards, task, idx, results, step, token, lastRaw }
+export function setEstimationState(v) { estimationState = v; }
+
+const KIND = { spot_on: "ok", ballpark: "part", off: "no" };
 
 export async function startEstimationDrill(sessionId) {
   const { sessions, studySets } = await bundle();
@@ -15,34 +19,26 @@ export async function startEstimationDrill(sessionId) {
   const cards = (set?.flashcards || []).filter((c) => c.front && c.back).slice(0, 50);
   if (!cards.length) return toast("This set has no cards to drill with yet.");
   const session = sessions.find((s) => s.id === sessionId);
-  
+
   estimationState = {
     sessionId,
     topic: String(session?.title || set?.title || "this topic").slice(0, 200),
-    cards: cards.map(c => ({ front: c.front, back: c.back })),
+    cards: cards.map((c) => ({ front: c.front, back: c.back })),
     task: null,
     idx: 0,
     results: [],
     step: "generating",
+    token: null,
+    lastRaw: "",
   };
   setFocusReturn("set:" + sessionId);
   showChrome(false);
-  paintEstimationLoader("Writing questions...");
+  paintLoader("Writing questions…");
   requestEstimationTask();
 }
 
-export function setEstimationState(v) { estimationState = v; }
-
-function paintEstimationLoader(msg) {
-  setHTML(app, `
-    <div class="rev-top">${XBTN}</div>
-    <div class="rev-body teach">
-      <div class="t-label">Estimation drill</div>
-      <div style="display:flex;align-items:center;gap:10px;margin-top:8px">
-        <span class="spinner" style="border-color:var(--border-control);border-top-color:var(--accent)"></span>
-        <span style="font-size:13px;color:var(--text-muted)">${esc(msg)}</span>
-      </div>
-    </div>`);
+function paintLoader(msg, counter = "") {
+  paintShell({ mode: "Estimate", progress: 0, counter, body: waitRow(msg) });
 }
 
 async function requestEstimationTask() {
@@ -57,154 +53,158 @@ async function requestEstimationTask() {
   } catch (e) {
     if (estimationState !== s || s.token !== token) return;
     toast(e.message);
-    (/** @type {HTMLElement} */ (document.querySelector(".rev-top .xbtn")))?.click();
+    goReturn();
   }
+}
+
+function shellFor(s, extra) {
+  const q = s.task.questions[s.idx];
+  paintShell({
+    mode: "Estimate",
+    prompt: q.question,
+    promptClass: "q",
+    progress: (s.idx / s.task.questions.length) * 100,
+    counter: `${s.idx + 1} / ${s.task.questions.length}`,
+    hasProgress: s.idx > 0 || s.step === "checked",
+    ...extra,
+  });
 }
 
 export function paintEstimationQuestion() {
   const s = estimationState;
+  if (!s) return;
   if (s.idx >= s.task.questions.length) return finishEstimation();
-  
-  const q = s.task.questions[s.idx];
-  
-  setHTML(app, `
-    <div class="ahd" style="display:flex;align-items:center;padding:12px;gap:12px"><button class="iconbtn" data-action="return-focus" aria-label="End session"><svg class="ic" viewBox="0 0 24 24" width="20" height="20" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg></button><div class="focus-track"><div class="focus-fill" style="width:${Math.max(2, Math.round((s.idx / s.task.questions.length) * 100))}%"></div></div><div style="font-size:13px;color:var(--text-muted);font-variant-numeric:tabular-nums">${esc(s.idx + 1)} / ${esc(s.task.questions.length)}</div></div>
-    <div class="rev-body teach">
-      <div class="t-label">Question ${esc(s.idx + 1)}</div>
-      <p class="teach-lead" style="margin-bottom:12px;font-size:18px">${esc(q.question)}</p>
-      
-      <div style="display:flex;flex-direction:column;gap:8px">
-        <input type="text" id="estimationValue" class="sa-input" inputmode="text" placeholder="e.g. 300 TB, 12k QPS, 2.5 GB/s" aria-label="Your estimate, with a unit" style="font-size:18px;padding:12px" autofocus />
-      </div>
-      <button class="btn-primary btn-block" data-action="estimation-submit" style="margin-top:16px">Check</button>
-    </div>`);
-    
-  // Allow enter to submit
-  const input = document.getElementById("estimationValue");
-  if (input) {
-    input.addEventListener("keydown", (e) => {
-      if (e.key === "Enter") submitEstimation();
-    });
-  }
+  s.step = "answering";
+  shellFor(s, {
+    body: `
+      <input type="text" id="estimationValue" class="st-field line st-mt24" placeholder="e.g. 300 TB, 12k QPS, 2.5 GB/s" aria-label="Your estimate" autocomplete="off" spellcheck="false">
+      <div class="st-note">The right order of magnitude counts.</div>`,
+    dock: `${secondaryBtn("estimation-dontknow", "Don't know")}${primaryBtn("estimation-submit", "Check", 'id="estimationCheck" disabled')}`,
+  });
+  const box = /** @type {HTMLInputElement} */ (document.getElementById("estimationValue"));
+  bindField(box, { btn: /** @type {HTMLButtonElement} */ (document.getElementById("estimationCheck")), onSubmit: () => submitEstimation(), enter: true });
+  focusEnd(box);
+}
+
+export function estimationAction(action) {
+  if (action === "dontknow" && estimationState?.step === "answering") grade("", null);
 }
 
 export function submitEstimation() {
   const s = estimationState;
-  const box = document.getElementById("estimationValue");
-  const raw = (/** @type {HTMLInputElement} */ (box))?.value.trim();
-  if (!raw) return toast("Enter an estimate.");
-  
+  if (!s || s.step !== "answering") return;
+  const raw = /** @type {HTMLInputElement|null} */ (document.getElementById("estimationValue"))?.value.trim();
+  if (!raw) return;
   const parsed = parseEstimation(raw);
   if (!parsed) return toast("Couldn't read that. Try a number with a unit, like 300 TB or 12k QPS.");
-  
-  const q = s.task.questions[s.idx];
-  // A reference unit we can't read is compared as the same kind as the answer.
-  const parsedRef = parseReference(q.reference_value, q.reference_unit) || { value: Number(q.reference_value), kind: parsed.kind };
-  const grade = gradeEstimation(parsedRef, parsed);
-  s.results.push({ question: q, answer: parsed, grade, note: mismatchNote(parsedRef, parsed) });
-  
-  paintEstimationGrade();
+  grade(raw, parsed);
 }
 
-function paintEstimationGrade() {
+function grade(raw, parsed) {
+  const s = estimationState;
+  const q = s.task.questions[s.idx];
+  let result = "off";
+  let note = "";
+  if (parsed) {
+    // A reference unit we can't read is compared as the same kind as the answer.
+    const ref = parseReference(q.reference_value, q.reference_unit) || { value: Number(q.reference_value), kind: parsed.kind };
+    result = gradeEstimation(ref, parsed);
+    note = mismatchNote(ref, parsed);
+  }
+  s.results.push({ question: q, raw, grade: result, note });
+  s.lastRaw = raw;
+  s.step = "checked";
+  paintEstimationChecked();
+}
+
+// The grading bands are 2x for "spot on" and 10x for "ballpark" (storage/estimation.js),
+// so the label states what was actually checked.
+const VERDICT = {
+  spot_on: "Correct · within 2×",
+  ballpark: "Close · right order of magnitude",
+  off: "Not quite",
+};
+
+function paintEstimationChecked() {
   const s = estimationState;
   const r = s.results[s.idx];
   const q = r.question;
-  
-  const colors = { spot_on: "ok", ballpark: "warn", off: "no" };
-  const labels = { spot_on: "Spot on (< 2x)", ballpark: "Ballpark (< 10x)", off: "Off" };
-  const cl = colors[r.grade];
-  const label = labels[r.grade];
-  
-  setHTML(app, `
-    <div class="ahd" style="display:flex;align-items:center;padding:12px;gap:12px"><button class="iconbtn" data-action="return-focus" aria-label="End session"><svg class="ic" viewBox="0 0 24 24" width="20" height="20" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg></button><div class="focus-track"><div class="focus-fill" style="width:${Math.max(2, Math.round(((s.idx + 1) / s.task.questions.length) * 100))}%"></div></div><div style="font-size:13px;color:var(--text-muted);font-variant-numeric:tabular-nums">${esc(s.idx + 1)} / ${esc(s.task.questions.length)}</div></div>
-    <div class="rev-body teach">
-      <div class="t-label">Question ${esc(s.idx + 1)}</div>
-      <p class="teach-lead" style="margin-bottom:12px;font-size:18px">${esc(q.question)}</p>
-      
-      <div style="background:var(--bg-surface2);border-radius:8px;padding:12px;margin-bottom:12px">
-        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
-          <span style="font-weight:600">Your answer</span>
-          <span class="idea-chip ${cl}">${esc(label)}</span>
-        </div>
-        <div style="font-size:20px;font-weight:700">${esc(r.answer.original)}</div>
-        <div style="font-size:13px;color:var(--text-muted);margin-top:4px">Reference: ${esc(q.reference_value)} ${esc(q.reference_unit)}</div>
-        ${r.note ? `<div style="font-size:13px;color:var(--danger-text);margin-top:4px">${esc(r.note)}</div>` : ""}
-      </div>
-      
-      <div class="t-label">Solution</div>
-      <div class="block tint" style="font-size:14px;line-height:1.5">${esc(q.worked_solution)}</div>
-      
-      <button class="btn-primary btn-block" data-action="estimation-next" style="margin-top:16px">Next</button>
-    </div>`);
+  const steps = String(q.worked_solution || "").split(/\n+/).map((x) => x.trim()).filter(Boolean).slice(0, 4);
+  shellFor(s, {
+    body: `
+      <div class="st-field line static st-mt24 ${r.grade === "spot_on" ? "ok" : "amber"}">${esc(r.raw || "Don't know")}</div>
+      <div class="st-mt16">${verdictRow(KIND[r.grade], VERDICT[r.grade])}</div>
+      <div class="st-label caps st-mt24">Working</div>
+      <div class="st-steps">
+        ${steps.map((x) => `<div>${esc(x)}</div>`).join("")}
+        <div class="ctx">Reference answer: ${esc(q.reference_value)} ${esc(q.reference_unit)}${r.note ? `. ${esc(r.note)}` : ""}</div>
+      </div>`,
+    dock: primaryBtn("estimation-next", "Next"),
+    keys: (e) => {
+      if (e.key !== "Enter") return;
+      e.preventDefault();
+      estimationNext();
+    },
+  });
 }
 
 export function estimationNext() {
-  estimationState.idx++;
+  const s = estimationState;
+  if (!s || s.step !== "checked") return;
+  s.idx++;
   paintEstimationQuestion();
 }
 
 async function finishEstimation() {
   const s = estimationState;
   s.step = "summarizing";
-  paintEstimationLoader("Writing a summary...");
-  
+  const n = s.results.length;
+  paintLoader("Writing a summary…", `${n} / ${n}`);
   const token = (s.token = {});
   try {
-    const res = await send({ type: "ESTIMATION_SUMMARY", results: s.results.map(r => ({
-      question: r.question.question,
-      expected: r.question.reference_value + " " + r.question.reference_unit,
-      answer: r.answer.original,
-      grade: r.grade
-    })) });
-    
+    const res = await send({
+      type: "ESTIMATION_SUMMARY",
+      results: s.results.map((r) => ({
+        question: r.question.question,
+        expected: `${r.question.reference_value} ${r.question.reference_unit}`,
+        answer: r.raw || "(skipped)",
+        grade: r.grade,
+      })),
+    });
     if (estimationState !== s || s.token !== token) return;
-    
     // Spot on counts fully, ballpark half.
-    const score = s.results.reduce((n, r) => n + (r.grade === "spot_on" ? 1 : r.grade === "ballpark" ? 0.5 : 0), 0);
+    const score = s.results.reduce((acc, r) => acc + (r.grade === "spot_on" ? 1 : r.grade === "ballpark" ? 0.5 : 0), 0);
     await Promise.all([
       bumpActivity(1),
-      appendReviewLog(drillLogEntry({ kind: "estimation", sessionId: s.sessionId, fraction: score / s.results.length, id: uid() })),
+      appendReviewLog(drillLogEntry({ kind: "estimation", sessionId: s.sessionId, fraction: score / n, id: uid() })),
     ]);
-    
-    paintEstimationSummary(res);
+    paintSummary(res);
   } catch (e) {
     if (estimationState !== s || s.token !== token) return;
     toast(e.message);
-    (/** @type {HTMLElement} */ (document.querySelector(".rev-top .xbtn")))?.click();
+    goReturn();
   }
 }
 
-function paintEstimationSummary(summary) {
+function paintSummary(summary) {
   const s = estimationState;
-  const spotOn = s.results.filter(r => r.grade === "spot_on").length;
-  const ballpark = s.results.filter(r => r.grade === "ballpark").length;
-  const off = s.results.filter(r => r.grade === "off").length;
-  
-  setHTML(app, `
-    <div class="rev-top">${XBTN}</div>
-    <div class="rev-body teach">
-      <div class="ahd"><div class="h-title">Drill complete</div></div>
-      
-      <div style="display:flex;gap:8px;margin-bottom:16px;text-align:center">
-        <div style="flex:1;background:var(--bg-surface2);border-radius:8px;padding:12px">
-          <div style="font-size:24px;font-weight:700;color:var(--status-mastered)">${spotOn}</div>
-          <div style="font-size:12px;color:var(--text-muted)">Spot on</div>
-        </div>
-        <div style="flex:1;background:var(--bg-surface2);border-radius:8px;padding:12px">
-          <div style="font-size:24px;font-weight:700;color:var(--status-learning)">${ballpark}</div>
-          <div style="font-size:12px;color:var(--text-muted)">Ballpark</div>
-        </div>
-        <div style="flex:1;background:var(--bg-surface2);border-radius:8px;padding:12px">
-          <div style="font-size:24px;font-weight:700;color:var(--danger-text)">${off}</div>
-          <div style="font-size:12px;color:var(--text-muted)">Off</div>
-        </div>
-      </div>
-      
-      <div class="listhd"><span class="t-label">Habit to fix</span></div>
-      <div class="block tint"><div style="margin-top:6px">${esc(summary.habit_to_fix)}</div></div>
-      
-      <button class="btn-primary btn-block" data-action="return-focus" style="margin-top:16px">Done</button>
-    </div>`);
+  const n = s.results.length;
+  const rows = s.results.map((r) => `
+    <div class="st-li roomy">
+      ${verdictRow(KIND[r.grade], r.raw ? `${VERDICT[r.grade]} · ${r.raw}` : "Skipped")}
+      <div class="st-feedback">${esc(r.question.question)}</div>
+    </div>`).join("");
+  paintShell({
+    mode: "Estimate",
+    prompt: "Round complete",
+    promptClass: "ask",
+    progress: 100,
+    counter: `${n} / ${n}`,
+    body: `
+      <div class="st-label st-mt24">Your answers</div>
+      <div class="st-list">${rows}</div>
+      <div class="st-label st-mt24">Habit to fix</div>
+      <div class="st-text15 st-mt8">${esc(summary.habit_to_fix)}</div>`,
+    dock: primaryBtn("return-focus", "Done"),
+  });
 }
-

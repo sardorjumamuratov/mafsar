@@ -1,87 +1,98 @@
-import { focusReturn, setFocusReturn } from "../flows/review.js";
+import { setFocusReturn } from "../flows/review.js";
 import { showChrome } from "../nav.js";
-import { XBTN, app, esc, setHTML } from "../core.js";
+import { esc } from "../core.js";
+import { quickQuizLen, shuffled, shuffleQuiz } from "../../../shared/quiz.js";
+import { icon, paintDone, paintShell, primaryBtn, typing } from "./shell.js";
+
+export { quickQuizLen, shuffled, shuffleQuiz };
 
 // ================================================================ QUIZ (focus)
 export let quizSet = null,
   quizIdx = 0,
   quizScore = 0;
-
-import { quickQuizLen, shuffled, shuffleQuiz } from "../../../shared/quiz.js";
-export { quickQuizLen, shuffled, shuffleQuiz };
+let picked = null; // index the learner chose on this question, null until they answer
 
 export function startQuiz(studySet, ret, limit) {
-  // Shuffle first, then slice — a Quick quiz draws a different sample each time.
   const qs = shuffleQuiz(studySet.quiz || []);
   quizSet = { quiz: limit > 0 ? qs.slice(0, limit) : qs };
   quizIdx = 0;
   quizScore = 0;
+  picked = null;
   setFocusReturn(ret);
   showChrome(false);
   paintQuizQ();
 }
 
+function optionHtml(o, i, q) {
+  const key = String.fromCharCode(65 + i);
+  let cls = "";
+  let tile = key;
+  if (picked !== null) {
+    if (i === q.answer) { cls = " right"; tile = icon("check", 16, 3); }
+    else if (i === picked) { cls = " wrong"; tile = icon("close", 14, 3); }
+    else cls = " dim";
+  }
+  return `<button type="button" class="st-opt${cls}" data-action="quiz-opt" data-i="${i}"${picked !== null ? " disabled" : ""}>
+      <span class="key">${tile}</span><span class="txt">${esc(o)}</span>
+    </button>`;
+}
+
 export function paintQuizQ() {
   if (quizIdx >= quizSet.quiz.length) return paintQuizDone();
   const q = quizSet.quiz[quizIdx];
-  setHTML(app, `
-    
-      <div class="ahd" style="display:flex;align-items:center;padding:12px;gap:12px">
-        <button class="iconbtn" data-action="return-focus" aria-label="End session"><svg class="ic" viewBox="0 0 24 24" width="20" height="20" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg></button>
-        <div class="focus-track">
-          <div class="focus-fill" style="width:${Math.max(2, Math.round((quizIdx / quizSet.quiz.length) * 100))}%"></div>
-        </div>
-        <div style="font-size:13px;color:var(--text-muted);font-variant-numeric:tabular-nums">${quizIdx + 1} / ${quizSet.quiz.length}</div>
-      </div>
-    <div class="rev-body">
-      <div class="t-label">Multiple choice</div>
-      <div style="font-size:16px;font-weight:600;line-height:1.35">${esc(q.q)}</div>
-      <div style="display:flex;flex-direction:column;gap:9px" id="opts">
-        ${q.options
-          .map(
-            (o, i) =>
-              `<button class="opt" data-action="quiz-opt" data-i="${i}"><span class="key">${String.fromCharCode(65 + i)}</span>${esc(o)}</button>`
-          )
-          .join("")}
-      </div>
-    </div>`);
+  const answered = picked !== null;
+  const right = picked === q.answer;
+  const last = quizIdx + 1 >= quizSet.quiz.length;
+  const scroll = document.getElementById("stBody")?.scrollTop || 0;
+  paintShell({
+    mode: "Quiz",
+    prompt: q.q,
+    promptClass: "q",
+    progress: (quizIdx / quizSet.quiz.length) * 100,
+    counter: `${quizIdx + 1} / ${quizSet.quiz.length}`,
+    hasProgress: quizIdx > 0 || answered,
+    body: `
+      <div class="st-opts">${q.options.map((o, i) => optionHtml(o, i, q)).join("")}</div>
+      ${answered ? `<div class="st-quizfb"><b class="${right ? "ok" : "amber"}">${right ? "Correct." : "Not quite."}</b> ${esc(q.explain || "")}</div>` : ""}`,
+    dock: answered
+      ? primaryBtn("quiz-next", last ? "See results" : "Next question")
+      : `<div class="st-dock-note">Pick an answer, or press A–D</div>`,
+    keys: (e) => {
+      if (typing(e) || e.ctrlKey || e.metaKey) return;
+      if (picked !== null) {
+        if (e.key !== "Enter") return;
+        e.preventDefault();
+        quizNext();
+        return;
+      }
+      const i = e.key.length === 1 ? e.key.toUpperCase().charCodeAt(0) - 65 : -1;
+      if (i < 0 || i >= q.options.length) return;
+      e.preventDefault();
+      answerQuiz(i);
+    },
+  });
+  const body = document.getElementById("stBody");
+  if (body && scroll) body.scrollTop = scroll;
 }
 
 export function answerQuiz(i) {
+  if (picked !== null) return; // options lock once answered
   const q = quizSet.quiz[quizIdx];
-  const opts = app.querySelectorAll("#opts .opt");
-  opts.forEach((b, bi) => {
-    /** @type {HTMLButtonElement} */ (b).disabled = true;
-    if (bi === q.answer) b.classList.add("correct");
-  });
+  picked = i;
   if (i === q.answer) quizScore++;
-  else opts[i].classList.add("wrong");
-  const body = app.querySelector(".rev-body");
-  const ex = document.createElement("div");
-  ex.className = "explain";
-  setHTML(ex, `<b style="color:${i === q.answer ? "var(--status-mastered)" : "var(--danger-text)"}">${
-    i === q.answer ? "Correct." : "Not quite."
-  }</b> ${esc(q.explain || "")}`);
-  body.appendChild(ex);
-  const next = document.createElement("button");
-  next.className = "btn-primary btn-block";
-  next.textContent = quizIdx + 1 >= quizSet.quiz.length ? "See results" : "Next question";
-  next.dataset.action = "quiz-next";
-  body.appendChild(next);
+  paintQuizQ();
 }
 
 export function paintQuizDone() {
   showChrome(false);
-  const pct = Math.round((quizScore / quizSet.quiz.length) * 100);
-  setHTML(app, `
-    <div class="view">
-      <div class="done-msg"><div class="big">${pct >= 80 ? "🌟" : pct >= 50 ? "👍" : "📖"}</div>
-        <div style="font-size:30px;font-weight:750;color:var(--text-primary)" class="tnum">${quizScore}/${quizSet.quiz.length}</div>
-        <div style="margin-top:4px">${pct}% correct</div>
-      </div>
-      <button class="btn-primary btn-block" data-action="return-focus">Done</button>
-    </div>`);
+  const n = quizSet.quiz.length;
+  const pct = Math.round((quizScore / n) * 100);
+  paintDone({ mode: "Quiz", title: "Quiz complete", detail: `${quizScore} of ${n} correct · ${pct}%` });
 }
 
-
-export function quizNext() { quizIdx++; paintQuizQ(); }
+export function quizNext() {
+  if (picked === null) return;
+  picked = null;
+  quizIdx++;
+  paintQuizQ();
+}

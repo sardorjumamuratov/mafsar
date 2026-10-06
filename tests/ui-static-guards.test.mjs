@@ -316,18 +316,19 @@ test("Teach it back is wired end to end", () => {
     assert.ok(panel.includes(`case "${a}"`), `panel.js must handle ${a}`);
   }
   const flow = read("../src/ui/flows/teach.js");
-  assert.ok(flow.includes('aria-live="polite"'), "the conversation must announce new replies to screen readers");
+  assert.ok(read("../src/ui/flows/shell.js").includes('aria-live="polite"') && flow.includes("thread:"), "the conversation must announce new replies to screen readers");
   assert.ok(flow.includes('kind: "teach"'), "review-log rows must be marked so they don't reschedule cards");
   assert.ok(read("../src/ui/flows/review.js").includes("setTeachState(null)"), "leaving a session must drop its state");
   const sw = read("../src/background/service-worker.js");
   assert.ok(sw.includes('case "TEACH_TURN"') && sw.includes('case "TEACH_EVALUATE"'), "the worker must route both messages");
 
-  assert.ok(flow.includes("teach-persona-chip"), "paintTeachChat renders a persona chip");
+  assert.ok(flow.includes('class="who" role="note"'), "paintTeachChat labels the audience above each reply");
   assert.ok(flow.includes("personaInfo("), "paintTeachChat builds it from personaInfo");
-  assert.ok(flow.includes("aria-label"), "chip has an aria-label");
-  assert.ok(!flow.includes("<button class=\"teach-persona-chip\"") && !flow.includes("data-action=\"teach-persona-chip\""), "the chip is not a button and has no data-action");
+  assert.ok(flow.includes("aria-label"), "the typing indicator has an aria-label");
+  assert.ok(!/class="who"[^>]*data-action/.test(flow), "the audience label is not a button and has no data-action");
   
-  assert.ok(flow.includes("Answer the ${"), "textarea placeholder uses the persona");
+
+
   assert.ok(flow.includes("The ${"), "typing indicator aria-label uses the persona");
   
   assert.ok(!flow.includes("A curious 12-year-old"), "teach.js contains no hard-coded string");

@@ -1,7 +1,6 @@
-let cardStartMs = 0;
 import { showChrome } from "../nav.js";
 import { byDue, isDue, review } from "../../../shared/srs.js";
-import { XBTN, app, bundle, esc, replaceHTML, setFor, setHTML, toast } from "../core.js";
+import { bundle, esc, setFor, toast } from "../core.js";
 import { appendReviewLog, bumpActivity, uid, updateCard } from "../../storage/store.js";
 import { syncNow } from "../../sync/sync.js";
 import { quickQuizLen } from "../flows/quiz.js";
@@ -11,16 +10,20 @@ import { setDesignState } from "./design.js";
 import { setEstimationState } from "./estimation.js";
 import { setBottleneckState } from "./bottleneck.js";
 import { setCompareState } from "./compare.js";
+import { setTypedState } from "./typed.js";
+import { setApplyState } from "./apply.js";
 import { renderSetDetail } from "../views/set-detail.js";
 import { renderHome } from "../views/home.js";
+import { confirmSheet } from "../confirm.js";
+import { icon, paintDone, paintShell, primaryBtn, promptClassFor, secondaryBtn, typing } from "./shell.js";
 
 // ================================================================ REVIEW (focus)
 export let queue = [],
   qIdx = 0,
   focusReturn = "home";
-// Distinct cards graded this sitting. Not queue.length — relearning requeues a
-// lapsed card, which would otherwise count it twice on the done screen.
 export const reviewedIds = new Set();
+let cardStartMs = 0;
+let grading = false;
 
 export function startReview(items, ret) {
   queue = items;
@@ -35,53 +38,70 @@ export function gradePreview(card, g, examDate) {
   return review(card, g, Date.now(), examDate).interval;
 }
 
+const GRADES = [["Again", 0], ["Hard", 3], ["Good", 4], ["Easy", 5]];
+
+function reviewShell(extra) {
+  const { card } = queue[qIdx];
+  paintShell({
+    mode: "Flashcards",
+    prompt: card.front,
+    promptClass: promptClassFor(card.front),
+    progress: (qIdx / queue.length) * 100,
+    counter: `${qIdx + 1} / ${queue.length}`,
+    hasProgress: qIdx > 0,
+    ...extra,
+  });
+}
+
 export function paintReviewCard() {
   cardStartMs = Date.now();
+  grading = false;
   if (qIdx >= queue.length) return paintReviewDone();
-  const { card } = queue[qIdx];
-  setHTML(app, `
-    
-      <div class="ahd" style="display:flex;align-items:center;padding:12px;gap:12px">
-        <button class="iconbtn" data-action="return-focus" aria-label="End session"><svg class="ic" viewBox="0 0 24 24" width="20" height="20" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg></button>
-        <div class="focus-track">
-          <div class="focus-fill" style="width:${Math.max(2, Math.round((qIdx / queue.length) * 100))}%"></div>
-        </div>
-        <div style="font-size:13px;color:var(--text-muted);font-variant-numeric:tabular-nums">${qIdx + 1} / ${queue.length}</div>
-      </div>
-    <div class="rev-body">
-      <div class="flashcard" data-action="flip">
-        <div class="lab">Question</div>
-        <div class="front">${esc(card.front)}</div>
-      </div>
-      <div class="flip-hint">Tap the card to reveal the answer</div>
-    </div>`);
+  reviewShell({
+    body: `<div class="st-help">Recall the answer, then reveal it.</div>`,
+    dock: primaryBtn("flip", "Show answer"),
+    keys: (e) => {
+      if (typing(e) || e.key !== " ") return;
+      e.preventDefault();
+      revealCard();
+    },
+  });
 }
 
 export function revealCard() {
-  const { card } = queue[qIdx];
-  const fc = app.querySelector(".flashcard");
-  fc.removeAttribute("data-action");
-  setHTML(fc, `<div class="lab">Question</div><div class="front">${esc(card.front)}</div>
-    <div class="rule"></div><div class="back">${esc(card.back || "—")}</div>`);
-  const hint = app.querySelector(".flip-hint");
-  replaceHTML(hint, `<div class="grades">
-      <button class="btn-ghost" style="color:var(--danger-text)" data-action="grade" data-g="0"><span class="g">Again</span><span class="iv">${gradePreview(card, 0, queue[qIdx].examDate)}d</span></button>
-      <button class="btn-ghost" style="color:var(--status-learning-text)" data-action="grade" data-g="3"><span class="g">Hard</span><span class="iv">${gradePreview(card, 3, queue[qIdx].examDate)}d</span></button>
-      <button class="btn-ghost" style="color:var(--accent-text)" data-action="grade" data-g="4"><span class="g">Good</span><span class="iv">${gradePreview(card, 4, queue[qIdx].examDate)}d</span></button>
-      <button class="btn-ghost" style="color:var(--status-mastered)" data-action="grade" data-g="5"><span class="g">Easy</span><span class="iv">${gradePreview(card, 5, queue[qIdx].examDate)}d</span></button>
-    </div>
-    <button class="btn-ghost btn-block" data-action="apply-card" style="margin-top:10px">🎯 Apply it — fresh scenario</button>`);
+  const item = queue[qIdx];
+  if (!item) return;
+  const { card } = item;
+  reviewShell({
+    body: `
+      <div class="st-rule"></div>
+      <div class="st-answer">${esc(card.back || "—")}</div>
+      <button type="button" class="st-link st-mt20" data-action="apply-card">Apply it in a new scenario ${icon("arrowRight", 16)}</button>`,
+    dock: `<div class="st-grades">${GRADES.map(([label, g]) => `
+        <button type="button" class="st-grade" data-action="grade" data-g="${g}">
+          <span class="l">${label}</span><span class="i">${gradePreview(card, g, item.examDate)}d</span>
+        </button>`).join("")}</div>`,
+    keys: (e) => {
+      const n = Number(e.key);
+      if (typing(e) || !(n >= 1 && n <= 4)) return;
+      e.preventDefault();
+      gradeCard(GRADES[n - 1][1]);
+    },
+  });
 }
 
 export async function gradeCard(g) {
   const item = queue[qIdx];
+  // A held key or a double tap must not grade the same card twice.
+  if (!item || grading) return;
+  grading = true;
   const prevInterval = item.card.interval ?? 0;
   const upd = review(item.card, g, Date.now(), item.examDate);
   Object.assign(item.card, upd);
   await updateCard(item.sessionId, item.card.id, upd);
   await Promise.all([
     bumpActivity(1),
-    appendReviewLog({ kind: "flashcard", stability: upd.stability, difficulty: upd.difficulty, 
+    appendReviewLog({ kind: "flashcard", stability: upd.stability, difficulty: upd.difficulty,
       id: uid(), cardId: item.card.id, sessionId: item.sessionId, grade: g,
       prevInterval, newInterval: upd.interval, reviewedAt: new Date().toISOString(),
       durationMs: Math.min(10 * 60 * 1000, Date.now() - cardStartMs)
@@ -89,10 +109,6 @@ export async function gradeCard(g) {
   ]);
   reviewedIds.add(item.card.id);
   qIdx++;
-  // Relearning step: a lapsed card comes back a few positions later in this
-  // sitting (Anki-style), so "Again" does not hide it until tomorrow. The
-  // STORED schedule stays day-level (+1 day) for future sessions. Capped at 2
-  // requeues per card so an endless "Again" loop cannot stall the session.
   if (g < 3 && (item.relearns || 0) < 2) {
     item.relearns = (item.relearns || 0) + 1;
     queue.splice(Math.min(qIdx + 3, queue.length), 0, item);
@@ -100,36 +116,27 @@ export async function gradeCard(g) {
   paintReviewCard();
 }
 
-// --- Apply step: a fresh hypothetical per concept, then typed grading --------
 export async function paintReviewDone() {
   showChrome(false);
   const reviewed = reviewedIds.size || queue.length;
-  syncNow().catch(() => {}); // push grades + pull changes after a session
-
-  const paint = (cta) =>
-    setHTML(app, `
-      <div class="view">
-        <div class="done-msg"><div class="big">🎉</div>
-          <div style="font-weight:650;color:var(--text-primary)">Review complete</div>
-          <div style="margin-top:4px">${reviewed} card${reviewed === 1 ? "" : "s"} reviewed.</div>
-        </div>
-        ${cta}
-        <button class="btn btn-${cta ? "ghost" : "primary"} btn-block" data-action="return-focus">Done</button>
-      </div>`);
-
-  paint("");
-
-  // Recognition (flashcards) then recall under pressure (quiz) is the natural
-  // next step — offer it, but only when the whole queue came from one set.
+  syncNow().catch(() => {});
+  const paint = (extra = "", dock) => paintDone({
+    mode: "Flashcards",
+    title: "Review complete",
+    detail: `${reviewed} card${reviewed === 1 ? "" : "s"} reviewed.`,
+    extra,
+    dock,
+  });
+  paint();
   const ids = [...new Set(queue.map((i) => i.sessionId))];
   if (ids.length !== 1) return;
   const { studySets } = await bundle();
   const set = setFor(ids[0], studySets);
   if (!set?.quiz?.length) return;
-  const n = quickQuizLen(set); // must match what the button actually launches
+  const n = quickQuizLen(set);
   paint(
-    `<div class="help" style="margin:0 0 10px;text-align:center">You've seen the answers — now try recalling them cold.</div>
-     <button class="btn-primary btn-block" data-action="quiz-after-review" data-id="${esc(ids[0])}">Take a quick quiz · ${n} question${n === 1 ? "" : "s"}</button>`
+    `<div class="st-help">You've seen the answers. Now try recalling them cold.</div>`,
+    `${secondaryBtn("return-focus", "Done")}${primaryBtn("quiz-after-review", `Take a quick quiz · ${n} question${n === 1 ? "" : "s"}`, `data-id="${esc(ids[0])}"`)}`
   );
 }
 
@@ -140,12 +147,37 @@ export function goReturn() {
   setEstimationState(null);
   setBottleneckState(null);
   setCompareState(null);
+  setTypedState(null);
+  setApplyState(null);
   const ret = focusReturn;
   if (typeof ret === "string" && ret.startsWith("set:")) renderSetDetail(ret.slice(4));
   else renderHome();
 }
 
-/** Every due card, most overdue first; `limit` caps it (Home's daily goal). */
+// A mode that holds a result it hasn't saved yet (a checked typed answer the
+// learner may still overrule) registers a flush here, so leaving never loses it.
+let beforeExit = null;
+export function setBeforeExit(fn) { beforeExit = fn; }
+
+/** The close button on a study screen: asks first when the session has progress to lose. */
+export async function exitStudy(btn) {
+  if (btn?.dataset?.progress === "1") {
+    const leave = await confirmSheet({
+      title: "End this session?",
+      body: "You can start another any time.",
+      confirmLabel: "End session",
+      cancelLabel: "Keep going",
+    });
+    if (!leave) return;
+  }
+  if (beforeExit) {
+    const flush = beforeExit;
+    beforeExit = null;
+    await flush().catch(() => {});
+  }
+  goReturn();
+}
+
 export async function startGlobalReview(limit = 0) {
   const { studySets } = await bundle();
   let items = [];
@@ -158,34 +190,32 @@ export async function startGlobalReview(limit = 0) {
   startReview(items, "home");
 }
 
-/** A session over exactly these cards, due or not (Home's "Fading soon"). */
 export async function startCardListReview(refs) {
   const { studySets } = await bundle();
   const items = [];
   for (const { sessionId, cardId } of refs) {
     const set = setFor(sessionId, studySets);
-    const card = set?.flashcards?.find((c) => c.id === cardId && !c.deleted);
-    if (card) items.push({ sessionId, card, examDate: set.examDate });
+    if (!set) continue;
+    const card = (set.flashcards || []).find((c) => c.id === cardId);
+    if (card && !card.deleted) items.push({ sessionId, card, examDate: set.examDate });
   }
-  if (!items.length) return toast("Those cards aren't here any more.");
+  if (!items.length) return toast("No cards to review.");
   startReview(items, "home");
 }
+
 export async function startSetReview(sessionId) {
   const { studySets } = await bundle();
   const set = setFor(sessionId, studySets);
-  // Due cards first; if none are due yet, fall through to studying ahead
-  // (still applies SM-2 normally) so the button always does something.
-  const live = (set?.flashcards || []).filter((c) => !c.deleted);
-  const due = live.filter((c) => isDue(c));
-  const pool = due.length ? due : live;
-  const items = pool.map((card) => ({ sessionId, card, examDate: set?.examDate }));
+  if (!set) return toast("Set not found.");
+  const cards = (set.flashcards || []).filter(c => !c.deleted);
+  if (!cards.length) return toast("This set has no cards yet.");
+  const due = cards.filter(c => isDue(c));
+  const subset = due.length ? due : cards;
+  const items = subset.map(c => ({ sessionId, card: c, examDate: set.examDate }));
   items.sort((a, b) => byDue(a.card, b.card));
-  if (!items.length) return toast("This set has no cards yet.");
   startReview(items, "set:" + sessionId);
 }
-
 
 export function applyNext() { qIdx++; paintReviewCard(); }
 export function setFocusReturn(v) { focusReturn = v; }
 export function setQIdx(v) { qIdx = v; }
-
