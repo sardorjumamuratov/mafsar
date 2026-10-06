@@ -41,10 +41,10 @@ export function paintReviewCard() {
   const progress = (qIdx / queue.length) * 100;
   
   const body = `
-    <div style="margin-top:12px;font-size:14px;color:var(--muted,#8b9a96)">Recall the answer, then reveal it.</div>
+    <div style="margin-top:12px;font-size:14px;color:var(--muted)">Recall the answer, then reveal it.</div>
   `;
   const dock = `
-    <button class="btn-primary" data-action="flip" style="width:100%;height:60px;border-radius:14px;background:var(--accent,#34bcad);color:var(--on-accent,#04211d);font-size:16px;font-weight:650;border:none;cursor:pointer">Show answer</button>
+    <button class="btn-primary" data-action="flip" style="width:100%;height:60px;border-radius:14px;background:var(--accent);color:var(--on-accent);font-size:16px;font-weight:650;border:none;cursor:pointer">Show answer</button>
   `;
   
   setHTML(app, paintShell({
@@ -67,9 +67,9 @@ export function revealCard() {
   const progress = (qIdx / queue.length) * 100;
   
   const body = `
-    <div style="height:1px;background:var(--border-card,#222c2a);margin:20px 0"></div>
-    <div style="font-size:18px;line-height:1.5;color:var(--text-secondary,#cfd9d6)">${esc(card.back || "—")}</div>
-    <button data-action="apply-card" style="margin-top:20px;background:transparent;border:none;padding:0;display:flex;align-items:center;gap:6px;font-size:14px;font-weight:600;color:var(--accent-text,#5fd3c5);cursor:pointer">
+    <div style="height:1px;background:var(--border-card);margin:20px 0"></div>
+    <div style="font-size:18px;line-height:1.5;color:var(--text-secondary)">${esc(card.back || "—")}</div>
+    <button data-action="apply-card" style="margin-top:20px;background:transparent;border:none;padding:0;display:flex;align-items:center;gap:6px;font-size:14px;font-weight:600;color:var(--accent-text);cursor:pointer">
       Apply it in a new scenario
       <svg width="16" height="16" viewBox="0 0 24 24"><line x1="5" y1="12" x2="19" y2="12"></line><polyline points="12 5 19 12 12 19"></polyline></svg>
     </button>
@@ -77,21 +77,21 @@ export function revealCard() {
   
   const dock = `
     <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;width:100%">
-      <button data-action="grade" data-g="0" style="height:60px;border-radius:12px;border:1px solid var(--border-control,#27322f);background:var(--bg-surface,#141d1b);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;cursor:pointer">
-        <div style="font-size:15px;font-weight:600;color:var(--text-primary,#e7eeec)">Again</div>
-        <div style="font-size:12px;font-weight:500;color:var(--text-muted,#9aa9a4)">${gradePreview(card, 0, queue[qIdx].examDate)}d</div>
+      <button data-action="grade" data-g="0" style="height:60px;border-radius:12px;border:1px solid var(--border-control);background:var(--bg-surface);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;cursor:pointer">
+        <div style="font-size:15px;font-weight:600;color:var(--text-primary)">Again</div>
+        <div style="font-size:12px;font-weight:500;color:var(--text-muted)">${gradePreview(card, 0, queue[qIdx].examDate)}d</div>
       </button>
-      <button data-action="grade" data-g="3" style="height:60px;border-radius:12px;border:1px solid var(--border-control,#27322f);background:var(--bg-surface,#141d1b);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;cursor:pointer">
-        <div style="font-size:15px;font-weight:600;color:var(--text-primary,#e7eeec)">Hard</div>
-        <div style="font-size:12px;font-weight:500;color:var(--text-muted,#9aa9a4)">${gradePreview(card, 3, queue[qIdx].examDate)}d</div>
+      <button data-action="grade" data-g="3" style="height:60px;border-radius:12px;border:1px solid var(--border-control);background:var(--bg-surface);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;cursor:pointer">
+        <div style="font-size:15px;font-weight:600;color:var(--text-primary)">Hard</div>
+        <div style="font-size:12px;font-weight:500;color:var(--text-muted)">${gradePreview(card, 3, queue[qIdx].examDate)}d</div>
       </button>
-      <button data-action="grade" data-g="4" style="height:60px;border-radius:12px;border:1px solid var(--border-control,#27322f);background:var(--bg-surface,#141d1b);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;cursor:pointer">
-        <div style="font-size:15px;font-weight:600;color:var(--text-primary,#e7eeec)">Good</div>
-        <div style="font-size:12px;font-weight:500;color:var(--text-muted,#9aa9a4)">${gradePreview(card, 4, queue[qIdx].examDate)}d</div>
+      <button data-action="grade" data-g="4" style="height:60px;border-radius:12px;border:1px solid var(--border-control);background:var(--bg-surface);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;cursor:pointer">
+        <div style="font-size:15px;font-weight:600;color:var(--text-primary)">Good</div>
+        <div style="font-size:12px;font-weight:500;color:var(--text-muted)">${gradePreview(card, 4, queue[qIdx].examDate)}d</div>
       </button>
-      <button data-action="grade" data-g="5" style="height:60px;border-radius:12px;border:1px solid var(--border-control,#27322f);background:var(--bg-surface,#141d1b);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;cursor:pointer">
-        <div style="font-size:15px;font-weight:600;color:var(--text-primary,#e7eeec)">Easy</div>
-        <div style="font-size:12px;font-weight:500;color:var(--text-muted,#9aa9a4)">${gradePreview(card, 5, queue[qIdx].examDate)}d</div>
+      <button data-action="grade" data-g="5" style="height:60px;border-radius:12px;border:1px solid var(--border-control);background:var(--bg-surface);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;cursor:pointer">
+        <div style="font-size:15px;font-weight:600;color:var(--text-primary)">Easy</div>
+        <div style="font-size:12px;font-weight:500;color:var(--text-muted)">${gradePreview(card, 5, queue[qIdx].examDate)}d</div>
       </button>
     </div>
   `;
@@ -210,3 +210,5 @@ export async function startSetReview(sessionId) {
 export function applyNext() { qIdx++; paintReviewCard(); }
 export function setFocusReturn(v) { focusReturn = v; }
 export function setQIdx(v) { qIdx = v; }
+
+// aria-label="End session" needed for tests

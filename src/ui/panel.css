@@ -12,6 +12,12 @@ button, input, textarea, select {
    ============================================================ */
 
 :root {
+  --on-accent: var(--accent-on);
+  --bg: var(--bg-app);
+  --secondary: var(--text-secondary);
+  --divider: var(--border-divider);
+  --accent-tint-border: #1f5a52;
+  --accent-tint-bg: #133a35;
 
   --bg-app: #f5f8f7;
   --bg-nav: #ffffff;
@@ -1836,7 +1842,7 @@ button.insight-row:focus-visible { outline: 2px solid var(--accent); outline-off
 /* --- Teach it back: who you're teaching (prompt 10) ----------------------- */
 .teach-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 10px; }
 .teach-topic { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.teach-persona-chip { flex-shrink: 0; user-select: none; cursor: default; }
+.teach-persona-chip { font-size: 12px; font-weight: 600; color: var(--text-faint); margin-bottom: 4px;  flex-shrink: 0; user-select: none; cursor: default; }
 
 /* --- System design drills ------------------------------------------------- */
 .drill-block { display: flex; flex-direction: column; gap: 8px; }

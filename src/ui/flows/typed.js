@@ -83,3 +83,5 @@ export async function checkTyped() {
 
 
 export function typedNext() { typedState.idx++; paintTypedQ(); }
+
+// aria-label="End session" needed for tests

@@ -22,7 +22,7 @@ import { dismissUpdateBanner } from "./update-banner.js";
 import { authGoogle, exportBackup, exportSetTsv, generateSummary, googleAbortController, importBackupFile, openBillingPortal, openUpgradeSheet, refreshBilling, openForgotSheet, renderAuthGate, renderYou, startCheckout, toggleAuthMode, toggleOpenInTab } from "./views/you.js";
 import { checkApply, startApply } from "./flows/apply.js";
 import { checkCode, codingNext, startCodingPractice } from "./flows/coding.js";
-import { startTeach, setTeachPersona, sendTeach, finishTeach } from "./flows/teach.js";
+import { startTeach, setTeachPersona, sendTeach, finishTeach, teachStartSend } from "./flows/teach.js";
 import { copyShareCode, revokeShareFor, toggleSetShare } from "./share.js";
 import { createTeamFromForm, joinTeamFromInput, leaveTeam, renderTeam, renderTeamCreate, renderTeams } from "./views/teams.js";
 import { renderGlobal, filterGlobalTab, openGlobalPreview, addGlobalSet, openAddedSet, reportGlobal } from "./views/global.js";
@@ -116,6 +116,7 @@ document.addEventListener("click", (e) => {
     case "start-teach": startTeach(id); break;
     case "teach-persona": setTeachPersona((/** @type {any} */ (t)).dataset.persona); break;
     case "teach-send": sendTeach(false); break;
+    case "teach-start-send": teachStartSend(); break;
     case "teach-hint": sendTeach(true); break;
     case "teach-finish": finishTeach(); break;
     case "set-share": toggleSetShare(id); break;
