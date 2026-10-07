@@ -40,7 +40,7 @@ import {
   backendEstimationSummary,
   backendBottleneckTask,
   backendBottleneckHint,
-  backendBottleneckGrade, backendDrillCardSuggestions,
+  backendBottleneckGrade, backendDrillCardSuggestions, backendDesignCheckpoint,
   backendExtractPdf, backendGlobalPublish, backendGlobalUnpublish, backendGlobalList, backendGlobalFetch, backendGlobalReport,
 } from "../sync/api.js";
 import {
@@ -633,7 +633,7 @@ if (chrome.contextMenus?.onClicked) {
 chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
   handle(msg)
     .then((result) => sendResponse({ ok: true, ...result }))
-    .catch((err) => sendResponse({ ok: false, error: err?.message || String(err) }));
+    .catch((err) => sendResponse({ ok: false, error: err?.message || String(err), ...(err?.code ? { code: err.code } : {}) }));
   return true; // async response
 });
 
@@ -815,26 +815,33 @@ async function handle(msg) {
         concept: String(msg.concept || ""),
         reference: Array.isArray(msg.reference) ? msg.reference : [],
         mode: msg.mode === "clinical" ? "clinical" : "design",
+        ...(msg.practiceStyle === "guided" || msg.practiceStyle === "simulation" ? { practiceStyle: msg.practiceStyle } : {}),
       });
     }
 
     case "DESIGN_GRADE": {
       return backendDesignGrade({
         task: String(msg.task || ""),
-        answer: String(msg.answer || ""),
+        ...(msg.answer ? { answer: String(msg.answer) } : {}),
+        // 0.3.6+: the sections separately; empty ones are skipped.
+        ...(msg.answers && typeof msg.answers === "object" ? { answers: msg.answers } : {}),
         rubric: Array.isArray(msg.rubric) ? msg.rubric.map(String) : [],
         mode: msg.mode === "clinical" ? "clinical" : "design",
         ...(msg.state ? { state: String(msg.state) } : {}),
+        ...(msg.practiceStyle === "guided" || msg.practiceStyle === "simulation" ? { practiceStyle: msg.practiceStyle } : {}),
         ...(msg.curveball ? { curveball: String(msg.curveball), originalAnswer: String(msg.originalAnswer || "") } : {}),
       });
     }
 
 
     case "DESIGN_CHECKPOINT": {
-      callApi("design-checkpoint", { step: msg.step, brief: msg.brief, answer: msg.answer })
-        .then((res) => sendResponse({ ok: true, ...res }))
-        .catch((e) => sendResponse({ ok: false, error: e.message }));
-      return true;
+      return backendDesignCheckpoint({
+        section: String(msg.section || ""),
+        answer: String(msg.answer || ""),
+        ...(msg.task ? { task: String(msg.task) } : {}),
+        ...(msg.state ? { state: String(msg.state) } : {}),
+        ...(msg.practiceStyle === "guided" || msg.practiceStyle === "simulation" ? { practiceStyle: msg.practiceStyle } : {}),
+      });
     }
     case "DESIGN_CURVEBALL": {
       return backendDesignCurveball({
@@ -850,38 +857,46 @@ async function handle(msg) {
       return backendEstimationTask({
         concept: String(msg.concept || ""),
         reference: Array.isArray(msg.reference) ? msg.reference : [],
+        ...(msg.practiceStyle === "guided" || msg.practiceStyle === "simulation" ? { practiceStyle: msg.practiceStyle } : {}),
       });
     }
 
     case "ESTIMATION_SUMMARY": {
-      return backendEstimationSummary({ results: Array.isArray(msg.results) ? msg.results : [] });
+      return backendEstimationSummary({ results: Array.isArray(msg.results) ? msg.results : [], ...(msg.practiceStyle === "guided" || msg.practiceStyle === "simulation" ? { practiceStyle: msg.practiceStyle } : {}), });
     }
 
     case "BOTTLENECK_TASK": {
       return backendBottleneckTask({
         concept: String(msg.concept || ""),
         reference: Array.isArray(msg.reference) ? msg.reference : [],
+        ...(msg.practiceStyle === "guided" || msg.practiceStyle === "simulation" ? { practiceStyle: msg.practiceStyle } : {}),
       });
     }
 
     case "BOTTLENECK_HINT": {
-      return backendBottleneckHint({ state: String(msg.state || "") });
+      return backendBottleneckHint({ state: String(msg.state || ""), ...(Number.isInteger(msg.level) ? { level: msg.level } : {}) });
     }
 
 
-    case "DRILL_CARD_SUGGESTIONS":
+    case "DRILL_CARD_SUGGESTIONS": {
       return backendDrillCardSuggestions({
         mode: String(msg.mode || ""),
         gaps: Array.isArray(msg.gaps) ? msg.gaps : [],
         topic: String(msg.topic || ""),
         existingFronts: Array.isArray(msg.existingFronts) ? msg.existingFronts : [],
-        practiceStyle: typeof msg.practiceStyle === "string" ? msg.practiceStyle : undefined
+        ...(msg.practiceStyle === "guided" || msg.practiceStyle === "simulation" ? { practiceStyle: msg.practiceStyle } : {}),
       });
+    }
+
     case "BOTTLENECK_GRADE": {
       return backendBottleneckGrade({
         state: String(msg.state || ""),
-        answer: String(msg.answer || ""),
+        ...(msg.answer ? { answer: String(msg.answer) } : {}),
+        // 0.3.6+: the guided fields, and the component the learner marked.
+        ...(msg.parts && typeof msg.parts === "object" ? { parts: msg.parts } : {}),
+        ...(msg.selectedComponentId ? { selectedComponentId: String(msg.selectedComponentId) } : {}),
         usedHint: !!msg.usedHint,
+        ...(msg.practiceStyle === "guided" || msg.practiceStyle === "simulation" ? { practiceStyle: msg.practiceStyle } : {}),
       });
     }
 

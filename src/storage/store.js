@@ -3,6 +3,7 @@
 
 import { initSchedule } from "../../shared/srs.js";
 import { syncLinkCards } from "./chain-links.js";
+import { drillMeta } from "./drill-log.js";
 //
 // Shape:
 //   settings        -> {}
@@ -456,6 +457,20 @@ export async function appendReviewLog(entry) {
   if (log.length > REVIEW_LOG_HARD_CAP) log.splice(0, log.length - REVIEW_LOG_HARD_CAP);
   await set(KEYS.REVIEW_LOG, log);
   return log;
+}
+
+/**
+ * Add local-only session metadata to a drill row already in the log (e.g. the
+ * review cards saved after grading). Only drillMeta's whitelist gets through,
+ * and reviewedAt is untouched, so sync sees the same row.
+ */
+export async function annotateReviewLog(id, meta) {
+  const log = await getReviewLog();
+  const row = log.find((r) => r.id === id);
+  if (!row) return false;
+  Object.assign(row, drillMeta(meta));
+  await set(KEYS.REVIEW_LOG, log);
+  return true;
 }
 
 // --- Backup / restore --------------------------------------------------------

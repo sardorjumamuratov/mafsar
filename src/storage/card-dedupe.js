@@ -1,36 +1,54 @@
-﻿export function normalizeFront(front) {
+// Keeps "Turn gaps into review cards" from suggesting cards the set already has
+// (docs/prompts/38 §6.1). Pure, so it's unit tested in tests/card-dedupe.test.mjs.
+
+const ARTICLES = /\b(a|an|the)\b/g;
+
+/** Lowercase, no punctuation, no English articles, single spaces. Letters in any script survive. */
+export function normalizeFront(front) {
   return String(front || "")
     .toLowerCase()
-    .replace(/[^\w\s]/g, "")
-    .replace(/\b(a|an|the)\b/g, "")
+    .normalize("NFKC")
+    .replace(/[^\p{L}\p{N}\s]/gu, " ")
+    .replace(ARTICLES, " ")
     .replace(/\s+/g, " ")
     .trim();
 }
 
-function tokenize(text) {
+function tokens(text) {
   const norm = normalizeFront(text);
-  if (!norm) return new Set();
-  return new Set(norm.split(" "));
+  return new Set(norm ? norm.split(" ") : []);
 }
 
+/** Token overlap, 0..1. Two empty texts share nothing: there is no evidence they match. */
 export function jaccard(a, b) {
-  const setA = tokenize(a);
-  const setB = tokenize(b);
-  if (setA.size === 0 && setB.size === 0) return 1;
-  if (setA.size === 0 || setB.size === 0) return 0;
-  
-  let intersection = 0;
-  for (const token of setA) {
-    if (setB.has(token)) intersection++;
-  }
-  
-  const union = setA.size + setB.size - intersection;
-  return intersection / union;
+  const A = tokens(a);
+  const B = tokens(b);
+  if (!A.size || !B.size) return 0;
+  let shared = 0;
+  for (const t of A) if (B.has(t)) shared++;
+  return shared / (A.size + B.size - shared);
 }
 
-export function isDuplicate(suggestedFront, existingFronts, threshold = 0.7) {
-  for (const existing of existingFronts) {
-    if (jaccard(suggestedFront, existing) >= threshold) return true;
+export function isDuplicate(front, existingFronts, threshold = 0.7) {
+  const norm = normalizeFront(front);
+  if (!norm) return false;
+  return (existingFronts || []).some((e) => normalizeFront(e) === norm || jaccard(front, e) >= threshold);
+}
+
+/**
+ * The suggestions worth showing: no near-copies of existing cards or of each
+ * other, at most `max`. Returns the kept cards and how many were skipped.
+ */
+export function selectSuggestions(suggestions, existingFronts, max = 3) {
+  const kept = [];
+  let skipped = 0;
+  for (const s of suggestions || []) {
+    if (!s || !String(s.front || "").trim() || !String(s.back || "").trim()) continue;
+    if (isDuplicate(s.front, existingFronts) || isDuplicate(s.front, kept.map((k) => k.front))) {
+      skipped++;
+      continue;
+    }
+    if (kept.length < max) kept.push(s);
   }
-  return false;
+  return { kept, skipped };
 }

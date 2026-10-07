@@ -97,7 +97,7 @@ export function send(msg) {
   return new Promise((resolve, reject) => {
     chrome.runtime.sendMessage(msg, (resp) => {
       if (chrome.runtime.lastError) return reject(new Error(chrome.runtime.lastError.message));
-      if (!resp || !resp.ok) return reject(new Error(resp?.error || "Request failed"));
+      if (!resp || !resp.ok) return reject(Object.assign(new Error(resp?.error || "Request failed"), { code: resp?.code }));
       resolve(resp);
     });
   });

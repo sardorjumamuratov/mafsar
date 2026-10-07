@@ -19,9 +19,33 @@ export function drillGrade(fraction) {
 }
 
 /**
- * @param {{ kind: string, sessionId: string, fraction: number, id: string, chainId?: string, reviewedAt?: string }} row
+ * Session metadata kept on the row (docs/prompts/38 §12). These fields stay on
+ * this device: the server's reviewSchema keeps only the core review fields and
+ * drops the rest without failing the batch. Never put answer text here.
  */
-export function drillLogEntry({ kind, sessionId, fraction, id, chainId = "", reviewedAt = new Date().toISOString() }) {
+export function drillMeta(meta = {}) {
+  const out = {};
+  const str = (v, max = 60) => (typeof v === "string" && v ? v.slice(0, max) : undefined);
+  const num = (v) => (Number.isFinite(v) && v >= 0 ? Math.round(v) : undefined);
+  const fields = {
+    practiceStyle: str(meta.practiceStyle, 20),
+    mode: str(meta.mode, 20),
+    startedAt: str(meta.startedAt, 40),
+    completedAt: str(meta.completedAt, 40),
+    durationMs: num(meta.durationMs),
+    usedHint: typeof meta.usedHint === "boolean" ? meta.usedHint : undefined,
+    hintCount: num(meta.hintCount),
+    selectedComponentId: str(meta.selectedComponentId, 60),
+    savedSuggestedCardIds: Array.isArray(meta.savedSuggestedCardIds) ? meta.savedSuggestedCardIds.filter((x) => typeof x === "string").slice(0, 3) : undefined,
+  };
+  for (const [k, v] of Object.entries(fields)) if (v !== undefined) out[k] = v;
+  return out;
+}
+
+/**
+ * @param {{ kind: string, sessionId: string, fraction: number, id: string, chainId?: string, reviewedAt?: string, meta?: object }} row
+ */
+export function drillLogEntry({ kind, sessionId, fraction, id, chainId = "", reviewedAt = new Date().toISOString(), meta }) {
   if (!DRILL_KINDS.includes(kind)) throw new Error(`unknown drill kind: ${kind}`);
   if (!sessionId) throw new Error("drill log needs a sessionId");
   return {
@@ -35,5 +59,6 @@ export function drillLogEntry({ kind, sessionId, fraction, id, chainId = "", rev
     reviewedAt,
     // Chain drills record which chain, so the picker can favour less-drilled ones.
     ...(chainId ? { chainId } : {}),
+    ...drillMeta(meta),
   };
 }
