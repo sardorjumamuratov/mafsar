@@ -4,7 +4,7 @@ import { showChrome } from "../nav.js";
 import { appendReviewLog, bumpActivity, uid } from "../../storage/store.js";
 import { drillLogEntry } from "../../storage/drill-log.js";
 import { SECTIONS, answerTooLong, assembleAnswer, emptySections, MAX_DESIGN_CHARS, rubricScore } from "../../storage/design.js";
-import { bindField, feedbackSummary, focusEnd, icon, paintShell, primaryBtn, secondaryBtn, verdictRow, waitRow } from "./shell.js";
+import { bindField, feedbackSummary, openSuggestionSheet, focusEnd, icon, paintShell, primaryBtn, secondaryBtn, verdictRow, waitRow } from "./shell.js";
 
 // Design brief: one section on screen at a time, a chip row to move between
 // them, and a draft per section that autosaves into state. Every section is
@@ -225,6 +225,7 @@ function paintDesignFeedback() {
       ${briefToggle}
       
       <div class="st-mt24">${summaryBlock}</div>
+      <button type="button" class="st-link st-mt12" id="designSuggestBtn">Turn gaps into review cards</button>
 
       <div class="st-label st-mt24">Sections</div>
       <div class="st-list">${rows}</div>
@@ -235,5 +236,11 @@ function paintDesignFeedback() {
         ${g.next_time ? `<div class="st-label st-mt16">Next time</div><div class="st-text15 st-mt4">${esc(g.next_time)}</div>` : ""}
       </div>`,
     dock: primaryBtn("return-focus", "Done"),
+  });
+
+  document.getElementById("designSuggestBtn")?.addEventListener("click", () => {
+    const gaps = (g.rubric_evaluation || []).filter(p => p.status !== "covered").map(p => ({ type: p.status === "partial" ? "partial_rubric" : "missed_rubric", text: p.point }));
+    if (g.highestLeverageGap) gaps.push({ type: "missed_rubric", text: g.highestLeverageGap });
+    openSuggestionSheet(s.sessionId, "design", gaps, s.topic, s.cards);
   });
 }

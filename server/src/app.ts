@@ -16,7 +16,7 @@ import type { DB } from "./db.js";
 import {
   register, login, requireAuth, signAccessToken, signRefreshToken, upsertGoogleUser, verifyPassword,
 } from "./auth.js";
-import { syncSchema, registerSchema, loginSchema, generateSchema, gradeSchema, hypotheticalSchema, summarizeSchema, blurbSchema, codingTaskSchema, teachTurnSchema, teachEvaluateSchema, codingGradeSchema, designTaskSchema, designGradeSchema, designCurveballSchema, estimationTaskSchema, estimationSummarySchema, bottleneckTaskSchema, bottleneckHintSchema, bottleneckGradeSchema, shareCreateSchema, shareRevokeSchema, teamCreateSchema, teamJoinSchema, pollSchema, deleteAccountSchema } from "./schema.js";
+import { syncSchema, registerSchema, loginSchema, generateSchema, gradeSchema, hypotheticalSchema, summarizeSchema, blurbSchema, codingTaskSchema, teachTurnSchema, teachEvaluateSchema, codingGradeSchema, designTaskSchema, designGradeSchema, designCurveballSchema, estimationTaskSchema, estimationSummarySchema, bottleneckTaskSchema, bottleneckHintSchema, bottleneckGradeSchema, drillCardSuggestionsSchema, shareCreateSchema, shareRevokeSchema, teamCreateSchema, teamJoinSchema, pollSchema, deleteAccountSchema } from "./schema.js";
 import { googleConfigured, buildAuthUrl, pkcePair, exchangeCode, verifyIdToken } from "./google.js";
 import { applySync, changesSince } from "./sync.js";
 import { deleteUserData } from "./account.js";
@@ -869,6 +869,13 @@ app.post("/v1/sets/:rootId/report", reportLimiter, async (c) => {
 });
 
   app.get("/healthz", (c) => c.json({ ok: true }));
+
+  
+  app.post("/v1/drill-card-suggestions", limitByUser(limits.llmPerUser), async (c) => {
+    if (process.env.DRILL_CARD_SUGGESTIONS === "off") return c.json({ error: "feature_disabled", message: "Suggestions are disabled" }, 404);
+    const body = drillCardSuggestionsSchema.parse(await c.req.json());
+    return c.json(await generateDrillCardSuggestions(body));
+  });
 
   return app;
 }

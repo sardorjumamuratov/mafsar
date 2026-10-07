@@ -40,7 +40,7 @@ import {
   backendEstimationSummary,
   backendBottleneckTask,
   backendBottleneckHint,
-  backendBottleneckGrade,
+  backendBottleneckGrade, backendDrillCardSuggestions,
   backendExtractPdf, backendGlobalPublish, backendGlobalUnpublish, backendGlobalList, backendGlobalFetch, backendGlobalReport,
 } from "../sync/api.js";
 import {
@@ -861,6 +861,15 @@ async function handle(msg) {
       return backendBottleneckHint({ state: String(msg.state || "") });
     }
 
+
+    case "DRILL_CARD_SUGGESTIONS":
+      return backendDrillCardSuggestions({
+        mode: String(msg.mode || ""),
+        gaps: Array.isArray(msg.gaps) ? msg.gaps : [],
+        topic: String(msg.topic || ""),
+        existingFronts: Array.isArray(msg.existingFronts) ? msg.existingFronts : [],
+        practiceStyle: typeof msg.practiceStyle === "string" ? msg.practiceStyle : undefined
+      });
     case "BOTTLENECK_GRADE": {
       return backendBottleneckGrade({
         state: String(msg.state || ""),

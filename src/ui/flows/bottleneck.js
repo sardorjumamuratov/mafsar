@@ -3,7 +3,7 @@ import { goReturn, setFocusReturn } from "./review.js";
 import { showChrome } from "../nav.js";
 import { appendReviewLog, bumpActivity, uid } from "../../storage/store.js";
 import { drillLogEntry } from "../../storage/drill-log.js";
-import { bindField, feedbackSummary, focusEnd, icon, paintShell, primaryBtn, verdictRow, waitRow } from "./shell.js";
+import { bindField, feedbackSummary, openSuggestionSheet, focusEnd, icon, paintShell, primaryBtn, verdictRow, waitRow } from "./shell.js";
 
 // What breaks: a small architecture with one planted flaw. The learner says what
 // fails, under what load or failure, and how they'd fix it.
@@ -243,6 +243,7 @@ function paintBottleneckFeedback() {
       ${r.alternateProblem ? `<div class="st-feedback">You also spotted a real problem: ${esc(r.alternateProblem.description)}</div>` : ""}
       
       <div class="st-mt24">${summaryBlock}</div>
+      <button type="button" class="st-link st-mt12" id="bnSuggestBtn">Turn gaps into review cards</button>
       ${criteriaBlock}
       
       <button type="button" class="st-link st-mt24" id="bnModelBtn" data-action="bottleneck-toggle-model">Compare your approach</button>
@@ -255,5 +256,13 @@ function paintBottleneckFeedback() {
         ${(r.modelAnswer?.tradeoff || r.tradeoff) ? `<div class="st-label st-mt16">Trade-off</div><div class="st-text15 st-mt4">${esc(r.modelAnswer?.tradeoff || r.tradeoff)}</div>` : ""}
       </div>`,
     dock: primaryBtn("return-focus", "Finish"),
+  });
+
+  document.getElementById("bnSuggestBtn")?.addEventListener("click", () => {
+    const gaps = [];
+    if (r.criteria?.foundFlaw?.status !== "covered") gaps.push({ type: "missed_bottleneck", text: `Missed flaw: ${r.planted_flaw}` });
+    if (r.criteria?.proposedFix?.status !== "covered") gaps.push({ type: "missing_tradeoff", text: `Missed fix or trade-off. Model solution: ${r.model_solution}` });
+    if (r.highestLeverageGap) gaps.push({ type: "missed_bottleneck", text: r.highestLeverageGap });
+    openSuggestionSheet(s.sessionId, "bottleneck", gaps, s.topic, s.cards);
   });
 }

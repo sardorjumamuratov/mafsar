@@ -4,7 +4,7 @@ import { showChrome } from "../nav.js";
 import { appendReviewLog, bumpActivity, uid } from "../../storage/store.js";
 import { drillLogEntry } from "../../storage/drill-log.js";
 import { gradeEstimation, mismatchNote, parseEstimation, parseReference } from "../../storage/estimation.js";
-import { bindField, feedbackSummary, focusEnd, paintShell, primaryBtn, secondaryBtn, verdictRow, waitRow } from "./shell.js";
+import { bindField, feedbackSummary, openSuggestionSheet, focusEnd, paintShell, primaryBtn, secondaryBtn, verdictRow, waitRow } from "./shell.js";
 
 // Estimate: back-of-the-envelope numbers. The model writes the questions and the
 // reference answers; the learner's number is graded on this side of the wire.
@@ -212,6 +212,7 @@ function paintSummary(summary) {
     counter: `${n} / ${n}`,
     body: `
       <div class="st-mt24">${summaryBlock}</div>
+      <button type="button" class="st-link st-mt12" id="estSuggestBtn">Turn gaps into review cards</button>
       ${summary.notes && summary.notes.length > 0 ? `
       <div class="st-label st-mt24">Notes</div>
       <div class="st-list">${summary.notes.map(note => `<div class="st-li st-feedback">${esc(note.message)}</div>`).join("")}</div>
@@ -219,5 +220,11 @@ function paintSummary(summary) {
       <div class="st-label st-mt24">Your answers</div>
       <div class="st-list">${rows}</div>`,
     dock: primaryBtn("return-focus", "Done"),
+  });
+
+  document.getElementById("estSuggestBtn")?.addEventListener("click", () => {
+    const gaps = s.results.filter(r => r.grade !== "spot_on").map(r => ({ type: "estimation_mistake", text: `Question: ${r.question.question} \nExpected: ${r.question.reference_value} ${r.question.reference_unit} \nAnswer: ${r.raw}` }));
+    if (summary.habit_to_fix) gaps.push({ type: "estimation_mistake", text: summary.habit_to_fix });
+    openSuggestionSheet(s.sessionId, "estimation", gaps, s.topic, s.cards);
   });
 }
