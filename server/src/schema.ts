@@ -233,45 +233,81 @@ const drillReference = z.array(z.object({ front: z.string().max(500), back: z.st
 const drillSource = { concept: z.string().min(1).max(500), reference: drillReference };
 export const MAX_DESIGN_ANSWER = 4000;
 
-export const designTaskSchema = z.object({ ...drillSource, mode: z.enum(["design", "clinical"]).default("design") });
+export const designTaskSchema = z.object({ ...drillSource, mode: z.enum(["design", "clinical"]).default("design"), practiceStyle: z.enum(["guided", "simulation"]).optional() });
 
 /** Grades the first answer, or (with curveball) the adaptation to a curveball. */
 export const designGradeSchema = z.object({
+  practiceStyle: z.enum(["guided", "simulation"]).optional(),
   // "clinical" reuses this route for Medicine clinical cases; state carries the
   // encrypted case (diagnosis, tests) the client must not see.
   mode: z.enum(["design", "clinical"]).default("design"),
   state: z.string().max(8000).optional(),
   task: z.string().min(1).max(2000),
-  answer: z.string().min(1).max(MAX_DESIGN_ANSWER),
+  answer: z.union([z.string().min(1).max(MAX_DESIGN_ANSWER), z.record(z.string(), z.string().max(MAX_DESIGN_ANSWER)).refine(obj => JSON.stringify(obj).length <= MAX_DESIGN_ANSWER, "Answer payload too large")]),
   curveball: z.string().max(1000).optional(),
   originalAnswer: z.string().max(MAX_DESIGN_ANSWER).optional(),
+});
+
+export const designCheckpointSchema = z.object({
+  step: z.string().max(200),
+  brief: z.string().max(2000),
+  answer: z.string().max(4000)
 });
 
 export const designCurveballSchema = z.object({
   mode: z.enum(["design", "clinical"]).default("design"),
   state: z.string().max(8000).optional(),
   task: z.string().min(1).max(2000),
-  answer: z.string().min(1).max(MAX_DESIGN_ANSWER),
+  answer: z.string().max(MAX_DESIGN_ANSWER).optional(),
+    selectedComponentId: z.string().max(200).optional(),
+    parts: z.object({
+      flaw: z.string().max(MAX_DESIGN_ANSWER).optional(),
+      reason: z.string().max(MAX_DESIGN_ANSWER).optional(),
+      fix: z.string().max(MAX_DESIGN_ANSWER).optional(),
+      tradeoff: z.string().max(MAX_DESIGN_ANSWER).optional(),
+    }).optional(),
   previous: z.array(z.string().max(1000)).max(5).default([]),
 });
 
 export const estimationTaskSchema = z.object(drillSource);
 
 export const estimationSummarySchema = z.object({
+  practiceStyle: z.enum(["guided", "simulation"]).optional(),
   results: z.array(z.object({
     question: z.string().max(1000),
     expected: z.string().max(200),
     answer: z.string().max(200),
-    grade: z.enum(["spot_on", "ballpark", "off"]),
-  })).min(1).max(10),
+      grade: z.enum(["spot_on", "ballpark", "off"]),
+      working: z.string().max(800).optional(),
+      status: z.enum(["correct", "close", "not_quite", "unit_mismatch"]).optional(),
+    })).min(1).max(10),
 });
 
-export const bottleneckTaskSchema = z.object(drillSource);
+export const bottleneckTaskSchema = z.object({ ...drillSource, practiceStyle: z.enum(["guided", "simulation"]).optional() });
 // state is the server-encrypted planted flaw (see crypto.ts); bounded so a
 // forged blob can't be huge.
-export const bottleneckHintSchema = z.object({ state: z.string().min(1).max(4000) });
+export const bottleneckHintSchema = z.object({ state: z.string().min(1).max(4000), level: z.number().int().min(1).max(3).optional() });
 export const bottleneckGradeSchema = z.object({
+  practiceStyle: z.enum(["guided", "simulation"]).optional(),
   state: z.string().min(1).max(4000),
-  answer: z.string().min(1).max(MAX_DESIGN_ANSWER),
+  answer: z.string().max(MAX_DESIGN_ANSWER).optional(),
+    selectedComponentId: z.string().max(200).optional(),
+    parts: z.object({
+      flaw: z.string().max(MAX_DESIGN_ANSWER).optional(),
+      reason: z.string().max(MAX_DESIGN_ANSWER).optional(),
+      fix: z.string().max(MAX_DESIGN_ANSWER).optional(),
+      tradeoff: z.string().max(MAX_DESIGN_ANSWER).optional(),
+    }).optional(),
   usedHint: z.boolean().default(false),
+});
+
+export const drillCardSuggestionsSchema = z.object({
+  mode: z.enum(["design", "estimation", "bottleneck"]),
+  gaps: z.array(z.object({
+    type: z.enum(["missed_rubric", "partial_rubric", "estimation_mistake", "unit_mismatch", "missed_bottleneck", "missing_tradeoff"]),
+    text: z.string().max(400)
+  })).max(8),
+  topic: z.string().max(200),
+  existingFronts: z.array(z.string().max(200)).max(50).optional(),
+  practiceStyle: z.enum(["guided", "simulation"]).optional()
 });

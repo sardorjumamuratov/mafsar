@@ -576,9 +576,10 @@ shortener: 5k writes/s, reads 100x writes, links never expire"). State concrete 
 two explicit constraints. Also list 4-7 rubric points a strong answer covers.
 
 Respond with ONLY valid JSON:
-{ "brief": string, "rubric": [string] }`;
+{ "brief": string, "rubric": [string], "constraints": [string] }
+constraints is an array of 2-4 very short constraint phrases (e.g. "5k writes/s", "reads 100x writes").`;
 
-export async function generateDesignTask(concept: string, reference: Ref[], mode?: string) {
+export async function generateDesignTask(concept: string, reference: Ref[], mode?: string, uid?: string, practiceStyle?: string) {
   if (mode === "clinical") {
     const CLINICAL_TASK_PROMPT = `You are a medical case generator. 
 Based on the provided mechanism chain, write a short clinical vignette (age, presenting complaint, relevant history, examination findings). It must read like a real case, not a quiz question.
@@ -602,7 +603,7 @@ Respond with ONLY valid JSON:
       chain: concept
     };
     const rubric = secret.tests.map((t: any) => t.name);
-    return { brief, rubric, state: encryptState(secret) };
+    return { brief, rubric, state: encryptState({ ...secret, uid, iat: Date.now(), practiceStyle }) };
   }
 
   const parsed = await callJson(DESIGN_TASK_PROMPT, `Topic: ${concept}\n\nStudy cards:\n${refText(reference)}`);
@@ -618,23 +619,32 @@ const VERDICTS = ["strong", "ok", "weak", "missing"] as const;
 const DESIGN_GRADE_PROMPT = `You are a system design interviewer grading a practice answer.
 You get the brief, its rubric (derive one from the brief if it's empty) and the learner's answer,
 written in labelled sections. If a curveball is given, grade ONLY how well the learner adapted their
-original design to it.
+original design to it. API and data-model content may live in the components step.
+(If omitted sections were just skipped, don't penalize them if you know it's a guided flow.)
 
 ${DRILL_RULES}
 
 Respond with ONLY valid JSON:
 {
   "rubric_evaluation": [{ "point": string, "status": "covered" | "partial" | "missed", "note": string }],
-  "sections": [{ "section": string, "verdict": "strong" | "ok" | "weak" | "missing", "note": string }],
+  "sections": [{ "section": string, "key": "requirements" | "estimates" | "api" | "dataModel" | "components" | "tradeoffs", "verdict": "strong" | "ok" | "weak" | "missing", "note": string }],
+  "strongestPart": string | null,
+  "highestLeverageGap": string | null,
   "next_time": string
 }
 "sections" uses these names: ${DESIGN_SECTIONS.join(", ")}. Omit "sections" when grading a curveball.`;
 
 export async function gradeDesignAnswer(input: {
-  task: string; answer: string; rubric?: string[]; curveball?: string; originalAnswer?: string; mode?: string; state?: string;
+  uid?: string;
+  task: string; answer: string | Record<string, string>; rubric?: string[]; curveball?: string; originalAnswer?: string; mode?: string; state?: string;
 }) {
+  let answerStr = input.answer;
+  if (typeof answerStr !== "string") {
+    answerStr = Object.entries(answerStr).filter(x => typeof x[1] === "string" && x[1].trim().length > 0).map(x => x[0].toUpperCase() + ":\n\n" + x[1]).join("\n\n---\n\n");
+    if (!answerStr) answerStr = "(Skipped all sections)";
+  }
   if (input.mode === "clinical" && input.state) {
-    const state = openState<ClinicalState>(input.state, "diagnosis");
+    const state = openState<ClinicalState>(input.state, "diagnosis", input.uid);
     const CLINICAL_GRADE_PROMPT = `You are a clinical educator grading a learner's work on a practice case.
 Judge against the reference below, not your own clinical knowledge, and never introduce
 findings or treatments the reference doesn't have.
@@ -649,7 +659,9 @@ ${DRILL_RULES}
 Respond with ONLY valid JSON:
 {
   "rubric_evaluation": [{ "point": string, "status": "covered" | "partial" | "missed", "note": string }],
-  "sections": [{ "section": string, "verdict": "strong" | "ok" | "weak" | "missing", "note": string }],
+  "sections": [{ "section": string, "key": "requirements" | "estimates" | "api" | "dataModel" | "components" | "tradeoffs", "verdict": "strong" | "ok" | "weak" | "missing", "note": string }],
+  "strongestPart": string | null,
+  "highestLeverageGap": string | null,
   "next_time": string
 }`;
     const user = [
@@ -658,7 +670,7 @@ Respond with ONLY valid JSON:
       `Reference management:\n${state.management}`,
       `Reference chain:\n${state.chain}`,
       `Learner's first answer (diagnosis and tests requested):\n${input.originalAnswer || "(none)"}`,
-      `Learner's final answer:\n${input.answer}`,
+      `Learner's final answer:\n${answerStr}`,
     ].join("\n\n");
     const parsed = await callJson(CLINICAL_GRADE_PROMPT, user);
     const rubric_evaluation = (Array.isArray(parsed?.rubric_evaluation) ? parsed.rubric_evaluation : [])
@@ -683,9 +695,9 @@ Respond with ONLY valid JSON:
     `Rubric:\n${(input.rubric || []).map((r) => `- ${r}`).join("\n") || "(derive from the brief)"}`,
   ];
   if (input.curveball) {
-    parts.push(`Original answer:\n${input.originalAnswer || "(not provided)"}`, `Curveball:\n${input.curveball}`, `Learner's adaptation:\n${input.answer}`);
+    parts.push(`Original answer:\n${input.originalAnswer || "(not provided)"}`, `Curveball:\n${input.curveball}`, `Learner's adaptation:\n${answerStr}`);
   } else {
-    parts.push(`Learner's answer:\n${input.answer}`);
+    parts.push(`Learner's answer:\n${answerStr}`);
   }
   const parsed = await callJson(DESIGN_GRADE_PROMPT, parts.join("\n\n"));
   const rubric_evaluation = (Array.isArray(parsed?.rubric_evaluation) ? parsed.rubric_evaluation : [])
@@ -701,11 +713,20 @@ Respond with ONLY valid JSON:
         .filter((x: any) => DESIGN_SECTIONS.includes(x?.section))
         .map((x: any) => ({
           section: x.section as string,
+          key: (["requirements", "estimates", "api", "dataModel", "components", "tradeoffs"].includes(x?.key) ? x.key : "components"),
           verdict: (VERDICTS as readonly string[]).includes(x?.verdict) ? x.verdict : "missing",
           note: str(x?.note, 300),
         }));
   if (!rubric_evaluation.length) throw new LLMError("The model didn't return a usable grade. Try again.");
-  return { rubric_evaluation, sections, next_time: str(parsed?.next_time, 500, "Keep practising.") };
+  const score = rubric_evaluation.reduce((s, p) => s + (p.status === "covered" ? 1 : p.status === "partial" ? 0.5 : 0), 0);
+  return {
+    rubric_evaluation,
+    sections,
+    next_time: str(parsed?.next_time, 500, "Keep practising."),
+    strongestPart: parsed?.strongestPart ? str(parsed.strongestPart, 500) : null,
+    highestLeverageGap: parsed?.highestLeverageGap ? str(parsed.highestLeverageGap, 500) : null,
+    score
+  };
 }
 
 const DESIGN_CURVEBALL_PROMPT = `You are a system design interviewer throwing a curveball.
@@ -764,8 +785,22 @@ Units must be one of: B, KB, MB, GB, TB, PB (bytes), bps, Kbps, Mbps, Gbps (bits
 B/s, KB/s, MB/s, GB/s (bytes per second), QPS, req/day, servers, users, or no unit for plain counts.
 
 Respond with ONLY valid JSON:
-{ "questions": [{ "question": string, "reference_value": number, "reference_unit": string, "worked_solution": string }] }
-worked_solution shows the arithmetic step by step in 2-5 short lines.`;
+{ "questions": [{
+    "question": string,
+    "reference_value": number,
+    "reference_unit": string,
+    "worked_solution": string,
+    "nudge": string,
+    "first_step": string,
+    "scaffold": [string],
+    "traffic": "average" | "peak" | null,
+    "assumptions": [string]
+}] }
+worked_solution shows the arithmetic step by step in 2-5 short lines.
+scaffold is an array of strings representing the equation, with "?" for unknown values. Must not contain the answer.
+nudge is a small hint when they are stuck.
+first_step gives them the very first arithmetic step to take.
+`;
 
 export async function generateEstimationTasks(concept: string, reference: Ref[]) {
   const parsed = await callJson(ESTIMATION_TASK_PROMPT, `Topic: ${concept}\n\nStudy cards:\n${refText(reference)}`);
@@ -775,26 +810,64 @@ export async function generateEstimationTasks(concept: string, reference: Ref[])
       reference_value: Number(q?.reference_value),
       reference_unit: str(q?.reference_unit, 20),
       worked_solution: str(q?.worked_solution, 1200),
+      nudge: str(q?.nudge, 500),
+      first_step: str(q?.first_step, 500),
+      scaffold: Array.isArray(q?.scaffold) ? q.scaffold.map((s: any) => str(s, 200)) : [],
+      traffic: q?.traffic === "average" || q?.traffic === "peak" ? q.traffic : null,
+      assumptions: Array.isArray(q?.assumptions) ? q.assumptions.map((a: any) => str(a, 200)) : []
     }))
     // A question without a usable positive answer can't be graded: drop it.
     .filter((q: any) => q.question && Number.isFinite(q.reference_value) && q.reference_value > 0)
     .slice(0, ESTIMATION_ROUND);
-  if (questions.length < 3) throw new LLMError("The model didn't return enough usable questions. Try again.");
+  if (questions.length < 3) throw new LLMError("The model didn\'t return enough usable questions. Try again.");
   return { questions };
 }
 
 const ESTIMATION_SUMMARY_PROMPT = `You review a learner's round of estimation answers (each graded
 spot_on / ballpark / off by order of magnitude). In ONE sentence, name the single most useful habit to
 fix (for example forgetting replication, mixing bits and bytes, per-day vs per-second). If they did
-well, say what to keep doing.
+well, say what to keep doing. Include up to 5 brief coaching notes grounded in their working (if any),
+without giving a second score.
 
 ${DRILL_RULES}
 
-Respond with ONLY valid JSON: { "habit_to_fix": string }`;
+Respond with ONLY valid JSON: {
+  "habit_to_fix": string,
+  "strongest_habit": string | null,
+  "notes": [{ "index": number, "message": string }]
+}`;
 
-export async function generateEstimationSummary(results: { question: string; expected: string; answer: string; grade: string }[]) {
-  const parsed = await callJson(ESTIMATION_SUMMARY_PROMPT, JSON.stringify(results));
-  return { habit_to_fix: str(parsed?.habit_to_fix, 400, "Keep practising your estimates.") };
+export async function generateEstimationSummary(results: { question: string; expected: string; answer: string; grade: string; working?: string }[]) {
+  try {
+    const parsed = await callJson(ESTIMATION_SUMMARY_PROMPT, JSON.stringify(results));
+    return {
+      habit_to_fix: str(parsed?.habit_to_fix, 400, "Keep practising your estimates."),
+      strongest_habit: str(parsed?.strongest_habit, 400) || null,
+      notes: (Array.isArray(parsed?.notes) ? parsed.notes : [])
+        .map((n: any) => ({ index: Number(n?.index), message: str(n?.message, 200) }))
+        .filter((n: any) => Number.isFinite(n.index) && n.message)
+        .slice(0, 5)
+    };
+  } catch (e) {
+    return { habit_to_fix: "We could not analyze the working this time, but your numerical answer was checked." };
+  }
+}
+
+const DESIGN_CHECKPOINT_PROMPT = `You are coaching a learner on a system design brief. 
+They have written a draft for one section of the design (\${step}).
+Identify ONE useful strength they covered, and ONE missing high-value idea they should consider adding.
+Be very concise (one short sentence each). Do not grade them.
+
+Respond with ONLY valid JSON:
+{ "strength": string, "gap": string }
+`;
+
+export async function generateDesignCheckpoint(step: string, brief: string, answer: string) {
+  const parsed = await callJson(DESIGN_CHECKPOINT_PROMPT.replace("${step}", step), `Brief:\n${brief}\n\nLearner's answer for ${step}:\n${answer}`);
+  return {
+    strength: str(parsed?.strength, 300),
+    gap: str(parsed?.gap, 300)
+  };
 }
 
 // --- Find the bottleneck --------------------------------------------------------
@@ -809,106 +882,216 @@ with no invalidation...). Don't hint at the flaw in the description.
 
 Respond with ONLY valid JSON:
 {
-  "narrative": string,                 // 2-4 sentences: what the system does, the traffic
-  "architecture": [string],            // components in request order, e.g. "API servers (3x)"
+  "narrative": string,
+  "components": [{ "id": string, "name": string, "detail": string }], // the architecture components in request order. id must be a unique slug
+  "flaw_component": string,            // the id of the component where the planted flaw lives
   "planted_flaw": string,
   "why_it_fails": string,
-  "model_solution": string             // a good fix and its trade-off
+  "model_solution": string,            // a good fix
+  "tradeoff": string                   // the fix's trade-off
 }`;
 
-export async function generateBottleneckTask(concept: string, reference: Ref[]) {
+export async function generateBottleneckTask(concept: string, reference: Ref[], uid?: string, practiceStyle?: string) {
   const parsed = await callJson(BOTTLENECK_TASK_PROMPT, `Topic: ${concept}\n\nStudy cards:\n${refText(reference)}`);
   const narrative = str(parsed?.narrative, 1200);
-  const architecture = strList(parsed?.architecture, 12, 120);
+  const components = (Array.isArray(parsed?.components) ? parsed.components : []).map((c: any) => ({
+    id: str(c?.id, 100),
+    name: str(c?.name, 200),
+    detail: str(c?.detail, 500)
+  })).filter((c: any) => c.id && c.name);
   const planted_flaw = str(parsed?.planted_flaw, 600);
-  if (!narrative || architecture.length < 2 || !planted_flaw) {
-    throw new LLMError("The model didn't return a usable scenario. Try again.");
+  if (!narrative || components.length < 2 || !planted_flaw) {
+    throw new LLMError("The model didn\'t return a usable scenario. Try again.");
   }
   const secret = {
     narrative,
-    architecture,
+    components,
+    flaw_component_id: str(parsed?.flaw_component, 100),
+    tradeoff: str(parsed?.tradeoff, 800),
+    hints: [],
+    hintLevel: 0,
     planted_flaw,
     why_it_fails: str(parsed?.why_it_fails, 800),
     model_solution: str(parsed?.model_solution, 1200),
   };
-  return { narrative, architecture, state: encryptState(secret) };
+  return { narrative, components, state: encryptState({ ...secret, uid, iat: Date.now(), practiceStyle }) };
 }
 
 /** A forged, corrupted or foreign scenario token: the client's fault, a 400 (app.ts onError). */
 export class BadStateError extends Error {
   status = 400;
-  constructor() {
-    super("This exercise can't be continued. Start a new one.");
+  constructor(message?: string) {
+    super(message || "This exercise can't be continued. Start a new one.");
     this.name = "BadStateError";
   }
 }
 
 /** Decrypt the scenario state; a forged or corrupted token is a 400, not a 500. */
-function openState<T>(state: string, required: keyof T & string): T {
+export function openState<T>(state: string, required: keyof T & string, uid?: string): T {
   try {
     const parsed = decryptState(state);
     if (!parsed || typeof parsed[required] !== "string") throw new BadStateError();
+    if (parsed.uid) {
+      if (uid && parsed.uid !== uid) throw new BadStateError("EXERCISE_EXPIRED");
+      if (parsed.iat && Date.now() - parsed.iat > 24 * 60 * 60 * 1000) throw new BadStateError("EXERCISE_EXPIRED");
+    }
     return parsed as T;
-  } catch {
+  } catch (e) {
+    if (e instanceof BadStateError) throw e;
     throw new BadStateError();
   }
 }
 
 /** The hidden half of a bottleneck exercise. */
-type BottleneckState = { narrative: string; architecture: string[]; planted_flaw: string; why_it_fails: string; model_solution: string };
+type BottleneckState = { narrative: string; components: {id: string, name: string, detail: string}[]; flaw_component_id: string; tradeoff: string; hints: string[]; hintLevel: number; planted_flaw: string; why_it_fails: string; model_solution: string; hintUsed?: boolean; uid?: string; iat?: number; practiceStyle?: string };
 /** The hidden half of a clinical case: results, diagnosis and management. */
 type ClinicalState = { tests: { name: string; result: string }[]; diagnosis: string; management: string; chain: string };
 
 const BOTTLENECK_HINT_PROMPT = `You give ONE short hint for a find-the-bottleneck exercise: point at the
 area to look at without naming the flaw. One sentence.
+The requested hint level is \${level}. If level 1, be vague. If level 2, point to a specific interaction. If level 3, practically give away the component.
 
-${DRILL_RULES}
+\${DRILL_RULES}
 
 Respond with ONLY valid JSON: { "hint": string }`;
 
-export async function generateBottleneckHint(state: string) {
-  const s = openState<BottleneckState>(state, "planted_flaw");
-  const parsed = await callJson(BOTTLENECK_HINT_PROMPT, `Architecture:\n${s.architecture.join(" → ")}\n\nPlanted flaw (do not reveal): ${s.planted_flaw}`);
-  return { hint: str(parsed?.hint, 300, "Follow a single write request end to end.") };
+export async function generateBottleneckHint(input: { state: string; level?: number; uid?: string }) {
+  const s = openState<BottleneckState>(input.state, "planted_flaw", input.uid);
+  const isSimulation = s.practiceStyle === "simulation";
+  const limit = isSimulation ? 1 : 3;
+  const reqLevel = input.level || ((s.hintLevel || 0) + 1);
+  if (reqLevel > limit) throw new BadStateError("HINT_LIMIT_REACHED");
+
+  // Asking for a hint we already have
+  if (s.hints && s.hints.length >= reqLevel && s.hints[reqLevel - 1]) {
+    return {
+      hint: s.hints[reqLevel - 1],
+      text: s.hints[reqLevel - 1],
+      level: reqLevel,
+      penalty: isSimulation ? 0.5 : 0,
+      revealsAnswer: false,
+      state: input.state
+    };
+  }
+
+  const prompt = BOTTLENECK_HINT_PROMPT.replace("\${level}", String(reqLevel));
+  const parsed = await callJson(prompt, `Architecture:\n\${(s.components || []).map(c => c.name).join(" → ")}\n\nPlanted flaw (do not reveal): \${s.planted_flaw}`);
+  const hintText = str(parsed?.hint, 300, "Follow a single write request end to end.");
+  
+  const hints = [...(s.hints || [])];
+  hints[reqLevel - 1] = hintText;
+  
+  const newState = { ...s, hints, hintLevel: Math.max(s.hintLevel || 0, reqLevel) };
+  return {
+    hint: hintText,
+    text: hintText,
+    level: reqLevel,
+    penalty: isSimulation ? 0.5 : 0,
+    revealsAnswer: false,
+    state: encryptState(newState)
+  };
 }
 
-const BOTTLENECK_GRADE_PROMPT = `You grade a find-the-bottleneck answer on three separate parts:
-1. found_flaw: did the learner identify the planted flaw, OR a different problem that is genuinely
-   real in this design (then set "other_valid_issue")?
-2. explanation_correct: is their explanation of why it fails (under what load or failure) right?
-3. fix_works: does their fix actually solve it, with its trade-off acknowledged?
+const BOTTLENECK_GRADE_PROMPT = `You grade a find-the-bottleneck answer on three criteria:
+1. foundFlaw: did the learner identify the planted flaw, OR a different problem that is genuinely real in this design?
+2. explainedFailure: is their explanation of why it fails right?
+3. proposedFix: does their fix solve it, and is its trade-off acknowledged?
 
 ${DRILL_RULES}
 
 Respond with ONLY valid JSON:
-{ "found_flaw": boolean, "other_valid_issue": string, "explanation_correct": boolean, "fix_works": boolean, "feedback": string }`;
+{
+  "criteria": {
+    "foundFlaw": { "status": "covered" | "partial" | "missed", "note": string },
+    "explainedFailure": { "status": "covered" | "partial" | "missed", "note": string },
+    "proposedFix": { "status": "covered" | "partial" | "missed", "note": string }
+  },
+  "verdict": "correct" | "partly_right" | "not_quite",
+  "feedback": string,
+  "strongestPart": string | null,
+  "highestLeverageGap": string | null,
+  "alternateProblem": { "componentId": string, "description": string } | null
+}`;
 
-export async function gradeBottleneckAnswer(state: string, answer: string, usedHint = false) {
-  const s = openState<BottleneckState>(state, "planted_flaw");
+export async function gradeBottleneckAnswer(input: {
+  state: string;
+  answer?: string;
+  usedHint?: boolean;
+  uid?: string;
+  practiceStyle?: string;
+  selectedComponentId?: string;
+  parts?: { flaw?: string; reason?: string; fix?: string; tradeoff?: string };
+}) {
+  const s = openState<BottleneckState>(input.state, "planted_flaw", input.uid);
+  let finalAnswer = input.answer || "";
+  if (input.parts && Object.values(input.parts).some(v => v && typeof v === "string" && v.trim())) {
+    const p = input.parts;
+    finalAnswer = [
+      p.flaw ? `Flaw: ${p.flaw}` : "",
+      p.reason ? `Reason: ${p.reason}` : "",
+      p.fix ? `Fix: ${p.fix}` : "",
+      p.tradeoff ? `Trade-off: ${p.tradeoff}` : ""
+    ].filter(Boolean).join("\n\n");
+  }
+
   const user = [
     `Scenario:\n${s.narrative}`,
-    `Architecture:\n${s.architecture.join(" → ")}`,
+    `Architecture:\n${(s.components || []).map(c => c.name).join(" → ")}`,
     `Planted flaw:\n${s.planted_flaw}`,
     `Why it fails:\n${s.why_it_fails}`,
-    `Learner's answer:\n${answer}`,
+    `Learner\'s answer:\n${finalAnswer}`,
   ].join("\n\n");
   const parsed = await callJson(BOTTLENECK_GRADE_PROMPT, user);
-  const found_flaw = parsed?.found_flaw === true;
-  const explanation_correct = parsed?.explanation_correct === true;
-  const fix_works = parsed?.fix_works === true;
-  // Three parts, one point each; a hint costs half a point.
-  const score = Math.max(0, Number(found_flaw) + Number(explanation_correct) + Number(fix_works) - (usedHint ? 0.5 : 0));
+
+  // Score mapping: covered=1, partial=0.5, missed=0
+  const criteria = {
+    foundFlaw: { status: parsed?.criteria?.foundFlaw?.status || "missed", note: parsed?.criteria?.foundFlaw?.note || "", earned: 0 },
+    explainedFailure: { status: parsed?.criteria?.explainedFailure?.status || "missed", note: parsed?.criteria?.explainedFailure?.note || "", earned: 0 },
+    proposedFix: { status: parsed?.criteria?.proposedFix?.status || "missed", note: parsed?.criteria?.proposedFix?.note || "", earned: 0 }
+  };
+  let score = 0;
+  for (const k of ["foundFlaw", "explainedFailure", "proposedFix"]) {
+    const val = (criteria as any)[k].status === "covered" ? 1 : (criteria as any)[k].status === "partial" ? 0.5 : 0;
+    (criteria as any)[k].earned = val;
+    score += val;
+  }
+
+  const v2Hint = Array.isArray(s.hints) && s.hints.length > 0;
+  const effectivelyUsedHint = v2Hint || input.usedHint;
+  const isSimulation = s.practiceStyle === "simulation" || input.practiceStyle === "simulation";
+  const hintPenalty = (isSimulation && effectivelyUsedHint) ? 0.5 : 0;
+  
+  const finalScore = Math.max(0, score - hintPenalty);
+
+  let selectedComponentResult = null;
+  if (input.selectedComponentId) {
+    if (s.flaw_component_id === input.selectedComponentId) {
+      selectedComponentResult = { componentId: input.selectedComponentId, status: "flaw" };
+    } else if (parsed?.alternateProblem && parsed.alternateProblem.componentId === input.selectedComponentId) {
+      selectedComponentResult = { componentId: input.selectedComponentId, status: "alternate" };
+    } else {
+      selectedComponentResult = { componentId: input.selectedComponentId, status: "not_the_flaw" };
+    }
+  }
+
   return {
-    found_flaw,
-    explanation_correct,
-    fix_works,
-    other_valid_issue: str(parsed?.other_valid_issue, 400),
     feedback: str(parsed?.feedback, 600, "Good attempt."),
-    score,
-    usedHint,
+    score: finalScore,
+    usedHint: effectivelyUsedHint,
     planted_flaw: s.planted_flaw,
     why_it_fails: s.why_it_fails,
     model_solution: s.model_solution,
+    maxScore: 3,
+    hintPenalty,
+    finalScore,
+    verdict: parsed?.verdict || "not_quite",
+    criteria,
+    selectedComponentResult,
+    failingComponentId: s.flaw_component_id,
+    strongestPart: str(parsed?.strongestPart, 500) || null,
+    highestLeverageGap: str(parsed?.highestLeverageGap, 500) || null,
+    alternateProblem: parsed?.alternateProblem ? { componentId: str(parsed.alternateProblem.componentId, 100), description: str(parsed.alternateProblem.description, 400) } : null,
+    modelAnswer: { flaw: s.planted_flaw, whyItFails: s.why_it_fails, goodFix: s.model_solution, tradeoff: s.tradeoff }
   };
 }
 
@@ -920,4 +1103,55 @@ export async function cleanSetTitle(title: string): Promise<string> {
   } catch(e) {
     throw e;
   }
+}
+
+const DRILL_SUGGESTION_PROMPT = `You turn a learner's mistakes in a system design drill into active-recall flashcards.
+You are given the topic, their gaps/mistakes, and a list of existing cards to avoid duplicating.
+Generate up to 3 flashcards addressing the most critical gaps. Each card must teach a transferable concept, not the exact scenario from the drill.
+
+${DRILL_RULES}
+
+Respond with ONLY valid JSON:
+{
+  "suggestions": [
+    {
+      "id": string, // unique random slug
+      "front": string, // a clear, active-recall question
+      "back": string, // a concise, accurate explanation
+      "conceptKey": string, // short label for the concept
+      "sourceType": string, // which gap type this addresses
+      "reason": string // brief note to the learner on why this helps
+    }
+  ]
+}`;
+
+export async function generateDrillCardSuggestions(input: {
+  mode: string;
+  gaps: { type: string; text: string }[];
+  topic: string;
+  existingFronts?: string[];
+}) {
+  if (!input.gaps || input.gaps.length === 0) return { suggestions: [] };
+  const user = [
+    `Topic: ${input.topic}`,
+    `Mode: ${input.mode}`,
+    `Gaps:`,
+    ...input.gaps.map(g => `- [${g.type}] ${g.text}`),
+    input.existingFronts && input.existingFronts.length > 0 ? `\nAvoid these existing questions:\n${input.existingFronts.map(f => `- ${f}`).join("\n")}` : ""
+  ].join("\n");
+  
+  const parsed = await callJson(DRILL_SUGGESTION_PROMPT, user);
+  const suggestions = (Array.isArray(parsed?.suggestions) ? parsed.suggestions : [])
+    .map((s: any) => ({
+      id: str(s?.id, 50, "rnd"),
+      front: str(s?.front, 160),
+      back: str(s?.back, 400),
+      conceptKey: str(s?.conceptKey, 100),
+      sourceType: str(s?.sourceType, 50),
+      reason: str(s?.reason, 200)
+    }))
+    .filter((s: any) => s.front && s.back)
+    .slice(0, 3);
+    
+  return { suggestions };
 }

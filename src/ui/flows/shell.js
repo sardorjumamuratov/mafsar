@@ -1,4 +1,7 @@
-import { app, esc, setHTML } from "../core.js";
+import { openSheet, closeSheet } from "../sheet.js";
+import { addCard } from "../../storage/store.js";
+import { isDuplicate } from "../../storage/card-dedupe.js";
+import { app, esc, setHTML, send, toast } from "../core.js";
 
 // The one layout every study mode shares (docs/design/06-study.html): a top bar
 // with close, progress and counter; a scrolling body that starts with the mode
@@ -156,4 +159,137 @@ export function revealInBody(el) {
   const r = el.getBoundingClientRect();
   if (r.bottom > b.bottom) body.scrollTop += r.bottom - b.bottom + 16;
   else if (r.top < b.top) body.scrollTop -= b.top - r.top + 16;
+}
+
+
+export function feedbackSummary({ strongest, gap, scoreLine }) {
+  let html = `<div style="display:flex;flex-direction:column;gap:12px;padding:16px;border-radius:14px;background:var(--bg-surface);border:1px solid var(--border-control)">`;
+  if (scoreLine) html += `<div style="font-size:15px;font-weight:650;color:var(--text-primary);border-bottom:1px solid var(--border-control);padding-bottom:12px;margin-bottom:4px">${esc(scoreLine)}</div>`;
+  if (strongest) {
+    html += `<div style="display:flex;gap:10px">
+      <span style="color:var(--status-mastered);margin-top:2px">${icon("check", 16, 2.5)}</span>
+      <span style="display:flex;flex-direction:column;gap:2px">
+        <span style="font-size:13px;font-weight:650;text-transform:uppercase;letter-spacing:0.04em;color:var(--status-mastered)">Strongest part</span>
+        <span style="font-size:14px;color:var(--text-primary);line-height:1.4">${esc(strongest)}</span>
+      </span>
+    </div>`;
+  }
+  if (gap) {
+    html += `<div style="display:flex;gap:10px">
+      <span style="color:var(--status-learning);margin-top:2px">${icon("arrow-up", 16, 2.5)}</span>
+      <span style="display:flex;flex-direction:column;gap:2px">
+        <span style="font-size:13px;font-weight:650;text-transform:uppercase;letter-spacing:0.04em;color:var(--status-learning)">Highest leverage gap</span>
+        <span style="font-size:14px;color:var(--text-primary);line-height:1.4">${esc(gap)}</span>
+      </span>
+    </div>`;
+  }
+  html += `</div>`;
+  return html;
+}
+
+
+export async function openSuggestionSheet(sessionId, mode, gaps, topic, existingCards) {
+  const existingFronts = existingCards.map(c => c.front).slice(0, 50);
+  gaps = gaps.slice(0, 8);
+  
+  // Show a wait row in the sheet
+  openSheet("Turn gaps into cards", `
+    <div style="display:flex;align-items:center;justify-content:center;height:100px;color:var(--text-secondary)">
+      <span class="st-spin">${icon("loader", 20, 2)}</span>
+    </div>
+  `, false, null, { px: 16, pb: 24, gap: 14 });
+
+  let res;
+  try {
+    res = await send({ type: "DRILL_CARD_SUGGESTIONS", mode, gaps, topic, existingFronts });
+  } catch (e) {
+    if (e.error === "feature_disabled") {
+      closeSheet();
+      toast("Suggestions are currently disabled.");
+      return;
+    }
+    closeSheet();
+    toast(e.message || "Could not generate suggestions.");
+    return;
+  }
+  
+  if (!res.suggestions || res.suggestions.length === 0) {
+    openSheet("Turn gaps into cards", `
+      <div class="st-text15" style="text-align:center;color:var(--text-secondary);padding:24px 0">
+        No new concepts needed.
+      </div>
+      <button type="button" class="sheet-quiet" id="sugg-close">Close</button>
+    `, false, null, { px: 16, pb: 24, gap: 14 });
+    document.getElementById("sugg-close")?.addEventListener("click", () => closeSheet());
+    return;
+  }
+
+  let skippedCount = 0;
+  const validSuggestions = [];
+  for (const sugg of res.suggestions) {
+    if (isDuplicate(sugg.front, existingFronts, 0.7)) {
+      skippedCount++;
+    } else {
+      validSuggestions.push(sugg);
+    }
+  }
+
+  if (validSuggestions.length === 0) {
+    openSheet("Turn gaps into cards", `
+      <div class="st-text15" style="text-align:center;color:var(--text-secondary);padding:24px 0">
+        ${skippedCount} ${skippedCount === 1 ? "is" : "are"} already in your set. No new cards to add.
+      </div>
+      <button type="button" class="sheet-quiet" id="sugg-close">Close</button>
+    `, false, null, { px: 16, pb: 24, gap: 14 });
+    document.getElementById("sugg-close")?.addEventListener("click", () => closeSheet());
+    return;
+  }
+
+  const html = validSuggestions.map((s, i) => `
+    <label style="display:flex;gap:12px;padding:12px;background:var(--bg-surface);border:1px solid var(--border-control);border-radius:12px;cursor:pointer">
+      <input type="checkbox" checked data-sugg-idx="${i}" style="margin-top:2px">
+      <div style="display:flex;flex-direction:column;gap:4px">
+        <div style="font-weight:650;font-size:14px;color:var(--text-primary)">${esc(s.front)}</div>
+        <div style="font-size:14px;color:var(--text-secondary);line-height:1.4">${esc(s.back)}</div>
+        ${s.reason ? `<div style="font-size:13px;color:var(--status-learning);margin-top:4px">${esc(s.reason)}</div>` : ""}
+      </div>
+    </label>
+  `).join("");
+
+  openSheet("Turn gaps into cards", `
+    ${skippedCount > 0 ? `<div class="st-note" style="margin-bottom:12px">${skippedCount} ${skippedCount === 1 ? "is" : "are"} already in your set.</div>` : ""}
+    <div style="display:flex;flex-direction:column;gap:12px;max-height:400px;overflow-y:auto;margin:0 -16px;padding:0 16px">${html}</div>
+    <div style="display:flex;flex-direction:column;gap:8px;margin-top:16px">
+      <button type="button" class="sheet-primary" id="sugg-add">Add selected cards</button>
+      <button type="button" class="sheet-quiet" id="sugg-cancel">Not now</button>
+    </div>
+  `, false, null, { px: 16, pb: 24, gap: 0 });
+
+  document.getElementById("sugg-cancel")?.addEventListener("click", () => closeSheet());
+  
+  const addBtn = /** @type {HTMLButtonElement} */ (document.getElementById("sugg-add"));
+  const checkboxes = /** @type {HTMLInputElement[]} */ (Array.from(document.querySelectorAll('input[data-sugg-idx]')));
+  
+  checkboxes.forEach(cb => {
+    cb.addEventListener("change", () => {
+      addBtn.disabled = !checkboxes.some(c => c.checked);
+    });
+  });
+
+  addBtn?.addEventListener("click", async () => {
+    const selected = checkboxes.filter(c => c.checked).map(c => validSuggestions[parseInt(c.getAttribute("data-sugg-idx"), 10)]);
+    addBtn.disabled = true;
+    addBtn.textContent = "Adding...";
+    try {
+      for (const s of selected) {
+        await addCard(sessionId, s.front, s.back);
+      }
+      toast(`Added ${selected.length} card${selected.length === 1 ? "" : "s"}.`);
+      closeSheet();
+    } catch (e) {
+      toast("Failed to add cards.");
+      addBtn.disabled = false;
+      addBtn.textContent = "Add selected cards";
+    }
+  });
 }

@@ -54,7 +54,7 @@ export function clinicalCaseAction(action) {
     const btn = document.getElementById("clinicalToggleBtn");
     if (el && btn) {
       el.hidden = !el.hidden;
-      btn.textContent = el.hidden ? "See your answers" : "Hide your answers";
+      btn.textContent = el.hidden ? "Compare your diagnosis" : "Hide your diagnosis";
     }
   } else if (action === "toggle-full-case") {
     const el = document.getElementById("clinicalVignette");
@@ -235,7 +235,7 @@ function renderClinical() {
       ${results ? `<div class="st-label st-mt24">Results</div><div class="st-list">${results}</div>` : ""}
       <div class="st-label st-mt20">Your assessment</div>
       <div class="st-verdicts">${verdicts}</div>
-      <button type="button" class="st-link st-mt16" id="clinicalToggleBtn" data-action="clinical-toggle-answers">See your answers</button>
+      <button type="button" class="st-link st-mt16" id="clinicalToggleBtn" data-action="clinical-toggle-answers">Compare your diagnosis</button>
       <div id="clinicalAnswers" hidden>
         <div class="st-label st-mt16">Leading diagnosis and why</div>
         <div class="st-text15 st-mt4">${esc(s.inputs.diagnosis)}</div>

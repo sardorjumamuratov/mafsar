@@ -145,6 +145,7 @@ export function backendTeachEvaluate(payload) {
 
 // System design drills. Payloads are shaped by the worker (service-worker.js).
 export const backendDesignTask = (payload) => post("/v1/design-task", payload);
+export const backendDrillCardSuggestions = (payload) => post("/v1/drill-card-suggestions", payload);
 export const backendDesignGrade = (payload) => post("/v1/design-grade", payload);
 export const backendDesignCurveball = (payload) => post("/v1/design-curveball", payload);
 export const backendEstimationTask = (payload) => post("/v1/estimation-task", payload);

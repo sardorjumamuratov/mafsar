@@ -12,7 +12,7 @@ import { app, bundle, nav, send, setFor, toast } from "./core.js";
 import { goToActiveTab, inFocusView, registerTabs } from "./nav.js";
 import { renderSets } from "./views/sets.js";
 import { onActiveTabChange } from "./tab-watch.js";
-import { confirmLeaveEdit, currentDetail, makeSet, openDetailTab, openSetExamEditor, paintDetail, promptAddCard, renderSetDetail, saveCardEdit, saveNewCard, setEditingCardId, editingCardId, startQuizForCurrentSet, } from "./views/set-detail.js";
+import { confirmLeaveEdit, openPracticeStyleEditor, applyPracticeStyle, openFirstRunSheet, currentDetail, makeSet, openDetailTab, openSetExamEditor, paintDetail, promptAddCard, renderSetDetail, saveCardEdit, saveNewCard, setEditingCardId, editingCardId, startQuizForCurrentSet, } from "./views/set-detail.js";
 import { captureCurrent, captureLastAnswer, refreshCaptureDock, openAddMenu } from "./capture.js";
 import { deleteCard, restoreCard, deleteSession, updateStudySet, setExamDate } from "../storage/store.js";
 import { review } from "../../shared/srs.js";
@@ -86,6 +86,53 @@ document.addEventListener("click", (e) => {
     case "you-upgrade": openUpgradeSheet(); break;
     case "you-retry-plan": refreshBilling().catch(() => {}); break;
     case "you-signin": renderAuthGate(); break;
+    case "you-practice-style":
+      (async () => {
+        const { STYLES, getDefaultPracticeStyle } = await import("../storage/practice-style.js");
+        const { openSheet } = await import("./sheet.js");
+        const current = await getDefaultPracticeStyle();
+        const isGuided = current === STYLES.GUIDED;
+        openSheet("Practice style", `
+          <div style="display:flex;flex-direction:column;gap:12px;padding:8px 16px 24px">
+            <button type="button" data-action="set-you-practice-style" data-style="${STYLES.GUIDED}" class="opt-row ${isGuided ? "selected" : ""}" style="text-align:left;height:auto;padding:12px 14px">
+              <span style="display:flex;flex-direction:column;gap:2px">
+                <span style="font-weight:600;font-size:15px">Learn concepts</span>
+                <span style="font-size:13px;color:var(--text-muted)">Step-by-step guidance and hints. Best for learning a new system.</span>
+              </span>
+            </button>
+            <button type="button" data-action="set-you-practice-style" data-style="${STYLES.SIMULATION}" class="opt-row ${!isGuided ? "selected" : ""}" style="text-align:left;height:auto;padding:12px 14px">
+              <span style="display:flex;flex-direction:column;gap:2px">
+                <span style="font-weight:600;font-size:15px">Interview simulation</span>
+                <span style="font-size:13px;color:var(--text-muted)">Blank canvas, elapsed timer, strict grading. No hints.</span>
+              </span>
+            </button>
+          </div>
+        `, false, null, { px: 0, pb: 0 });
+      })().catch(() => {});
+      break;
+    case "set-first-run-style":
+      (async () => {
+        const { setDefaultPracticeStyle } = await import("../storage/practice-style.js");
+        const { closeSheet } = await import("./sheet.js");
+        await setDefaultPracticeStyle(t.getAttribute("data-style"));
+        closeSheet();
+        const nextAction = t.getAttribute("data-next");
+        const did = t.getAttribute("data-id");
+        if (nextAction === "start-design") startDesignDrill(did);
+        else if (nextAction === "start-estimation") startEstimationDrill(did);
+        else if (nextAction === "start-bottleneck") startBottleneckDrill(did);
+      })().catch(() => {});
+      break;
+    case "set-you-practice-style":
+      (async () => {
+        const { setDefaultPracticeStyle } = await import("../storage/practice-style.js");
+        const { closeSheet } = await import("./sheet.js");
+        
+        await setDefaultPracticeStyle(t.getAttribute("data-style"));
+        closeSheet();
+        renderYou();
+      })().catch(() => {});
+      break;
     case "open-in-tab": toggleOpenInTab(t, saveSettings); break;
     case "apply-card": startApply(); break;
     case "set-mode":
@@ -102,7 +149,22 @@ document.addEventListener("click", (e) => {
       break;
     case "start-coding": startCodingPractice(id); break;
     case "start-clinical-case": startClinicalCase(id); break;
-    case "start-design": startDesignDrill(id); break;
+        case "start-design":
+    case "start-estimation":
+    case "start-bottleneck":
+      (async () => {
+        const { getDefaultPracticeStyle } = await import("../storage/practice-style.js");
+        const current = await getDefaultPracticeStyle();
+        if (!current) {
+          const { openFirstRunSheet } = await import("./views/set-detail.js");
+          openFirstRunSheet(a, id);
+        } else {
+          if (a === "start-design") startDesignDrill(id);
+          else if (a === "start-estimation") startEstimationDrill(id);
+          else if (a === "start-bottleneck") startBottleneckDrill(id);
+        }
+      })().catch(() => {});
+      break;
     case "design-submit": submitDesign(); break;
     case "design-nav": designAction("nav", (/** @type {any} */ (t)).dataset.key); break;
     case "design-toggle-brief": designAction("toggle-brief"); break;
@@ -111,12 +173,13 @@ document.addEventListener("click", (e) => {
     case "clinical-next": clinicalCaseAction("next"); break;
     case "clinical-toggle-answers": clinicalCaseAction("toggle-answers"); break;
     case "clinical-toggle-full-case": clinicalCaseAction("toggle-full-case"); break;
-    case "start-estimation": startEstimationDrill(id); break;
-    case "estimation-submit": submitEstimation(); break;
+        case "estimation-submit": submitEstimation(); break;
     case "estimation-next": estimationNext(); break;
     case "estimation-dontknow": estimationAction("dontknow"); break;
-    case "start-bottleneck": startBottleneckDrill(id); break;
-    case "bottleneck-hint": requestBottleneckHint(); break;
+    case "estimation-toggle-working": estimationAction("toggle-working"); break;
+    case "estimation-traffic-average": estimationAction("traffic-average"); break;
+    case "estimation-traffic-peak": estimationAction("traffic-peak"); break;
+        case "bottleneck-hint": requestBottleneckHint(); break;
     case "bottleneck-submit": submitBottleneck(); break;
     case "bottleneck-toggle-scenario": bottleneckAction("toggle-scenario"); break;
     case "bottleneck-toggle-model": bottleneckAction("toggle-model"); break;
@@ -221,6 +284,13 @@ document.addEventListener("click", (e) => {
         })().catch(e => toast(e.message));
         break;
     case "exam-edit-set": openSetExamEditor(); break;
+    case "edit-practice-style": openPracticeStyleEditor(); break;
+    case "set-practice-style":
+      (async () => {
+        const el = document.getElementById("practice-style-default");
+        await applyPracticeStyle(t.getAttribute("data-style"), el ? /** @type {HTMLInputElement} */ (el).checked : false);
+      })().catch(() => {});
+      break;
     case "exam-clear":
       (async () => {
         const { studySets } = await bundle();

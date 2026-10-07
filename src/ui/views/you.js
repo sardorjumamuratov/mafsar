@@ -1,5 +1,6 @@
 import { activeTab, setNav, showChrome } from "../nav.js";
 import { GOOGLE_G, app, bundle, esc, send, setFor, setHTML, toast, topOfView } from "../core.js";
+import { getDefaultPracticeStyle, STYLES } from "../../storage/practice-style.js";
 import { dayKey, exportAll, importAll } from "../../storage/store.js";
 import { getAuth, googleSignIn, login, register } from "../../sync/auth.js";
 import { renderHome } from "../views/home.js";
@@ -76,6 +77,8 @@ export async function renderYou() {
   const auth = await getAuth();
   const signedIn = !!auth?.user;
   const openInTab = !!settings.openInTab;
+  const practiceStyle = await getDefaultPracticeStyle();
+  const styleName = practiceStyle === STYLES.GUIDED ? "Learn concepts" : "Interview simulation";
 
   const profile = signedIn
     ? `<div style="padding:14px;border-radius:14px;background:var(--bg-surface);border:1px solid var(--border-card);display:flex;align-items:center;gap:12px">
@@ -96,6 +99,9 @@ export async function renderYou() {
       ${signedIn ? group("Plan", `<div id="billingSlot">${billingSkeleton()}</div>`) : ""}
       ${group("Study", row({ icon: ICON.team, title: "Teams", sub: "Study with a group", attrs: 'data-action="nav-teams"' }))}
       ${group("Preferences", row({
+          icon: ICON.design, title: "Practice style", sub: styleName,
+          attrs: `data-action="you-practice-style"`
+        }) + row({
         icon: ICON.external, title: "Open in a tab", sub: "Full page instead of the side panel",
         attrs: `id="openInTabCheck" data-action="open-in-tab" role="switch" aria-checked="${openInTab}"`,
         trailing: '<span class="you-switch" aria-hidden="true"></span>',

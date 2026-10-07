@@ -82,7 +82,7 @@ export function sameKind(ref, ans) {
 export const BANDS = { spot_on: 2, ballpark: 10 };
 
 export function gradeEstimation(ref, ans) {
-  if (!ref || !ans || !sameKind(ref, ans)) return "off";
+  if (!ref || !ans || !sameKind(ref, ans)) return "unit_mismatch";
   if (ref.value === 0 && ans.value === 0) return "spot_on";
   if (ref.value <= 0 || ans.value <= 0) return "off";
   const ratio = Math.max(ref.value / ans.value, ans.value / ref.value);
@@ -95,5 +95,5 @@ const KIND_WORDS = { data: "a data size", data_rate: "a data rate", rate: "a rat
 /** Why an answer can't be compared, for the feedback line ("" when it can). */
 export function mismatchNote(ref, ans) {
   if (!ref || !ans || sameKind(ref, ans)) return "";
-  return `The answer is ${KIND_WORDS[ref.kind]}, but you gave ${KIND_WORDS[ans.kind]}.`;
+  return `This question asks for ${KIND_WORDS[ref.kind]}, but your answer is ${KIND_WORDS[ans.kind]}.`;
 }
