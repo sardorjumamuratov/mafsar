@@ -576,7 +576,8 @@ shortener: 5k writes/s, reads 100x writes, links never expire"). State concrete 
 two explicit constraints. Also list 4-7 rubric points a strong answer covers.
 
 Respond with ONLY valid JSON:
-{ "brief": string, "rubric": [string] }`;
+{ "brief": string, "rubric": [string], "constraints": [string] }
+constraints is an array of 2-4 very short constraint phrases (e.g. "5k writes/s", "reads 100x writes").`;
 
 export async function generateDesignTask(concept: string, reference: Ref[], mode?: string, uid?: string, practiceStyle?: string) {
   if (mode === "clinical") {
@@ -850,6 +851,23 @@ export async function generateEstimationSummary(results: { question: string; exp
   } catch (e) {
     return { habit_to_fix: "We could not analyze the working this time, but your numerical answer was checked." };
   }
+}
+
+const DESIGN_CHECKPOINT_PROMPT = `You are coaching a learner on a system design brief. 
+They have written a draft for one section of the design (\${step}).
+Identify ONE useful strength they covered, and ONE missing high-value idea they should consider adding.
+Be very concise (one short sentence each). Do not grade them.
+
+Respond with ONLY valid JSON:
+{ "strength": string, "gap": string }
+`;
+
+export async function generateDesignCheckpoint(step: string, brief: string, answer: string) {
+  const parsed = await callJson(DESIGN_CHECKPOINT_PROMPT.replace("${step}", step), `Brief:\n${brief}\n\nLearner's answer for ${step}:\n${answer}`);
+  return {
+    strength: str(parsed?.strength, 300),
+    gap: str(parsed?.gap, 300)
+  };
 }
 
 // --- Find the bottleneck --------------------------------------------------------

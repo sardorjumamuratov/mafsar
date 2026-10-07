@@ -16,14 +16,14 @@ import type { DB } from "./db.js";
 import {
   register, login, requireAuth, signAccessToken, signRefreshToken, upsertGoogleUser, verifyPassword,
 } from "./auth.js";
-import { syncSchema, registerSchema, loginSchema, generateSchema, gradeSchema, hypotheticalSchema, summarizeSchema, blurbSchema, codingTaskSchema, teachTurnSchema, teachEvaluateSchema, codingGradeSchema, designTaskSchema, designGradeSchema, designCurveballSchema, estimationTaskSchema, estimationSummarySchema, bottleneckTaskSchema, bottleneckHintSchema, bottleneckGradeSchema, drillCardSuggestionsSchema, shareCreateSchema, shareRevokeSchema, teamCreateSchema, teamJoinSchema, pollSchema, deleteAccountSchema } from "./schema.js";
+import { syncSchema, registerSchema, loginSchema, generateSchema, gradeSchema, hypotheticalSchema, summarizeSchema, blurbSchema, codingTaskSchema, teachTurnSchema, teachEvaluateSchema, codingGradeSchema, designTaskSchema, designGradeSchema, designCurveballSchema, designCheckpointSchema, estimationTaskSchema, estimationSummarySchema, bottleneckTaskSchema, bottleneckHintSchema, bottleneckGradeSchema, drillCardSuggestionsSchema, shareCreateSchema, shareRevokeSchema, teamCreateSchema, teamJoinSchema, pollSchema, deleteAccountSchema } from "./schema.js";
 import { googleConfigured, buildAuthUrl, pkcePair, exchangeCode, verifyIdToken } from "./google.js";
 import { applySync, changesSince } from "./sync.js";
 import { deleteUserData } from "./account.js";
 import { nowISO, one, all, run, uid } from "./db.js";
 import { retrievability, forgetBy } from "./fsrs.js";
 import { genTeamCode, leaderboardFor, learningFor } from "./teams.js";
-import { generateStudySet, gradeAnswer, generateHypothetical, summarizeConversation, setBlurb, generateCodingTask, gradeCode, generateDesignTask, gradeDesignAnswer, generateDesignCurveball, generateEstimationTasks, generateEstimationSummary, generateBottleneckTask, generateBottleneckHint, gradeBottleneckAnswer } from "./llm.js";
+import { generateStudySet, gradeAnswer, generateHypothetical, summarizeConversation, setBlurb, generateCodingTask, gradeCode, generateDesignTask, gradeDesignAnswer, generateDesignCurveball, generateDesignCheckpoint, generateEstimationTasks, generateEstimationSummary, generateBottleneckTask, generateBottleneckHint, gradeBottleneckAnswer } from "./llm.js";
 import { DEFAULT_LIMITS, clientIp, corsOrigin, limitByIp, limitByUser, slidingWindow, tooMany, type IpSource } from "./ratelimit.js";
 import { MAX_STUDENT_TURNS, evaluateTeaching, studentTurns, teachTurn } from "./teach.js";
 import { PRIVACY_HTML } from "./privacy.js";
@@ -509,6 +509,12 @@ app.post("/v1/feedback", async (c, next) => {
   app.post("/v1/design-grade", limitByUser(limits.llmPerUser), async (c) => {
     const body = designGradeSchema.parse(await c.req.json());
     return c.json(await gradeDesignAnswer({ ...body, uid: c.get("userId") as string }));
+  });
+
+
+  app.post("/v1/design-checkpoint", limitByUser(limits.llmPerUser), async (c) => {
+    const body = designCheckpointSchema.parse(await c.req.json());
+    return c.json(await generateDesignCheckpoint(body.step, body.brief, body.answer));
   });
 
   app.post("/v1/design-curveball", limitByUser(limits.llmPerUser), async (c) => {

@@ -248,6 +248,12 @@ export const designGradeSchema = z.object({
   originalAnswer: z.string().max(MAX_DESIGN_ANSWER).optional(),
 });
 
+export const designCheckpointSchema = z.object({
+  step: z.string().max(200),
+  brief: z.string().max(2000),
+  answer: z.string().max(4000)
+});
+
 export const designCurveballSchema = z.object({
   mode: z.enum(["design", "clinical"]).default("design"),
   state: z.string().max(8000).optional(),

@@ -90,7 +90,7 @@ test("mismatched kinds are off, with a note saying why", () => {
   const ref = parseReference(12000, "QPS");
   const ans = parseEstimation("12k");
   assert.equal(sameKind(ref, ans), false);
-  assert.equal(gradeEstimation(ref, ans), "off");
+  assert.equal(gradeEstimation(ref, ans), "unit_mismatch");
   assert.match(mismatchNote(ref, ans), /rate per time/);
   assert.equal(mismatchNote(ref, parseEstimation("12k QPS")), "");
 });

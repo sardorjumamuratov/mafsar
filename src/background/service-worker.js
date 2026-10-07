@@ -829,6 +829,13 @@ async function handle(msg) {
       });
     }
 
+
+    case "DESIGN_CHECKPOINT": {
+      callApi("design-checkpoint", { step: msg.step, brief: msg.brief, answer: msg.answer })
+        .then((res) => sendResponse({ ok: true, ...res }))
+        .catch((e) => sendResponse({ ok: false, error: e.message }));
+      return true;
+    }
     case "DESIGN_CURVEBALL": {
       return backendDesignCurveball({
         task: String(msg.task || ""),

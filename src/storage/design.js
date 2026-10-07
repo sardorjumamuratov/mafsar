@@ -25,17 +25,17 @@ export const CLINICAL_FINAL_SECTIONS = [
   { key: "final", title: "Final diagnosis & management", hint: "Your diagnosis now, and the first-line management." },
 ];
 
-export function emptySections(mode) {
+export function emptySections(mode, style) {
   if (mode === "clinical") return Object.fromEntries(CLINICAL_SECTIONS.map((s) => [s.key, ""]));
-  return Object.fromEntries(SECTIONS.map((s) => [s.key, ""]));
+  return Object.fromEntries((style === "guided" ? GUIDED_SECTIONS : SECTIONS).map((s) => [s.key, ""]));
 }
 
 /**
  * The answer sent for grading: filled sections under their titles. Never
  * truncated here; the caller checks the length and tells the learner.
  */
-export function assembleAnswer(sections, mode) {
-  const arr = mode === "clinical" ? CLINICAL_SECTIONS.concat(CLINICAL_FINAL_SECTIONS) : SECTIONS;
+export function assembleAnswer(sections, mode, style) {
+  const arr = mode === "clinical" ? CLINICAL_SECTIONS.concat(CLINICAL_FINAL_SECTIONS) : (style === "guided" ? GUIDED_SECTIONS : SECTIONS);
   return arr
     .map(({ key, title }) => [title, String((sections || {})[key] || "").trim()])
     .filter(([, text]) => text)
