@@ -1,3 +1,4 @@
+import { getDefaultPracticeStyle } from "../../storage/practice-style.js";
 import { app, bundle, esc, send, setFor, toast } from "../core.js";
 import { goReturn, setFocusReturn } from "./review.js";
 import { showChrome } from "../nav.js";
@@ -16,9 +17,11 @@ export async function startBottleneckDrill(sessionId) {
   const cards = (set?.flashcards || []).filter((c) => c.front && c.back).slice(0, 50);
   if (!cards.length) return toast("This set has no cards to drill with yet.");
   const session = sessions.find((s) => s.id === sessionId);
+  const style = set?.practiceStyle || await getDefaultPracticeStyle() || "guided";
 
   bottleneckState = {
     sessionId,
+    practiceStyle: style,
     topic: String(session?.title || set?.title || "this topic").slice(0, 200),
     cards: cards.map((c) => ({ front: c.front, back: c.back })),
     task: null,
@@ -50,7 +53,7 @@ async function requestBottleneckTask() {
   const s = bottleneckState;
   const token = (s.token = {});
   try {
-    const res = await send({ type: "BOTTLENECK_TASK", concept: s.topic, reference: s.cards });
+    const res = await send({ type: "BOTTLENECK_TASK", concept: s.topic, reference: s.cards, practiceStyle: s.practiceStyle });
     if (bottleneckState !== s || s.token !== token) return;
     s.task = res;
     s.step = "answering";

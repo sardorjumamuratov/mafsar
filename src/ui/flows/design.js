@@ -1,3 +1,4 @@
+import { getDefaultPracticeStyle } from "../../storage/practice-style.js";
 import { app, bundle, esc, send, setFor, toast } from "../core.js";
 import { goReturn, setFocusReturn } from "./review.js";
 import { showChrome } from "../nav.js";
@@ -31,9 +32,11 @@ export async function startDesignDrill(sessionId) {
   const set = setFor(sessionId, studySets);
   const cards = (set?.flashcards || []).filter((c) => c.front && c.back).slice(0, 50);
   if (!cards.length) return toast("This set has no cards to drill with yet.");
+  const style = set?.practiceStyle || await getDefaultPracticeStyle() || "guided";
 
   designState = {
     sessionId,
+    practiceStyle: style,
     topic: String(set?.title || "this topic").slice(0, 200),
     cards: cards.map((c) => ({ front: c.front, back: c.back })),
     brief: "",
@@ -57,7 +60,7 @@ async function requestDesignTask() {
   const s = designState;
   const token = (s.token = {});
   try {
-    const res = await send({ type: "DESIGN_TASK", mode: "design", concept: s.topic, reference: s.cards });
+    const res = await send({ type: "DESIGN_TASK", mode: "design", concept: s.topic, reference: s.cards, practiceStyle: s.practiceStyle });
     if (designState !== s || s.token !== token) return;
     s.brief = res.brief;
     s.rubric = res.rubric || [];

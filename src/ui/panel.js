@@ -176,6 +176,9 @@ document.addEventListener("click", (e) => {
         case "estimation-submit": submitEstimation(); break;
     case "estimation-next": estimationNext(); break;
     case "estimation-dontknow": estimationAction("dontknow"); break;
+    case "estimation-toggle-working": estimationAction("toggle-working"); break;
+    case "estimation-traffic-average": estimationAction("traffic-average"); break;
+    case "estimation-traffic-peak": estimationAction("traffic-peak"); break;
         case "bottleneck-hint": requestBottleneckHint(); break;
     case "bottleneck-submit": submitBottleneck(); break;
     case "bottleneck-toggle-scenario": bottleneckAction("toggle-scenario"); break;

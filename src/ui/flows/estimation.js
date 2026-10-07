@@ -1,9 +1,11 @@
+import { getDefaultPracticeStyle } from "../../storage/practice-style.js";
 import { esc, bundle, send, setFor, toast } from "../core.js";
 import { goReturn, setFocusReturn } from "./review.js";
 import { showChrome } from "../nav.js";
 import { appendReviewLog, bumpActivity, uid } from "../../storage/store.js";
 import { drillLogEntry } from "../../storage/drill-log.js";
 import { gradeEstimation, mismatchNote, parseEstimation, parseReference } from "../../storage/estimation.js";
+import { diagnoseEstimation } from "../../storage/estimation-diagnose.js";
 import { bindField, feedbackSummary, openSuggestionSheet, focusEnd, paintShell, primaryBtn, secondaryBtn, verdictRow, waitRow } from "./shell.js";
 
 // Estimate: back-of-the-envelope numbers. The model writes the questions and the
@@ -11,7 +13,7 @@ import { bindField, feedbackSummary, openSuggestionSheet, focusEnd, paintShell, 
 export let estimationState = null; // { sessionId, topic, cards, task, idx, results, step, token, lastRaw }
 export function setEstimationState(v) { estimationState = v; }
 
-const KIND = { spot_on: "ok", ballpark: "part", off: "no" };
+const KIND = { spot_on: "ok", ballpark: "part", off: "no", unit_mismatch: "no" };
 
 export async function startEstimationDrill(sessionId) {
   const { sessions, studySets } = await bundle();
@@ -19,9 +21,11 @@ export async function startEstimationDrill(sessionId) {
   const cards = (set?.flashcards || []).filter((c) => c.front && c.back).slice(0, 50);
   if (!cards.length) return toast("This set has no cards to drill with yet.");
   const session = sessions.find((s) => s.id === sessionId);
+  const style = set?.practiceStyle || await getDefaultPracticeStyle() || "guided";
 
   estimationState = {
     sessionId,
+    practiceStyle: style,
     topic: String(session?.title || set?.title || "this topic").slice(0, 200),
     cards: cards.map((c) => ({ front: c.front, back: c.back })),
     task: null,
@@ -45,7 +49,7 @@ async function requestEstimationTask() {
   const s = estimationState;
   const token = (s.token = {});
   try {
-    const res = await send({ type: "ESTIMATION_TASK", concept: s.topic, reference: s.cards });
+    const res = await send({ type: "ESTIMATION_TASK", concept: s.topic, reference: s.cards, practiceStyle: s.practiceStyle });
     if (estimationState !== s || s.token !== token) return;
     s.task = res;
     s.step = "answering";
@@ -75,19 +79,98 @@ export function paintEstimationQuestion() {
   if (!s) return;
   if (s.idx >= s.task.questions.length) return finishEstimation();
   s.step = "answering";
+  
+  const q = s.task.questions[s.idx];
+  const isGuided = s.practiceStyle !== "simulation";
+  
+  if (!s.working && isGuided && q.scaffold && q.scaffold.length > 0) {
+    s.working = q.scaffold.join("\n");
+  }
+
+  let extras = "";
+  if (isGuided && q.nudge) {
+    extras += `<div class="st-feedback st-mt16">${esc(q.nudge)}</div>`;
+  }
+  
+  if (isGuided && s.dontKnowPressed && q.first_step) {
+    extras += `<div class="st-feedback st-mt16">First step: ${esc(q.first_step)}</div>`;
+  }
+  
+  if (isGuided && q.traffic) {
+    extras += `
+      <div class="st-mt16 st-label">Traffic assumption</div>
+      <div class="st-mt4" style="display:flex;gap:8px">
+        <button type="button" class="st-pill ${s.trafficAssumption === "average" ? "active" : ""}" data-action="estimation-traffic-average">Average</button>
+        <button type="button" class="st-pill ${s.trafficAssumption === "peak" ? "active" : ""}" data-action="estimation-traffic-peak">Peak</button>
+      </div>
+      ${s.trafficAssumption ? `<div class="st-note st-mt8">Production systems need headroom above average traffic.</div>` : ""}
+    `;
+  }
+  
+  const toggleText = s.showWorking ? "Hide rough working" : "Show rough working (optional)";
+  
   shellFor(s, {
     body: `
-      <input type="text" id="estimationValue" class="st-field line st-mt24" placeholder="e.g. 300 TB, 12k QPS, 2.5 GB/s" aria-label="Your estimate" autocomplete="off" spellcheck="false">
-      <div class="st-note">The right order of magnitude counts.</div>`,
+      ${extras}
+      <div class="st-mt24">
+        <input type="text" id="estimationValue" class="st-field line" placeholder="e.g. 300 TB, 12k QPS, 2.5 GB/s" aria-label="Your estimate" autocomplete="off" spellcheck="false" value="${esc(s.lastRaw)}">
+        <div class="st-note st-mt4">The right order of magnitude counts.</div>
+      </div>
+      
+      <div class="st-mt24">
+        <button type="button" class="st-link" data-action="estimation-toggle-working">${toggleText}</button>
+        ${s.showWorking ? `<textarea id="estimationWorking" class="st-field h80 st-mt8" placeholder="Rough working...">${esc(s.working)}</textarea>` : ""}
+      </div>
+    `,
     dock: `${secondaryBtn("estimation-dontknow", "Don't know")}${primaryBtn("estimation-submit", "Check", 'id="estimationCheck" disabled')}`,
   });
+  
   const box = /** @type {HTMLInputElement} */ (document.getElementById("estimationValue"));
   bindField(box, { btn: /** @type {HTMLButtonElement} */ (document.getElementById("estimationCheck")), onSubmit: () => submitEstimation(), enter: true });
-  focusEnd(box);
+  
+  const workingBox = /** @type {HTMLTextAreaElement} */ (document.getElementById("estimationWorking"));
+  if (workingBox) {
+    workingBox.addEventListener("input", () => { s.working = workingBox.value; });
+  }
+  
+  if (!s.showWorking) focusEnd(box);
 }
 
 export function estimationAction(action) {
-  if (action === "dontknow" && estimationState?.step === "answering") grade("", null);
+  const s = estimationState;
+  if (!s || s.step !== "answering") return;
+  const q = s.task.questions[s.idx];
+
+  const raw = document.getElementById("estimationValue")?.value || "";
+  s.lastRaw = raw;
+  const workingBox = document.getElementById("estimationWorking");
+  if (workingBox) s.working = workingBox.value;
+
+  if (action === "dontknow") {
+    if (s.practiceStyle !== "simulation" && !s.dontKnowPressed && q.first_step) {
+      s.dontKnowPressed = true;
+      s.showWorking = true;
+      paintEstimationQuestion();
+      return;
+    }
+    grade("", null);
+    return;
+  }
+  if (action === "toggle-working") {
+    s.showWorking = !s.showWorking;
+    paintEstimationQuestion();
+    return;
+  }
+  if (action === "traffic-average") {
+    s.trafficAssumption = "average";
+    paintEstimationQuestion();
+    return;
+  }
+  if (action === "traffic-peak") {
+    s.trafficAssumption = "peak";
+    paintEstimationQuestion();
+    return;
+  }
 }
 
 export function submitEstimation() {
@@ -135,6 +218,7 @@ function paintEstimationChecked() {
       <div class="st-field line static st-mt24 ${r.grade === "spot_on" ? "ok" : "amber"}">${esc(r.raw || "Don't know")}</div>
       <div class="st-mt16">${verdictRow(KIND[r.grade], VERDICT[r.grade])}</div>
       <div class="st-label caps st-mt24">Working</div>
+      ${r.diagnosis ? `<div class="st-feedback st-mt16">${esc(r.diagnosis)}</div>` : ""}
       <div class="st-steps">
         ${steps.map((x) => `<div>${esc(x)}</div>`).join("")}
         <div class="ctx">Reference answer: ${esc(q.reference_value)} ${esc(q.reference_unit)}${r.note ? `. ${esc(r.note)}` : ""}</div>
