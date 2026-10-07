@@ -233,16 +233,17 @@ const drillReference = z.array(z.object({ front: z.string().max(500), back: z.st
 const drillSource = { concept: z.string().min(1).max(500), reference: drillReference };
 export const MAX_DESIGN_ANSWER = 4000;
 
-export const designTaskSchema = z.object({ ...drillSource, mode: z.enum(["design", "clinical"]).default("design") });
+export const designTaskSchema = z.object({ ...drillSource, mode: z.enum(["design", "clinical"]).default("design"), practiceStyle: z.enum(["guided", "simulation"]).optional() });
 
 /** Grades the first answer, or (with curveball) the adaptation to a curveball. */
 export const designGradeSchema = z.object({
+  practiceStyle: z.enum(["guided", "simulation"]).optional(),
   // "clinical" reuses this route for Medicine clinical cases; state carries the
   // encrypted case (diagnosis, tests) the client must not see.
   mode: z.enum(["design", "clinical"]).default("design"),
   state: z.string().max(8000).optional(),
   task: z.string().min(1).max(2000),
-  answer: z.string().min(1).max(MAX_DESIGN_ANSWER),
+  answer: z.union([z.string().min(1).max(MAX_DESIGN_ANSWER), z.record(z.string(), z.string().max(MAX_DESIGN_ANSWER)).refine(obj => JSON.stringify(obj).length <= MAX_DESIGN_ANSWER, "Answer payload too large")]),
   curveball: z.string().max(1000).optional(),
   originalAnswer: z.string().max(MAX_DESIGN_ANSWER).optional(),
 });
@@ -258,6 +259,7 @@ export const designCurveballSchema = z.object({
 export const estimationTaskSchema = z.object(drillSource);
 
 export const estimationSummarySchema = z.object({
+  practiceStyle: z.enum(["guided", "simulation"]).optional(),
   results: z.array(z.object({
     question: z.string().max(1000),
     expected: z.string().max(200),
@@ -266,11 +268,12 @@ export const estimationSummarySchema = z.object({
   })).min(1).max(10),
 });
 
-export const bottleneckTaskSchema = z.object(drillSource);
+export const bottleneckTaskSchema = z.object({ ...drillSource, practiceStyle: z.enum(["guided", "simulation"]).optional() });
 // state is the server-encrypted planted flaw (see crypto.ts); bounded so a
 // forged blob can't be huge.
 export const bottleneckHintSchema = z.object({ state: z.string().min(1).max(4000) });
 export const bottleneckGradeSchema = z.object({
+  practiceStyle: z.enum(["guided", "simulation"]).optional(),
   state: z.string().min(1).max(4000),
   answer: z.string().min(1).max(MAX_DESIGN_ANSWER),
   usedHint: z.boolean().default(false),

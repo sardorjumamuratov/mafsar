@@ -1,0 +1,11 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "panel-harness",
+      "runtimeExecutable": "node",
+      "runtimeArgs": ["C:/Users/S1ED3~1.JUM/AppData/Local/Temp/claude/C--Users-s-jumamuratov-Projects-mafsar/46eb2cbe-71ed-46a9-ae0f-f460939be882/scratchpad/serve.mjs", "5178"],
+      "port": 8777
+    }
+  ]
+}

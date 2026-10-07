@@ -137,7 +137,7 @@ export function bottleneckAction(action) {
     const btn = document.getElementById("bnModelBtn");
     if (!el || !btn) return;
     el.hidden = !el.hidden;
-    btn.textContent = el.hidden ? "See a model answer" : "Hide the model answer";
+    btn.textContent = el.hidden ? "Compare your approach" : "Hide your approach";
   }
 }
 
@@ -210,7 +210,7 @@ function paintBottleneckFeedback() {
       ${r.feedback ? `<div class="st-feedback">${esc(r.feedback)}</div>` : ""}
       ${r.other_valid_issue ? `<div class="st-feedback">You also spotted a real problem: ${esc(r.other_valid_issue)}</div>` : ""}
       ${r.usedHint ? `<div class="st-note">Score ${esc(r.score)} / 3, with the hint's half point taken off.</div>` : `<div class="st-note">Score ${esc(r.score)} / 3.</div>`}
-      <button type="button" class="st-link st-mt12" id="bnModelBtn" data-action="bottleneck-toggle-model">See a model answer</button>
+      <button type="button" class="st-link st-mt12" id="bnModelBtn" data-action="bottleneck-toggle-model">Compare your approach</button>
       <div id="bnModel" hidden>
         <div class="st-label st-mt16">The flaw</div>
         <div class="st-text15 st-mt4">${esc(r.planted_flaw)}</div>

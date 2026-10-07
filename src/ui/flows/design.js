@@ -45,7 +45,7 @@ export async function startDesignDrill(sessionId) {
   };
   setFocusReturn("set:" + sessionId);
   showChrome(false);
-  paintLoader("Writing the brief…", "0 / 6");
+  paintLoader("Building a design exercise from your cards...", "0 / 6");
   requestDesignTask();
 }
 
@@ -157,7 +157,7 @@ export function designAction(action, payload) {
     const btn = document.getElementById("designModelBtn");
     if (!el || !btn) return;
     el.hidden = !el.hidden;
-    btn.textContent = el.hidden ? "See a model answer" : "Hide the model answer";
+    btn.textContent = el.hidden ? "Compare your approach" : "Hide your approach";
   }
 }
 
@@ -217,7 +217,7 @@ function paintDesignFeedback() {
       ${briefToggle}
       <div class="st-label st-mt24">Feedback</div>
       <div class="st-list">${rows}</div>
-      <button type="button" class="st-link st-mt12" id="designModelBtn" data-action="design-toggle-model">See a model answer</button>
+      <button type="button" class="st-link st-mt12" id="designModelBtn" data-action="design-toggle-model">Compare your approach</button>
       <div id="designModel" hidden>
         <div class="st-label st-mt16">A strong answer covers</div>
         <div class="st-list">${points}</div>

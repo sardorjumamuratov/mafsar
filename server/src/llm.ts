@@ -578,7 +578,7 @@ two explicit constraints. Also list 4-7 rubric points a strong answer covers.
 Respond with ONLY valid JSON:
 { "brief": string, "rubric": [string] }`;
 
-export async function generateDesignTask(concept: string, reference: Ref[], mode?: string) {
+export async function generateDesignTask(concept: string, reference: Ref[], mode?: string, uid?: string, practiceStyle?: string) {
   if (mode === "clinical") {
     const CLINICAL_TASK_PROMPT = `You are a medical case generator. 
 Based on the provided mechanism chain, write a short clinical vignette (age, presenting complaint, relevant history, examination findings). It must read like a real case, not a quiz question.
@@ -602,7 +602,7 @@ Respond with ONLY valid JSON:
       chain: concept
     };
     const rubric = secret.tests.map((t: any) => t.name);
-    return { brief, rubric, state: encryptState(secret) };
+    return { brief, rubric, state: encryptState({ ...secret, uid, iat: Date.now(), practiceStyle }) };
   }
 
   const parsed = await callJson(DESIGN_TASK_PROMPT, `Topic: ${concept}\n\nStudy cards:\n${refText(reference)}`);
@@ -631,10 +631,16 @@ Respond with ONLY valid JSON:
 "sections" uses these names: ${DESIGN_SECTIONS.join(", ")}. Omit "sections" when grading a curveball.`;
 
 export async function gradeDesignAnswer(input: {
-  task: string; answer: string; rubric?: string[]; curveball?: string; originalAnswer?: string; mode?: string; state?: string;
+  uid?: string;
+  task: string; answer: string | Record<string, string>; rubric?: string[]; curveball?: string; originalAnswer?: string; mode?: string; state?: string;
 }) {
+  let answerStr = input.answer;
+  if (typeof answerStr !== "string") {
+    answerStr = Object.entries(answerStr).filter(x => typeof x[1] === "string" && x[1].trim().length > 0).map(x => x[0].toUpperCase() + ":\n\n" + x[1]).join("\n\n---\n\n");
+    if (!answerStr) answerStr = "(Skipped all sections)";
+  }
   if (input.mode === "clinical" && input.state) {
-    const state = openState<ClinicalState>(input.state, "diagnosis");
+    const state = openState<ClinicalState>(input.state, "diagnosis", input.uid);
     const CLINICAL_GRADE_PROMPT = `You are a clinical educator grading a learner's work on a practice case.
 Judge against the reference below, not your own clinical knowledge, and never introduce
 findings or treatments the reference doesn't have.
@@ -658,7 +664,7 @@ Respond with ONLY valid JSON:
       `Reference management:\n${state.management}`,
       `Reference chain:\n${state.chain}`,
       `Learner's first answer (diagnosis and tests requested):\n${input.originalAnswer || "(none)"}`,
-      `Learner's final answer:\n${input.answer}`,
+      `Learner's final answer:\n${answerStr}`,
     ].join("\n\n");
     const parsed = await callJson(CLINICAL_GRADE_PROMPT, user);
     const rubric_evaluation = (Array.isArray(parsed?.rubric_evaluation) ? parsed.rubric_evaluation : [])
@@ -683,9 +689,9 @@ Respond with ONLY valid JSON:
     `Rubric:\n${(input.rubric || []).map((r) => `- ${r}`).join("\n") || "(derive from the brief)"}`,
   ];
   if (input.curveball) {
-    parts.push(`Original answer:\n${input.originalAnswer || "(not provided)"}`, `Curveball:\n${input.curveball}`, `Learner's adaptation:\n${input.answer}`);
+    parts.push(`Original answer:\n${input.originalAnswer || "(not provided)"}`, `Curveball:\n${input.curveball}`, `Learner's adaptation:\n${answerStr}`);
   } else {
-    parts.push(`Learner's answer:\n${input.answer}`);
+    parts.push(`Learner's answer:\n${answerStr}`);
   }
   const parsed = await callJson(DESIGN_GRADE_PROMPT, parts.join("\n\n"));
   const rubric_evaluation = (Array.isArray(parsed?.rubric_evaluation) ? parsed.rubric_evaluation : [])
@@ -816,7 +822,7 @@ Respond with ONLY valid JSON:
   "model_solution": string             // a good fix and its trade-off
 }`;
 
-export async function generateBottleneckTask(concept: string, reference: Ref[]) {
+export async function generateBottleneckTask(concept: string, reference: Ref[], uid?: string, practiceStyle?: string) {
   const parsed = await callJson(BOTTLENECK_TASK_PROMPT, `Topic: ${concept}\n\nStudy cards:\n${refText(reference)}`);
   const narrative = str(parsed?.narrative, 1200);
   const architecture = strList(parsed?.architecture, 12, 120);
@@ -831,31 +837,36 @@ export async function generateBottleneckTask(concept: string, reference: Ref[]) 
     why_it_fails: str(parsed?.why_it_fails, 800),
     model_solution: str(parsed?.model_solution, 1200),
   };
-  return { narrative, architecture, state: encryptState(secret) };
+  return { narrative, architecture, state: encryptState({ ...secret, uid, iat: Date.now(), practiceStyle }) };
 }
 
 /** A forged, corrupted or foreign scenario token: the client's fault, a 400 (app.ts onError). */
 export class BadStateError extends Error {
   status = 400;
-  constructor() {
-    super("This exercise can't be continued. Start a new one.");
+  constructor(message?: string) {
+    super(message || "This exercise can't be continued. Start a new one.");
     this.name = "BadStateError";
   }
 }
 
 /** Decrypt the scenario state; a forged or corrupted token is a 400, not a 500. */
-function openState<T>(state: string, required: keyof T & string): T {
+export function openState<T>(state: string, required: keyof T & string, uid?: string): T {
   try {
     const parsed = decryptState(state);
     if (!parsed || typeof parsed[required] !== "string") throw new BadStateError();
+    if (parsed.uid) {
+      if (uid && parsed.uid !== uid) throw new BadStateError("EXERCISE_EXPIRED");
+      if (parsed.iat && Date.now() - parsed.iat > 24 * 60 * 60 * 1000) throw new BadStateError("EXERCISE_EXPIRED");
+    }
     return parsed as T;
-  } catch {
+  } catch (e) {
+    if (e instanceof BadStateError) throw e;
     throw new BadStateError();
   }
 }
 
 /** The hidden half of a bottleneck exercise. */
-type BottleneckState = { narrative: string; architecture: string[]; planted_flaw: string; why_it_fails: string; model_solution: string };
+type BottleneckState = { narrative: string; architecture: string[]; planted_flaw: string; why_it_fails: string; model_solution: string; hintUsed?: boolean; uid?: string; iat?: number; practiceStyle?: string };
 /** The hidden half of a clinical case: results, diagnosis and management. */
 type ClinicalState = { tests: { name: string; result: string }[]; diagnosis: string; management: string; chain: string };
 
@@ -866,10 +877,11 @@ ${DRILL_RULES}
 
 Respond with ONLY valid JSON: { "hint": string }`;
 
-export async function generateBottleneckHint(state: string) {
-  const s = openState<BottleneckState>(state, "planted_flaw");
+export async function generateBottleneckHint(state: string, uid?: string) {
+  const s = openState<BottleneckState>(state, "planted_flaw", uid);
+  if (s.practiceStyle === "simulation") throw new BadStateError("Hints are disabled in interview simulation.");
   const parsed = await callJson(BOTTLENECK_HINT_PROMPT, `Architecture:\n${s.architecture.join(" → ")}\n\nPlanted flaw (do not reveal): ${s.planted_flaw}`);
-  return { hint: str(parsed?.hint, 300, "Follow a single write request end to end.") };
+  return { hint: str(parsed?.hint, 300, "Follow a single write request end to end."), state: encryptState({ ...s, hintUsed: true }) };
 }
 
 const BOTTLENECK_GRADE_PROMPT = `You grade a find-the-bottleneck answer on three separate parts:
@@ -883,8 +895,8 @@ ${DRILL_RULES}
 Respond with ONLY valid JSON:
 { "found_flaw": boolean, "other_valid_issue": string, "explanation_correct": boolean, "fix_works": boolean, "feedback": string }`;
 
-export async function gradeBottleneckAnswer(state: string, answer: string, usedHint = false) {
-  const s = openState<BottleneckState>(state, "planted_flaw");
+export async function gradeBottleneckAnswer(state: string, answer: string, usedHint = false, uid?: string) {
+  const s = openState<BottleneckState>(state, "planted_flaw", uid);
   const user = [
     `Scenario:\n${s.narrative}`,
     `Architecture:\n${s.architecture.join(" → ")}`,
@@ -897,7 +909,8 @@ export async function gradeBottleneckAnswer(state: string, answer: string, usedH
   const explanation_correct = parsed?.explanation_correct === true;
   const fix_works = parsed?.fix_works === true;
   // Three parts, one point each; a hint costs half a point.
-  const score = Math.max(0, Number(found_flaw) + Number(explanation_correct) + Number(fix_works) - (usedHint ? 0.5 : 0));
+  const effectivelyUsedHint = s.hintUsed || usedHint;
+    const score = Math.max(0, Number(found_flaw) + Number(explanation_correct) + Number(fix_works) - (effectivelyUsedHint ? 0.5 : 0));
   return {
     found_flaw,
     explanation_correct,
@@ -905,7 +918,7 @@ export async function gradeBottleneckAnswer(state: string, answer: string, usedH
     other_valid_issue: str(parsed?.other_valid_issue, 400),
     feedback: str(parsed?.feedback, 600, "Good attempt."),
     score,
-    usedHint,
+    usedHint: effectivelyUsedHint,
     planted_flaw: s.planted_flaw,
     why_it_fails: s.why_it_fails,
     model_solution: s.model_solution,

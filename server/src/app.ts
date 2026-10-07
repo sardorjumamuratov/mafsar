@@ -503,12 +503,12 @@ app.post("/v1/feedback", async (c, next) => {
   // bounded by the per-user limit instead.
   app.post("/v1/design-task", requireQuota(db, "practice"), async (c) => {
     const body = designTaskSchema.parse(await c.req.json());
-    return c.json(await generateDesignTask(body.concept, body.reference, body.mode));
+    return c.json(await generateDesignTask(body.concept, body.reference, body.mode, c.get("userId") as string, body.practiceStyle));
   });
 
   app.post("/v1/design-grade", limitByUser(limits.llmPerUser), async (c) => {
     const body = designGradeSchema.parse(await c.req.json());
-    return c.json(await gradeDesignAnswer(body));
+    return c.json(await gradeDesignAnswer({ ...body, uid: c.get("userId") as string }));
   });
 
   app.post("/v1/design-curveball", limitByUser(limits.llmPerUser), async (c) => {
@@ -528,17 +528,17 @@ app.post("/v1/feedback", async (c, next) => {
 
   app.post("/v1/bottleneck-task", requireQuota(db, "practice"), async (c) => {
     const body = bottleneckTaskSchema.parse(await c.req.json());
-    return c.json(await generateBottleneckTask(body.concept, body.reference));
+    return c.json(await generateBottleneckTask(body.concept, body.reference, c.get("userId") as string, body.practiceStyle));
   });
 
   app.post("/v1/bottleneck-hint", limitByUser(limits.llmPerUser), async (c) => {
     const body = bottleneckHintSchema.parse(await c.req.json());
-    return c.json(await generateBottleneckHint(body.state));
+    return c.json(await generateBottleneckHint(body.state, c.get("userId") as string));
   });
 
   app.post("/v1/bottleneck-grade", limitByUser(limits.llmPerUser), async (c) => {
     const body = bottleneckGradeSchema.parse(await c.req.json());
-    return c.json(await gradeBottleneckAnswer(body.state, body.answer, body.usedHint));
+    return c.json(await gradeBottleneckAnswer(body.state, body.answer, body.usedHint, c.get("userId") as string));
   });
 
   app.post("/v1/coding-task", requireQuota(db, "coding"), async (c) => {
