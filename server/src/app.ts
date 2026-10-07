@@ -23,7 +23,7 @@ import { deleteUserData } from "./account.js";
 import { nowISO, one, all, run, uid } from "./db.js";
 import { retrievability, forgetBy } from "./fsrs.js";
 import { genTeamCode, leaderboardFor, learningFor } from "./teams.js";
-import { generateStudySet, gradeAnswer, generateHypothetical, summarizeConversation, setBlurb, generateCodingTask, gradeCode, generateDesignTask, gradeDesignAnswer, generateDesignCurveball, generateDesignCheckpoint, generateEstimationTasks, generateEstimationSummary, generateBottleneckTask, generateBottleneckHint, gradeBottleneckAnswer } from "./llm.js";
+import { generateStudySet, gradeAnswer, generateHypothetical, summarizeConversation, setBlurb, generateCodingTask, gradeCode, generateDesignTask, gradeDesignAnswer, generateDesignCurveball, generateDesignCheckpoint, generateEstimationTasks, generateEstimationSummary, generateBottleneckTask, generateBottleneckHint, gradeBottleneckAnswer, generateDrillCardSuggestions } from "./llm.js";
 import { DEFAULT_LIMITS, clientIp, corsOrigin, limitByIp, limitByUser, slidingWindow, tooMany, type IpSource } from "./ratelimit.js";
 import { MAX_STUDENT_TURNS, evaluateTeaching, studentTurns, teachTurn } from "./teach.js";
 import { PRIVACY_HTML } from "./privacy.js";
@@ -65,6 +65,7 @@ export function createApp(db: DB) {
     googleStartPerIp: slidingWindow(DEFAULT_LIMITS.googleStartPerIp),
     googlePollPerIp: slidingWindow(DEFAULT_LIMITS.googlePollPerIp),
     llmPerUser: slidingWindow(DEFAULT_LIMITS.llmPerUser),
+    checkpointPerUser: slidingWindow(DEFAULT_LIMITS.checkpointPerUser),
   };
 
   // Feedback works signed out too, so it's registered before the /v1 auth
@@ -151,7 +152,8 @@ app.post("/v1/feedback", async (c, next) => {
     // actionable rather than "generation failed".
     const where = { method: c.req.method, path: c.req.path, userId: c.get("userId") as string | undefined };
     if (e.name === "BadStateError") {
-      return c.json({ error: "bad_state", message: e.message }, 400);
+      // code: bad_state, EXERCISE_EXPIRED, HINT_LIMIT_REACHED or INVALID_COMPONENT; message is a sentence for the learner.
+      return c.json({ error: (e as { code?: string }).code || "bad_state", message: e.message }, 400);
     }
     if (e.name === "LLMError") {
       console.error("LLM:", e.message);
@@ -512,9 +514,14 @@ app.post("/v1/feedback", async (c, next) => {
   });
 
 
-  app.post("/v1/design-checkpoint", limitByUser(limits.llmPerUser), async (c) => {
+  // Guided "Check my thinking": user-triggered coaching, never a grade. DESIGN_CHECKPOINTS=off
+  // turns it off; the client hides the button when it sees feature_disabled.
+  app.post("/v1/design-checkpoint", async (c, next) => {
+    if (process.env.DESIGN_CHECKPOINTS === "off") return c.json({ error: "feature_disabled", message: "Checking a step is turned off right now." }, 404);
+    return next();
+  }, limitByUser(limits.checkpointPerUser), limitByUser(limits.llmPerUser), async (c) => {
     const body = designCheckpointSchema.parse(await c.req.json());
-    return c.json(await generateDesignCheckpoint(body.step, body.brief, body.answer));
+    return c.json(await generateDesignCheckpoint({ ...body, uid: c.get("userId") as string }));
   });
 
   app.post("/v1/design-curveball", limitByUser(limits.llmPerUser), async (c) => {
@@ -524,12 +531,12 @@ app.post("/v1/feedback", async (c, next) => {
 
   app.post("/v1/estimation-task", requireQuota(db, "practice"), async (c) => {
     const body = estimationTaskSchema.parse(await c.req.json());
-    return c.json(await generateEstimationTasks(body.concept, body.reference));
+    return c.json(await generateEstimationTasks(body.concept, body.reference, body.practiceStyle));
   });
 
   app.post("/v1/estimation-summary", limitByUser(limits.llmPerUser), async (c) => {
     const body = estimationSummarySchema.parse(await c.req.json());
-    return c.json(await generateEstimationSummary(body.results));
+    return c.json(await generateEstimationSummary(body.results, body.practiceStyle));
   });
 
   app.post("/v1/bottleneck-task", requireQuota(db, "practice"), async (c) => {
@@ -877,8 +884,11 @@ app.post("/v1/sets/:rootId/report", reportLimiter, async (c) => {
   app.get("/healthz", (c) => c.json({ ok: true }));
 
   
-  app.post("/v1/drill-card-suggestions", limitByUser(limits.llmPerUser), async (c) => {
-    if (process.env.DRILL_CARD_SUGGESTIONS === "off") return c.json({ error: "feature_disabled", message: "Suggestions are disabled" }, 404);
+  // "Turn gaps into review cards": user-triggered; DRILL_CARD_SUGGESTIONS=off turns it off.
+  app.post("/v1/drill-card-suggestions", async (c, next) => {
+    if (process.env.DRILL_CARD_SUGGESTIONS === "off") return c.json({ error: "feature_disabled", message: "Review-card suggestions are turned off right now." }, 404);
+    return next();
+  }, limitByUser(limits.llmPerUser), async (c) => {
     const body = drillCardSuggestionsSchema.parse(await c.req.json());
     return c.json(await generateDrillCardSuggestions(body));
   });

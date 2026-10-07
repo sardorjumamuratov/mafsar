@@ -232,82 +232,112 @@ export const teachEvaluateSchema = z
 const drillReference = z.array(z.object({ front: z.string().max(500), back: z.string().max(2000) })).max(50);
 const drillSource = { concept: z.string().min(1).max(500), reference: drillReference };
 export const MAX_DESIGN_ANSWER = 4000;
+/** One design section's draft (docs/prompts/38: 2,000 characters per section). */
+export const MAX_DESIGN_SECTION = 2000;
+// Every new field is optional: clients older than 0.3.6 send none of them.
+const practiceStyle = z.enum(["guided", "simulation"]).optional();
+// v2 drill tokens carry components, hints and the style, so they run longer than the old ones.
+const drillState = z.string().min(1).max(12000);
 
-export const designTaskSchema = z.object({ ...drillSource, mode: z.enum(["design", "clinical"]).default("design"), practiceStyle: z.enum(["guided", "simulation"]).optional() });
+export const designTaskSchema = z.object({ ...drillSource, mode: z.enum(["design", "clinical"]).default("design"), practiceStyle });
+
+const sectionText = z.string().max(MAX_DESIGN_SECTION).optional();
+const designAnswers = z.object({
+  requirements: sectionText, estimates: sectionText, api: sectionText,
+  dataModel: sectionText, components: sectionText, tradeoffs: sectionText,
+});
+const answerText = (b: { answer?: unknown; answers?: Record<string, string | undefined> }) => {
+  const structured = Object.values(b.answers || {}).filter((v) => typeof v === "string" && v.trim());
+  if (structured.length) return structured.join("");
+  if (typeof b.answer === "string") return b.answer.trim();
+  if (b.answer && typeof b.answer === "object") return Object.values(b.answer).filter((v) => typeof v === "string" && v.trim()).join("");
+  return "";
+};
 
 /** Grades the first answer, or (with curveball) the adaptation to a curveball. */
-export const designGradeSchema = z.object({
-  practiceStyle: z.enum(["guided", "simulation"]).optional(),
-  // "clinical" reuses this route for Medicine clinical cases; state carries the
-  // encrypted case (diagnosis, tests) the client must not see.
-  mode: z.enum(["design", "clinical"]).default("design"),
-  state: z.string().max(8000).optional(),
-  task: z.string().min(1).max(2000),
-  answer: z.union([z.string().min(1).max(MAX_DESIGN_ANSWER), z.record(z.string(), z.string().max(MAX_DESIGN_ANSWER)).refine(obj => JSON.stringify(obj).length <= MAX_DESIGN_ANSWER, "Answer payload too large")]),
-  curveball: z.string().max(1000).optional(),
-  originalAnswer: z.string().max(MAX_DESIGN_ANSWER).optional(),
-});
+export const designGradeSchema = z
+  .object({
+    // "clinical" reuses this route for Medicine clinical cases; state carries the
+    // encrypted case (diagnosis, tests) the client must not see. For a design
+    // brief, state carries the sealed rubric (0.3.6+).
+    mode: z.enum(["design", "clinical"]).default("design"),
+    state: z.string().max(12000).optional(),
+    task: z.string().min(1).max(2000),
+    // The labelled single answer old clients send; an object of sections is also read.
+    answer: z.union([z.string().max(MAX_DESIGN_ANSWER), designAnswers]).optional(),
+    // New clients send the sections separately; empty means skipped.
+    answers: designAnswers.optional(),
+    rubric: z.array(z.string().max(300)).max(10).optional(),
+    curveball: z.string().max(1000).optional(),
+    originalAnswer: z.string().max(MAX_DESIGN_ANSWER).optional(),
+    practiceStyle,
+  })
+  .refine((b) => answerText(b).length > 0, { message: "Write in at least one section first.", path: ["answer"] })
+  .refine((b) => answerText(b).length <= MAX_DESIGN_ANSWER, { message: `The answer is over ${MAX_DESIGN_ANSWER} characters in total.`, path: ["answer"] });
 
 export const designCheckpointSchema = z.object({
-  step: z.string().max(200),
-  brief: z.string().max(2000),
-  answer: z.string().max(4000)
+  section: z.enum(["requirements", "estimates", "components", "tradeoffs", "api", "dataModel"]),
+  answer: z.string().trim().min(1).max(MAX_DESIGN_SECTION),
+  task: z.string().max(2000).optional(),
+  state: z.string().max(12000).optional(),
+  practiceStyle,
 });
 
 export const designCurveballSchema = z.object({
   mode: z.enum(["design", "clinical"]).default("design"),
   state: z.string().max(8000).optional(),
   task: z.string().min(1).max(2000),
-  answer: z.string().max(MAX_DESIGN_ANSWER).optional(),
-    selectedComponentId: z.string().max(200).optional(),
-    parts: z.object({
-      flaw: z.string().max(MAX_DESIGN_ANSWER).optional(),
-      reason: z.string().max(MAX_DESIGN_ANSWER).optional(),
-      fix: z.string().max(MAX_DESIGN_ANSWER).optional(),
-      tradeoff: z.string().max(MAX_DESIGN_ANSWER).optional(),
-    }).optional(),
+  answer: z.string().min(1).max(MAX_DESIGN_ANSWER),
   previous: z.array(z.string().max(1000)).max(5).default([]),
 });
 
-export const estimationTaskSchema = z.object(drillSource);
+export const estimationTaskSchema = z.object({ ...drillSource, practiceStyle });
 
 export const estimationSummarySchema = z.object({
-  practiceStyle: z.enum(["guided", "simulation"]).optional(),
   results: z.array(z.object({
     question: z.string().max(1000),
     expected: z.string().max(200),
     answer: z.string().max(200),
-      grade: z.enum(["spot_on", "ballpark", "off"]),
-      working: z.string().max(800).optional(),
-      status: z.enum(["correct", "close", "not_quite", "unit_mismatch"]).optional(),
-    })).min(1).max(10),
+    grade: z.enum(["spot_on", "ballpark", "off"]),
+    // 0.3.6+: the finer verdict (a unit mismatch is graded "off") and optional rough working.
+    status: z.enum(["correct", "close", "not_quite", "unit_mismatch"]).optional(),
+    working: z.string().max(800).optional(),
+  })).min(1).max(10),
+  practiceStyle,
 });
 
-export const bottleneckTaskSchema = z.object({ ...drillSource, practiceStyle: z.enum(["guided", "simulation"]).optional() });
+export const bottleneckTaskSchema = z.object({ ...drillSource, practiceStyle });
 // state is the server-encrypted planted flaw (see crypto.ts); bounded so a
 // forged blob can't be huge.
-export const bottleneckHintSchema = z.object({ state: z.string().min(1).max(4000), level: z.number().int().min(1).max(3).optional() });
-export const bottleneckGradeSchema = z.object({
-  practiceStyle: z.enum(["guided", "simulation"]).optional(),
-  state: z.string().min(1).max(4000),
-  answer: z.string().max(MAX_DESIGN_ANSWER).optional(),
-    selectedComponentId: z.string().max(200).optional(),
-    parts: z.object({
-      flaw: z.string().max(MAX_DESIGN_ANSWER).optional(),
-      reason: z.string().max(MAX_DESIGN_ANSWER).optional(),
-      fix: z.string().max(MAX_DESIGN_ANSWER).optional(),
-      tradeoff: z.string().max(MAX_DESIGN_ANSWER).optional(),
-    }).optional(),
-  usedHint: z.boolean().default(false),
+export const bottleneckHintSchema = z.object({ state: drillState, level: z.number().int().min(1).max(3).optional() });
+const bottleneckParts = z.object({
+  flaw: z.string().max(1500).optional(),
+  reason: z.string().max(1500).optional(),
+  fix: z.string().max(1500).optional(),
+  tradeoff: z.string().max(1000).optional(),
 });
+export const bottleneckGradeSchema = z
+  .object({
+    state: drillState,
+    answer: z.string().max(MAX_DESIGN_ANSWER).optional(),
+    parts: bottleneckParts.optional(),
+    usedHint: z.boolean().default(false),
+    selectedComponentId: z.string().max(60).optional(),
+    practiceStyle,
+  })
+  .refine((b) => !!b.answer?.trim() || Object.values(b.parts || {}).some((v) => typeof v === "string" && v.trim()), {
+    message: "Write what breaks first.",
+    path: ["answer"],
+  });
 
 export const drillCardSuggestionsSchema = z.object({
   mode: z.enum(["design", "estimation", "bottleneck"]),
   gaps: z.array(z.object({
     type: z.enum(["missed_rubric", "partial_rubric", "estimation_mistake", "unit_mismatch", "missed_bottleneck", "missing_tradeoff"]),
-    text: z.string().max(400)
+    text: z.string().min(1).max(400),
   })).max(8),
   topic: z.string().max(200),
-  existingFronts: z.array(z.string().max(200)).max(50).optional(),
-  practiceStyle: z.enum(["guided", "simulation"]).optional()
+  existingFronts: z.array(z.string().max(200)).max(50).default([]),
+  practiceStyle,
 });
+
