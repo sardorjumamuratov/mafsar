@@ -533,12 +533,12 @@ app.post("/v1/feedback", async (c, next) => {
 
   app.post("/v1/bottleneck-hint", limitByUser(limits.llmPerUser), async (c) => {
     const body = bottleneckHintSchema.parse(await c.req.json());
-    return c.json(await generateBottleneckHint(body.state, c.get("userId") as string));
+    return c.json(await generateBottleneckHint({ ...body, uid: c.get("userId") as string }));
   });
 
   app.post("/v1/bottleneck-grade", limitByUser(limits.llmPerUser), async (c) => {
     const body = bottleneckGradeSchema.parse(await c.req.json());
-    return c.json(await gradeBottleneckAnswer(body.state, body.answer, body.usedHint, c.get("userId") as string));
+    return c.json(await gradeBottleneckAnswer({ ...body, uid: c.get("userId") as string }));
   });
 
   app.post("/v1/coding-task", requireQuota(db, "coding"), async (c) => {

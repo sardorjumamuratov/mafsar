@@ -88,8 +88,8 @@ describe("Design drill", () => {
       { point: "A rubric point", status: "covered", note: "ok" },
     ]);
     expect(body.sections).toEqual([
-      { section: "API", verdict: "strong", note: "" },
-      { section: "Estimates", verdict: "missing", note: "" },
+      { section: "API", key: "components", verdict: "strong", note: "" },
+      { section: "Estimates", key: "components", verdict: "missing", note: "" },
     ]);
     expect(body.next_time).toBe("Keep practising.");
   });
@@ -150,6 +150,7 @@ describe("Estimation drill", () => {
     const ok = await post("/v1/estimation-summary", { results: [{ question: "q", expected: "300 TB", answer: "250 TB", grade: "spot_on" }] });
     expect(ok.status).toBe(200);
     expect((await ok.json()).habit_to_fix).toBe("Remember replication.");
+      expect(await practiceUnits()).toBe(0);
     expect(await practiceUnits()).toBe(0);
     const bad = await post("/v1/estimation-summary", { results: [{ question: "q", expected: "1", answer: "1", grade: "amazing" }] });
     expect(bad.status).toBe(400);
@@ -159,7 +160,8 @@ describe("Estimation drill", () => {
 describe("Find the bottleneck", () => {
   const SCENARIO = {
     narrative: "A global read-heavy API with 50k reads/s and 5k writes/s.",
-    architecture: ["Client", "API servers (6x)", "Postgres primary"],
+    components: [{id: "client", name: "Client", detail: ""}, {id: "api", name: "API servers (6x)", detail: ""}, {id: "db", name: "Postgres primary", detail: ""}],
+    flaw_component: "db",
     planted_flaw: "All writes go to a single primary in one region",
     why_it_fails: "Write latency and a single point of failure",
     model_solution: "Shard by user id, or use a multi-region primary with conflict rules",
@@ -173,20 +175,20 @@ describe("Find the bottleneck", () => {
     expect(raw).not.toContain("single primary");
     expect(raw).not.toContain("Shard by user");
     const body = JSON.parse(raw);
-    expect(body.architecture).toEqual(SCENARIO.architecture);
+    expect(body.components).toEqual(SCENARIO.components);
     expect(typeof body.state).toBe("string");
   });
 
   it("grades with the decrypted flaw and reveals it afterwards; a hint costs half a point", async () => {
     vi.stubGlobal("fetch", reply(SCENARIO));
     const { state } = await (await post("/v1/bottleneck-task", SOURCE)).json();
-    const fetchMock = reply({ found_flaw: true, explanation_correct: true, fix_works: "yes", feedback: "Nice." });
+    const fetchMock = reply({ criteria: { foundFlaw: { status: "covered" }, explainedFailure: { status: "covered" }, proposedFix: { status: "missed" } }, feedback: "Nice." });
     vi.stubGlobal("fetch", fetchMock);
     const body = await (await post("/v1/bottleneck-grade", { state, answer: "The single primary", usedHint: true })).json();
     expect(JSON.stringify(fetchMock.mock.calls[0][1])).toContain("single primary");
-    expect(body.found_flaw).toBe(true);
-    expect(body.fix_works).toBe(false); // only a real true counts
-    expect(body.score).toBe(1.5);
+    expect(body.criteria.foundFlaw.status).toBe("covered");
+    expect(body.criteria.proposedFix.status).toBe("missed"); // only a real true counts
+    expect(body.score).toBe(2);
     expect(body.planted_flaw).toBe(SCENARIO.planted_flaw);
   });
 

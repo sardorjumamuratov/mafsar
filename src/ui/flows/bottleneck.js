@@ -3,7 +3,7 @@ import { goReturn, setFocusReturn } from "./review.js";
 import { showChrome } from "../nav.js";
 import { appendReviewLog, bumpActivity, uid } from "../../storage/store.js";
 import { drillLogEntry } from "../../storage/drill-log.js";
-import { bindField, focusEnd, icon, paintShell, primaryBtn, verdictRow, waitRow } from "./shell.js";
+import { bindField, feedbackSummary, focusEnd, icon, paintShell, primaryBtn, verdictRow, waitRow } from "./shell.js";
 
 // What breaks: a small architecture with one planted flaw. The learner says what
 // fails, under what load or failure, and how they'd fix it.
@@ -192,10 +192,42 @@ export async function submitBottleneck() {
 function paintBottleneckFeedback() {
   const s = bottleneckState;
   const r = s.result;
-  const parts = Number(!!r.found_flaw) + Number(!!r.explanation_correct) + Number(!!r.fix_works);
-  const kind = parts === 3 ? "ok" : parts > 0 ? "part" : "no";
-  const label = { ok: "Correct", part: "Partly right", no: "Not quite" }[kind];
-  const arch = s.task.architecture || [];
+  const kind = r.verdict === "correct" ? "ok" : r.verdict === "partly_right" ? "part" : "no";
+  const label = { ok: "Correct", part: "Partly right", no: "Not quite" }[kind] || "Not quite";
+  const arch = s.task.components || s.task.architecture || [];
+  
+  let failingIdx = -1;
+  if (r.failingComponentId) {
+    failingIdx = arch.findIndex(c => c.id === r.failingComponentId);
+  } else {
+    failingIdx = failingIndex(arch, r.planted_flaw);
+  }
+
+  const scoreLine = `Score ${r.score} / ${r.maxScore || 3}${r.hintPenalty ? " (hint penalty applied)" : ""}`;
+  
+  const summaryBlock = feedbackSummary({
+    strongest: r.strongestPart,
+    gap: r.highestLeverageGap,
+    scoreLine
+  });
+
+  const criteriaBlock = r.criteria ? `
+    <div class="st-mt24" style="display:flex;flex-direction:column;gap:12px">
+      ${Object.entries(r.criteria).map(([k, v]) => {
+        const title = k === "foundFlaw" ? "Found flaw" : k === "explainedFailure" ? "Explained failure" : "Proposed fix";
+        const iconName = v.status === "covered" ? "check" : v.status === "partial" ? "check" : "x";
+        const color = v.status === "covered" ? "var(--status-mastered)" : v.status === "partial" ? "var(--status-learning)" : "var(--text-secondary)";
+        return `<div style="display:flex;gap:12px;align-items:start">
+          <span style="color:${color};margin-top:2px">${icon(iconName, 16, 2.5)}</span>
+          <div>
+            <div style="font-weight:650;font-size:14px;color:var(--text-primary)">${title}</div>
+            ${v.note ? `<div style="font-size:14px;color:var(--text-secondary);margin-top:2px">${esc(v.note)}</div>` : ""}
+          </div>
+        </div>`;
+      }).join("")}
+    </div>
+  ` : "";
+
   paintShell({
     mode: "What breaks",
     progress: 100,
@@ -205,18 +237,22 @@ function paintBottleneckFeedback() {
     body: `
       <button type="button" class="st-link st-mt6" id="bnScenarioBtn" data-action="bottleneck-toggle-scenario">Show full scenario</button>
       <div class="st-label st-mt20">Architecture</div>
-      ${rail(arch, failingIndex(arch, r.planted_flaw))}
+      ${rail(arch, failingIdx)}
       <div class="st-mt24">${verdictRow(kind, label)}</div>
       ${r.feedback ? `<div class="st-feedback">${esc(r.feedback)}</div>` : ""}
-      ${r.other_valid_issue ? `<div class="st-feedback">You also spotted a real problem: ${esc(r.other_valid_issue)}</div>` : ""}
-      ${r.usedHint ? `<div class="st-note">Score ${esc(r.score)} / 3, with the hint's half point taken off.</div>` : `<div class="st-note">Score ${esc(r.score)} / 3.</div>`}
-      <button type="button" class="st-link st-mt12" id="bnModelBtn" data-action="bottleneck-toggle-model">Compare your approach</button>
+      ${r.alternateProblem ? `<div class="st-feedback">You also spotted a real problem: ${esc(r.alternateProblem.description)}</div>` : ""}
+      
+      <div class="st-mt24">${summaryBlock}</div>
+      ${criteriaBlock}
+      
+      <button type="button" class="st-link st-mt24" id="bnModelBtn" data-action="bottleneck-toggle-model">Compare your approach</button>
       <div id="bnModel" hidden>
         <div class="st-label st-mt16">The flaw</div>
-        <div class="st-text15 st-mt4">${esc(r.planted_flaw)}</div>
-        ${r.why_it_fails ? `<div class="st-label st-mt16">Why it fails</div><div class="st-text15 st-mt4">${esc(r.why_it_fails)}</div>` : ""}
+        <div class="st-text15 st-mt4">${esc(r.modelAnswer?.flaw || r.planted_flaw)}</div>
+        ${(r.modelAnswer?.whyItFails || r.why_it_fails) ? `<div class="st-label st-mt16">Why it fails</div><div class="st-text15 st-mt4">${esc(r.modelAnswer?.whyItFails || r.why_it_fails)}</div>` : ""}
         <div class="st-label st-mt16">A good fix</div>
-        <div class="st-text15 st-mt4">${esc(r.model_solution)}</div>
+        <div class="st-text15 st-mt4">${esc(r.modelAnswer?.goodFix || r.model_solution)}</div>
+        ${(r.modelAnswer?.tradeoff || r.tradeoff) ? `<div class="st-label st-mt16">Trade-off</div><div class="st-text15 st-mt4">${esc(r.modelAnswer?.tradeoff || r.tradeoff)}</div>` : ""}
       </div>`,
     dock: primaryBtn("return-focus", "Finish"),
   });

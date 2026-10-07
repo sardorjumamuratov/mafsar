@@ -4,7 +4,7 @@ import { showChrome } from "../nav.js";
 import { appendReviewLog, bumpActivity, uid } from "../../storage/store.js";
 import { drillLogEntry } from "../../storage/drill-log.js";
 import { gradeEstimation, mismatchNote, parseEstimation, parseReference } from "../../storage/estimation.js";
-import { bindField, focusEnd, paintShell, primaryBtn, secondaryBtn, verdictRow, waitRow } from "./shell.js";
+import { bindField, feedbackSummary, focusEnd, paintShell, primaryBtn, secondaryBtn, verdictRow, waitRow } from "./shell.js";
 
 // Estimate: back-of-the-envelope numbers. The model writes the questions and the
 // reference answers; the learner's number is graded on this side of the wire.
@@ -194,6 +194,16 @@ function paintSummary(summary) {
       ${verdictRow(KIND[r.grade], r.raw ? `${VERDICT[r.grade]} · ${r.raw}` : "Skipped")}
       <div class="st-feedback">${esc(r.question.question)}</div>
     </div>`).join("");
+    
+  const score = s.results.reduce((acc, r) => acc + (r.grade === "spot_on" ? 1 : r.grade === "ballpark" ? 0.5 : 0), 0);
+  const scoreLine = `Score ${score} / ${n}`;
+  
+  const summaryBlock = feedbackSummary({
+    strongest: summary.strongest_habit,
+    gap: summary.habit_to_fix,
+    scoreLine
+  });
+
   paintShell({
     mode: "Estimate",
     prompt: "Round complete",
@@ -201,10 +211,13 @@ function paintSummary(summary) {
     progress: 100,
     counter: `${n} / ${n}`,
     body: `
+      <div class="st-mt24">${summaryBlock}</div>
+      ${summary.notes && summary.notes.length > 0 ? `
+      <div class="st-label st-mt24">Notes</div>
+      <div class="st-list">${summary.notes.map(note => `<div class="st-li st-feedback">${esc(note.message)}</div>`).join("")}</div>
+      ` : ""}
       <div class="st-label st-mt24">Your answers</div>
-      <div class="st-list">${rows}</div>
-      <div class="st-label st-mt24">Habit to fix</div>
-      <div class="st-text15 st-mt8">${esc(summary.habit_to_fix)}</div>`,
+      <div class="st-list">${rows}</div>`,
     dock: primaryBtn("return-focus", "Done"),
   });
 }

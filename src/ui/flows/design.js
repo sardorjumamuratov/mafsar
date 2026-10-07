@@ -4,7 +4,7 @@ import { showChrome } from "../nav.js";
 import { appendReviewLog, bumpActivity, uid } from "../../storage/store.js";
 import { drillLogEntry } from "../../storage/drill-log.js";
 import { SECTIONS, answerTooLong, assembleAnswer, emptySections, MAX_DESIGN_CHARS, rubricScore } from "../../storage/design.js";
-import { bindField, focusEnd, icon, paintShell, primaryBtn, secondaryBtn, verdictRow, waitRow } from "./shell.js";
+import { bindField, feedbackSummary, focusEnd, icon, paintShell, primaryBtn, secondaryBtn, verdictRow, waitRow } from "./shell.js";
 
 // Design brief: one section on screen at a time, a chip row to move between
 // them, and a draft per section that autosaves into state. Every section is
@@ -197,7 +197,7 @@ function paintDesignFeedback() {
 
   const rows = SECTIONS.map((sec) => {
     if (!s.sections[sec.key].trim()) return `<div class="st-li roomy">${verdictRow("skip", `${sec.title} · skipped`)}</div>`;
-    const v = byName.get(sec.title);
+    const v = byName.get(sec.title) || byName.get(sec.key);
     if (!v) return `<div class="st-li roomy">${verdictRow("skip", `${sec.title} · not graded`)}</div>`;
     return `<div class="st-li roomy">${verdictRow(SECTION_KIND[v.verdict] || "no", sec.title)}${v.note ? `<div class="st-feedback">${esc(v.note)}</div>` : ""}</div>`;
   }).join("");
@@ -207,6 +207,14 @@ function paintDesignFeedback() {
   const points = (g.rubric_evaluation || []).map((p) => `<div class="st-li">${verdictRow(POINT_KIND[p.status] || "no", p.point)}${p.note ? `<div class="st-feedback">${esc(p.note)}</div>` : ""}</div>`).join("");
 
   const filled = filledCount(s);
+  
+  const scoreLine = `Score ${g.score} / ${g.maxScore || (g.rubric_evaluation || []).length}`;
+  const summaryBlock = feedbackSummary({
+    strongest: g.strongestPart,
+    gap: g.highestLeverageGap,
+    scoreLine
+  });
+
   paintShell({
     mode: "Design brief · ~15 min",
     promptHtml: briefHtml(s),
@@ -215,7 +223,10 @@ function paintDesignFeedback() {
     hasProgress: true,
     body: `
       ${briefToggle}
-      <div class="st-label st-mt24">Feedback</div>
+      
+      <div class="st-mt24">${summaryBlock}</div>
+
+      <div class="st-label st-mt24">Sections</div>
       <div class="st-list">${rows}</div>
       <button type="button" class="st-link st-mt12" id="designModelBtn" data-action="design-toggle-model">Compare your approach</button>
       <div id="designModel" hidden>
