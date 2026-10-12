@@ -331,7 +331,7 @@ export const bottleneckGradeSchema = z
   });
 
 export const drillCardSuggestionsSchema = z.object({
-  mode: z.enum(["design", "estimation", "bottleneck"]),
+  mode: z.enum(["design", "estimation", "bottleneck", "clinical"]),
   gaps: z.array(z.object({
     type: z.enum(["missed_rubric", "partial_rubric", "estimation_mistake", "unit_mismatch", "missed_bottleneck", "missing_tradeoff"]),
     text: z.string().min(1).max(400),

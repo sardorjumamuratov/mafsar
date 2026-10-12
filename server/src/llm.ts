@@ -1594,7 +1594,10 @@ export async function checkClinicalSteps(input: {
       if (!s.findingIds.includes(a.answer)) throw new BadStateError("That isn't one of the findings in this case.", "INVALID_ANSWER");
       return { ...base, verdict: s.keyFindingIds.includes(a.answer) ? "correct" : "not_quite", keyFindingIds: s.keyFindingIds } as Record<string, unknown>;
     }
-    const row = { ...base, verdict: "not_quite", modelAnswer: step.modelAnswer, note: "" } as Record<string, unknown>;
+    // A typed test name ("a rapid flu test first") still counts as ordering that test.
+    const typed = a.answer.toLowerCase();
+    const test = step.area === "tests" ? s.tests.find((x) => typed.includes(x.name.toLowerCase()) || (typed.length >= 4 && x.name.toLowerCase().includes(typed))) : undefined;
+    const row = { ...base, verdict: "not_quite", modelAnswer: step.modelAnswer, note: "", ...(test ? { testResult: test } : {}) } as Record<string, unknown>;
     pending.push({ step, answer: a.answer });
     return row;
   });

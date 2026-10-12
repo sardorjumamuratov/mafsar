@@ -287,6 +287,16 @@ describe("checking steps", () => {
     expect(last.otherResults.every((t: any) => t.ordered === false)).toBe(true);
   });
 
+  it("matches a typed test name to the case's tests, so Advanced learners see the result they asked for", async () => {
+    const c = await begin(WITH_TESTS, "advanced");
+    const testStep = c.steps.find((s: any) => s.area === "tests");
+    vi.stubGlobal("fetch", replies({ results: [{ stepId: testStep.id, verdict: "correct", note: "Good first test." }] }));
+    const res = await (await post("/v1/clinical-check", { state: c.state, answers: [{ stepId: testStep.id, answer: "a rapid influenza test first" }] })).json();
+    expect(res.results[0].testResult).toEqual({ name: "Rapid influenza test", result: "Positive for influenza A", source: "notes" });
+    vi.stubGlobal("fetch", replies({ results: [{ stepId: testStep.id, verdict: "not_quite", note: "" }] }));
+    const none = await (await post("/v1/clinical-check", { state: c.state, answers: [{ stepId: testStep.id, answer: "an MRI of the head" }] })).json();
+    expect(none.results[0].testResult).toBeUndefined();
+  });
   it("binds the token to its user and expires it", async () => {
     const c = await begin();
     const a = { stepId: c.steps[0].id, answer: c.steps[0].options[0].id };
