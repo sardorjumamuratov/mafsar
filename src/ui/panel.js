@@ -2,7 +2,7 @@ import { renderStats, openFeedback } from "./views/stats.js";
 import { saveSettings } from "../storage/store.js";
 import { startCompare, selectComparePair, toggleCompareSame, createForkCards } from "./flows/compare.js";
 import { startDesignDrill, submitDesign, designAction } from "./flows/design.js";
-import { openPracticeSettingsSheet, openStyleOverrideSheet, startWithStyle } from "./practice-ui.js";
+import { openLevelSheet, openPracticeSettingsSheet, openStyleOverrideSheet, startWithStyle } from "./practice-ui.js";
 import { runReviewCards } from "./flows/shell.js";
 import { startClinicalCase, clinicalCaseAction } from "./flows/clinical.js";
 import { estimationNext, startEstimationDrill, submitEstimation, estimationAction } from "./flows/estimation.js";
@@ -76,6 +76,9 @@ document.addEventListener("click", (e) => {
     case "chain-check": chainDrillAction("check"); break;
     case "chain-next": chainDrillAction("next"); break;
     case "chain-finish": chainDrillAction("finish"); break;
+    case "chain-pick": chainDrillAction("pick", id); break;
+    case "chain-hint": chainDrillAction("hint"); break;
+    case "chain-level-up": chainDrillAction("level-up"); break;
     case "start-compare": startCompare(id); break;
     case "compare-select": selectComparePair((/** @type {any} */ (t)).dataset.id1, (/** @type {any} */ (t)).dataset.id2); break;
     case "compare-toggle": toggleCompareSame((/** @type {any} */ (t)).dataset.key); break;
@@ -104,7 +107,7 @@ document.addEventListener("click", (e) => {
       })().catch(e => toast(e.message));
       break;
     case "start-coding": startCodingPractice(id); break;
-    case "start-clinical-case": startClinicalCase(id); break;
+    case "start-clinical-case": startWithStyle(id, startClinicalCase).catch((e) => toast(e.message)); break;
     case "start-design": startWithStyle(id, startDesignDrill).catch((e) => toast(e.message)); break;
     case "start-estimation": startWithStyle(id, startEstimationDrill).catch((e) => toast(e.message)); break;
     case "start-bottleneck": startWithStyle(id, startBottleneckDrill).catch((e) => toast(e.message)); break;
@@ -121,10 +124,20 @@ document.addEventListener("click", (e) => {
     case "design-toggle-brief": designAction("toggle-brief"); break;
     case "design-toggle-compare": designAction("toggle-compare"); break;
     case "review-cards": runReviewCards(); break;
-    case "clinical-submit": clinicalCaseAction("submit"); break;
+    case "clinical-pick": clinicalCaseAction("pick", id); break;
+    case "clinical-finding": clinicalCaseAction("finding", id); break;
+    case "clinical-check": clinicalCaseAction("check"); break;
+    case "clinical-skip": clinicalCaseAction("skip"); break;
+    case "clinical-hint": clinicalCaseAction("hint"); break;
     case "clinical-next": clinicalCaseAction("next"); break;
-    case "clinical-toggle-answers": clinicalCaseAction("toggle-answers"); break;
+    case "clinical-retry": clinicalCaseAction("retry"); break;
+    case "clinical-level-up": clinicalCaseAction("level-up"); break;
     case "clinical-toggle-full-case": clinicalCaseAction("toggle-full-case"); break;
+    case "edit-practice-level": {
+      const sid = currentDetail()?.session?.id;
+      if (sid) openLevelSheet(sid, () => paintDetail(true, true)).catch((e) => toast(e.message));
+      break;
+    }
     case "estimation-submit": submitEstimation(); break;
     case "estimation-next": estimationNext(); break;
     case "estimation-dontknow": estimationAction("dontknow"); break;

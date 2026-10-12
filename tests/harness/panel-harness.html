@@ -197,6 +197,37 @@
                 return { ok: true, hint: hints[level - 1], text: hints[level - 1], level, penalty: 0, revealsAnswer: false, state: "harness-state-" + level };
               },
               BOTTLENECK_GRADE: (m) => ({ ok: true, found_flaw: true, explanation_correct: true, fix_works: false, other_valid_issue: "", feedback: "You found the single write primary; the fix needs its trade-off.", score: 2, usedHint: !!m.usedHint, planted_flaw: "All writes from four regions go to one PostgreSQL primary.", why_it_fails: "At 8k writes a second the primary saturates and cross-region round trips dominate latency.", model_solution: "Shard by user id and keep a regional primary per shard.", maxScore: 3, hintPenalty: 0, finalScore: 2, verdict: "partly_right", criteria: { foundFlaw: { status: "covered", note: "You named the single write primary.", earned: 1 }, explainedFailure: { status: "covered", note: "You linked global writes to primary load.", earned: 1 }, proposedFix: { status: "partial", note: "Sharding helps; say what it costs.", earned: 0 } }, selectedComponentResult: m.selectedComponentId ? { componentId: m.selectedComponentId, status: m.selectedComponentId === "postgresql-primary" ? "flaw" : "not_the_flaw" } : null, failingComponentId: "postgresql-primary", strongestPart: "You connected global writes to pressure on one node.", highestLeverageGap: "Name the trade-off your sharding fix introduces.", alternateProblem: null, modelAnswer: { flaw: "All writes from four regions go to one PostgreSQL primary.", whyItFails: "At 8k writes a second the primary saturates and cross-region round trips dominate latency.", goodFix: "Shard by user id and keep a regional primary per shard.", tradeoff: "Cross-shard queries and resharding get harder." } }),
+              // Clinical case (docs/prompts/39): a flu case whose steps follow the level, checked like the server does.
+              CLINICAL_CASE: (m) => {
+                const level = m.level || "beginner";
+                const typed = level === "advanced";
+                const opts = (texts) => texts.map((x, i) => ({ id: "o" + (i + 1), text: x }));
+                const steps = [
+                  typed ? { id: "s1", kind: "short", area: "diagnosis", question: "What is the most likely diagnosis?", hints: ["Think about how fast this came on.", "A cold would be gradual.", "It starts suddenly and spreads to contacts."] }
+                        : { id: "s1", kind: "choice", area: "diagnosis", question: "What is the most likely diagnosis?", options: opts(["Common cold", "Influenza", "Strep throat", "Pneumonia"]), hints: ["Think about how fast this came on.", "A cold would be gradual.", "It starts suddenly and spreads to contacts."] },
+                  { id: "s2", kind: "finding", area: "symptoms", question: "Which finding points to it most?", hints: ["Look at how it started.", "Colds build slowly.", "Onset and aches together."] },
+                  typed ? { id: "s3", kind: "short", area: "tests", question: "Which test would you order first?", hints: ["Confirm the virus.", "One test is fast.", "It names the virus."] }
+                        : { id: "s3", kind: "choice", area: "tests", question: "Which test would you order first?", options: opts(["Rapid influenza test", "Chest X-ray", "Complete blood count"]), hints: ["Confirm the virus.", "One test is fast.", "It names the virus."] },
+                ];
+                if (level !== "beginner") steps.push({ id: "s4", kind: "short", area: "differentials", question: "What separates flu from a common cold?", optional: level === "intermediate", hints: ["Compare onset.", "Compare fever.", "Flu is sudden and severe."] });
+                return { ok: true, vignette: "A 34-year-old woman has a 2-day history of sudden fever, chills, severe aches, a dry cough and fatigue. A coworker was ill the same way. She has no shortness of breath and no chest pain.", findings: [{ id: "f1", text: "Sudden onset" }, { id: "f2", text: "High fever and chills" }, { id: "f3", text: "Severe body aches" }, { id: "f4", text: "Dry cough" }, { id: "f5", text: "Sick coworker" }], coverage: { symptoms: true, diagnosis: true, differentials: true, tests: true, treatment: true, redFlags: true }, level, steps, state: "harness-clinical-" + level };
+              },
+              CLINICAL_CHECK: (m) => {
+                const level = String(m.state || "").replace("harness-clinical-", "") || "beginner";
+                const TESTS = [{ name: "Rapid influenza test", result: "Positive for influenza A", source: "notes" }, { name: "Chest X-ray", result: "Clear lung fields", source: "notes" }, { name: "Complete blood count", result: "Normal white cell count", source: "notes" }];
+                const names = { o1: "Rapid influenza test", o2: "Chest X-ray", o3: "Complete blood count" };
+                const lastId = level === "beginner" ? "s3" : "s4";
+                const results = (m.answers || []).map((a) => {
+                  const base = { stepId: a.stepId, source: "notes" };
+                  if (a.stepId === "s1") return { ...base, verdict: (a.answer === "o2" || /influenza|flu/i.test(a.answer)) ? "correct" : "not_quite", correctOptionId: "o2", ...(level === "advanced" ? { modelAnswer: "Influenza" } : {}), note: level === "advanced" ? "Right." : "", explanation: "Sudden high fever with severe aches and a dry cough is influenza." };
+                  if (a.stepId === "s2") return { ...base, verdict: (a.answer === "f1" || a.answer === "f3") ? "correct" : "not_quite", keyFindingIds: ["f1", "f3"], explanation: "Sudden onset with severe aches separates flu from a cold." };
+                  if (a.stepId === "s3") { const test = level === "advanced" ? null : TESTS.find((x) => x.name === names[a.answer]); return { ...base, verdict: (a.answer === "o1" || /rapid|influenza/i.test(a.answer)) ? "correct" : "not_quite", correctOptionId: "o1", ...(level === "advanced" ? { modelAnswer: "Rapid influenza test" } : {}), explanation: "A rapid test confirms flu early.", ...(test ? { testResult: test } : {}) }; }
+                  return { ...base, verdict: /onset|sudden|fever/i.test(a.answer) ? "correct" : "partial", modelAnswer: "Sudden onset with high fever and marked aches", note: "Compare how it started.", explanation: "A cold comes on gradually, with a runny nose and little fever." };
+                });
+                const caseDone = !!m.finish || (m.answers || []).some((a) => a.stepId === lastId);
+                const ordered = new Set([...(m.ordered || []), ...results.map((r) => r.testResult?.name).filter(Boolean)]);
+                return { ok: true, results, caseDone, ...(caseDone ? { otherResults: TESTS.filter((x) => !ordered.has(x.name)).map((x) => ({ ...x, ordered: false })) } : {}) };
+              },
               DRILL_CARD_SUGGESTIONS: (m) => ({ ok: true, suggestions: [
                 { id: "sug_1", front: "Why can a single write primary become a bottleneck under global writes?", back: "Every write converges on one node, capping write throughput and adding cross-region latency.", conceptKey: "single-primary", sourceType: "missed_bottleneck", reason: "" },
                 { id: "sug_2", front: "What does sharding by user id cost you?", back: "Cross-shard queries, rebalancing and routing logic.", conceptKey: "sharding-tradeoff", sourceType: "missing_tradeoff", reason: "" },

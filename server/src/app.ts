@@ -16,14 +16,14 @@ import type { DB } from "./db.js";
 import {
   register, login, requireAuth, signAccessToken, signRefreshToken, upsertGoogleUser, verifyPassword,
 } from "./auth.js";
-import { syncSchema, registerSchema, loginSchema, generateSchema, gradeSchema, hypotheticalSchema, summarizeSchema, blurbSchema, codingTaskSchema, teachTurnSchema, teachEvaluateSchema, codingGradeSchema, designTaskSchema, designGradeSchema, designCurveballSchema, designCheckpointSchema, estimationTaskSchema, estimationSummarySchema, bottleneckTaskSchema, bottleneckHintSchema, bottleneckGradeSchema, drillCardSuggestionsSchema, shareCreateSchema, shareRevokeSchema, teamCreateSchema, teamJoinSchema, pollSchema, deleteAccountSchema } from "./schema.js";
+import { syncSchema, registerSchema, loginSchema, generateSchema, gradeSchema, hypotheticalSchema, summarizeSchema, blurbSchema, codingTaskSchema, teachTurnSchema, teachEvaluateSchema, codingGradeSchema, designTaskSchema, designGradeSchema, designCurveballSchema, designCheckpointSchema, clinicalCaseSchema, clinicalCheckSchema, estimationTaskSchema, estimationSummarySchema, bottleneckTaskSchema, bottleneckHintSchema, bottleneckGradeSchema, drillCardSuggestionsSchema, shareCreateSchema, shareRevokeSchema, teamCreateSchema, teamJoinSchema, pollSchema, deleteAccountSchema } from "./schema.js";
 import { googleConfigured, buildAuthUrl, pkcePair, exchangeCode, verifyIdToken } from "./google.js";
 import { applySync, changesSince } from "./sync.js";
 import { deleteUserData } from "./account.js";
 import { nowISO, one, all, run, uid } from "./db.js";
 import { retrievability, forgetBy } from "./fsrs.js";
 import { genTeamCode, leaderboardFor, learningFor } from "./teams.js";
-import { generateStudySet, gradeAnswer, generateHypothetical, summarizeConversation, setBlurb, generateCodingTask, gradeCode, generateDesignTask, gradeDesignAnswer, generateDesignCurveball, generateDesignCheckpoint, generateEstimationTasks, generateEstimationSummary, generateBottleneckTask, generateBottleneckHint, gradeBottleneckAnswer, generateDrillCardSuggestions } from "./llm.js";
+import { generateStudySet, gradeAnswer, generateHypothetical, summarizeConversation, setBlurb, generateCodingTask, gradeCode, generateDesignTask, gradeDesignAnswer, generateDesignCurveball, generateDesignCheckpoint, generateEstimationTasks, generateEstimationSummary, generateBottleneckTask, generateBottleneckHint, gradeBottleneckAnswer, generateDrillCardSuggestions, generateClinicalCase, checkClinicalSteps } from "./llm.js";
 import { DEFAULT_LIMITS, clientIp, corsOrigin, limitByIp, limitByUser, slidingWindow, tooMany, type IpSource } from "./ratelimit.js";
 import { MAX_STUDENT_TURNS, evaluateTeaching, studentTurns, teachTurn } from "./teach.js";
 import { PRIVACY_HTML } from "./privacy.js";
@@ -522,6 +522,18 @@ app.post("/v1/feedback", async (c, next) => {
   }, limitByUser(limits.checkpointPerUser), limitByUser(limits.llmPerUser), async (c) => {
     const body = designCheckpointSchema.parse(await c.req.json());
     return c.json(await generateDesignCheckpoint({ ...body, uid: c.get("userId") as string }));
+  });
+
+  // Medicine practice (docs/prompts/39). Starting a case costs a practice unit, refunded if it fails;
+  // checking steps is bounded by the per-user limit, and choice and finding steps make no model call.
+  app.post("/v1/clinical-case", requireQuota(db, "practice"), async (c) => {
+    const body = clinicalCaseSchema.parse(await c.req.json());
+    return c.json(await generateClinicalCase({ ...body, uid: c.get("userId") as string }));
+  });
+
+  app.post("/v1/clinical-check", limitByUser(limits.llmPerUser), async (c) => {
+    const body = clinicalCheckSchema.parse(await c.req.json());
+    return c.json(await checkClinicalSteps({ ...body, uid: c.get("userId") as string }));
   });
 
   app.post("/v1/design-curveball", limitByUser(limits.llmPerUser), async (c) => {

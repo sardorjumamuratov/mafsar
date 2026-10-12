@@ -331,7 +331,7 @@ export const bottleneckGradeSchema = z
   });
 
 export const drillCardSuggestionsSchema = z.object({
-  mode: z.enum(["design", "estimation", "bottleneck"]),
+  mode: z.enum(["design", "estimation", "bottleneck", "clinical"]),
   gaps: z.array(z.object({
     type: z.enum(["missed_rubric", "partial_rubric", "estimation_mistake", "unit_mismatch", "missed_bottleneck", "missing_tradeoff"]),
     text: z.string().min(1).max(400),
@@ -341,3 +341,31 @@ export const drillCardSuggestionsSchema = z.object({
   practiceStyle,
 });
 
+// --- Medicine practice: grounded, bite-sized clinical cases (docs/prompts/39) ---
+export const PRACTICE_LEVELS = ["beginner", "intermediate", "advanced"] as const;
+/** A chain as notes: the case writer may use only what is here and in the cards. */
+const caseChain = z.object({
+  title: z.string().max(200),
+  steps: z.array(z.object({ label: z.string().max(80), statement: z.string().max(300), why: z.string().max(300).optional() })).max(10),
+});
+export const clinicalCaseSchema = z.object({
+  ...drillSource,
+  chains: z.array(caseChain).max(20).default([]),
+  level: z.enum(PRACTICE_LEVELS).default("beginner"),
+  practiceStyle,
+}).refine((b) => b.reference.length > 0 || b.chains.length > 0, { message: "Add some cards to this set first: a case is built from your notes.", path: ["reference"] });
+/** One request holds one step (guided) or the whole case's typed steps at once (simulation). */
+export const clinicalCheckSchema = z
+  .object({
+    state: drillState,
+    answers: z.array(z.object({
+      stepId: z.string().min(1).max(40),
+      answer: z.string().trim().min(1).max(200),
+      why: z.string().max(200).optional(),
+    })).max(4).default([]),
+    // The case is over: also return the results of tests the learner didn't order.
+    finish: z.boolean().optional(),
+    ordered: z.array(z.string().max(120)).max(6).optional(),
+    practiceStyle,
+  })
+  .refine((b) => b.answers.length > 0 || b.finish === true, { message: "Answer a step first.", path: ["answers"] });

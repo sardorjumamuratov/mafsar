@@ -2875,3 +2875,15 @@ input[type="checkbox"].switch:checked::after, .toggle-switch:checked::after {
 .st-railitem.fail .st-railtag { color: var(--st-amber-text); }
 .st-dot.sm.sel { background: var(--accent); }
 .st-markline { margin-top: 8px; display: flex; flex-wrap: wrap; justify-content: space-between; align-items: baseline; gap: 6px 12px; font-size: 13px; color: var(--st-secondary); }
+
+
+/* Medicine practice (docs/prompts/39): level rows, a quiet answer field, results tags. */
+.style-rows { display: flex; flex-wrap: wrap; gap: 4px 16px; }
+.st-field.h72 { min-height: 72px; }
+.st-opt.sel { border-color: var(--border-hover); background: var(--bg-surface2); }
+.st-opt.sel .key { border-color: var(--border-hover); color: var(--st-text); }
+.st-chip.btn.on { background: var(--bg-segment-active); border-color: var(--border-hover); color: var(--st-text); font-weight: 600; }
+.st-chip.btn.amber { border-color: var(--st-amber); color: var(--st-amber-text); }
+.st-chip.btn:disabled { cursor: default; }
+.st-hintbar { margin-top: 12px; }
+.st-tag { margin-left: 6px; font-size: 12px; font-weight: 600; color: var(--st-muted); }

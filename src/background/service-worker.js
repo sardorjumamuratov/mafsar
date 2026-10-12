@@ -40,7 +40,7 @@ import {
   backendEstimationSummary,
   backendBottleneckTask,
   backendBottleneckHint,
-  backendBottleneckGrade, backendDrillCardSuggestions, backendDesignCheckpoint,
+  backendBottleneckGrade, backendDrillCardSuggestions, backendDesignCheckpoint, backendClinicalCase, backendClinicalCheck,
   backendExtractPdf, backendGlobalPublish, backendGlobalUnpublish, backendGlobalList, backendGlobalFetch, backendGlobalReport,
 } from "../sync/api.js";
 import {
@@ -833,6 +833,28 @@ async function handle(msg) {
       });
     }
 
+
+    // Medicine practice (docs/prompts/39): the case is written from the learner's notes, and steps are
+    // checked against a sealed token. Every field is forwarded by hand, as the worker rebuilds each payload.
+    case "CLINICAL_CASE": {
+      return backendClinicalCase({
+        concept: String(msg.concept || ""),
+        reference: Array.isArray(msg.reference) ? msg.reference : [],
+        chains: Array.isArray(msg.chains) ? msg.chains : [],
+        level: ["beginner", "intermediate", "advanced"].includes(msg.level) ? msg.level : "beginner",
+        ...(msg.practiceStyle === "guided" || msg.practiceStyle === "simulation" ? { practiceStyle: msg.practiceStyle } : {}),
+      });
+    }
+
+    case "CLINICAL_CHECK": {
+      return backendClinicalCheck({
+        state: String(msg.state || ""),
+        answers: Array.isArray(msg.answers) ? msg.answers : [],
+        ...(msg.finish ? { finish: true } : {}),
+        ...(Array.isArray(msg.ordered) ? { ordered: msg.ordered } : {}),
+        ...(msg.practiceStyle === "guided" || msg.practiceStyle === "simulation" ? { practiceStyle: msg.practiceStyle } : {}),
+      });
+    }
 
     case "DESIGN_CHECKPOINT": {
       return backendDesignCheckpoint({

@@ -29,6 +29,8 @@ export function drillMeta(meta = {}) {
   const num = (v) => (Number.isFinite(v) && v >= 0 ? Math.round(v) : undefined);
   const fields = {
     practiceStyle: str(meta.practiceStyle, 20),
+    level: str(meta.level, 20),
+    score: Number.isFinite(meta.score) && meta.score >= 0 && meta.score <= 1 ? Math.round(meta.score * 100) / 100 : undefined,
     mode: str(meta.mode, 20),
     startedAt: str(meta.startedAt, 40),
     completedAt: str(meta.completedAt, 40),

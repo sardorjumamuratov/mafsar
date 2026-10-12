@@ -3,7 +3,7 @@ import { encryptState, decryptState } from "./crypto.js";
 // and grading run here with the server's key (LLM_PROVIDER / LLM_API_KEY).
 // Grounded strictly in user-supplied content; never fabricate facts.
 
-import { randomUUID } from "node:crypto";
+import { randomInt, randomUUID } from "node:crypto";
 
 /**
  * An LLM-proxy failure the caller can act on: missing server config, an
@@ -1335,4 +1335,298 @@ export async function generateDrillCardSuggestions(input: {
       .map((s: Record<string, string>) => ({ id: `sug_${randomUUID().slice(0, 8)}`, ...s }));
     return { suggestions };
   });
+}
+
+// --- Medicine practice: grounded, bite-sized clinical cases (docs/prompts/39) -------
+// One model call writes the case from the learner's notes: a vignette, findings to
+// tap, and 3-4 one-decision steps with answers, explanations and hints. The answers
+// stay in a sealed token, so choice and finding steps are checked with no model
+// call; typed steps are graded in one batched call.
+
+export type PracticeLevel = "beginner" | "intermediate" | "advanced";
+const CASE_LEVELS = ["beginner", "intermediate", "advanced"] as const;
+export const CLINICAL_CASE_PROMPT_VERSION = "v1";
+export const CLINICAL_CHECK_PROMPT_VERSION = "v1";
+
+const COVER_KEYS = ["symptoms", "diagnosis", "differentials", "tests", "treatment", "redFlags"] as const;
+type CoverKey = (typeof COVER_KEYS)[number];
+// What the "what next" step may ask about, in the order a fallback prefers them.
+const NEXT_AREAS = ["tests", "treatment", "redFlags", "differentials"] as const;
+
+const NOT_ENOUGH = "These notes don't have enough clinical detail for a case yet. Add symptoms and a diagnosis, or try the chain drill.";
+
+const CLINICAL_CASE_PROMPT = `You write one short practice clinical case from a learner's own notes.
+
+The notes are the only source of truth. Use only facts that appear in the notes below (the study
+cards and the mechanism chains). Do not add tests, results, treatments or diagnoses that the notes
+don't mention. If the notes don't cover an area, say so in "coverage" and leave that area out:
+never fill it from your own medical knowledge. Mark an item "general" only for harmless colour in the
+vignette (age, setting); every answer, explanation and test result must have source "notes".
+
+First list what the notes cover (true or false each): symptoms, diagnosis, differentials (other
+conditions it is told apart from), tests (named investigations, with results), treatment, redFlags
+(when to seek urgent care).
+
+Then write the case for the learner's level:
+- beginner: a textbook presentation with every key feature; clearly wrong distractors.
+- intermediate: one or two distractor findings and one key feature left out; plausible distractors.
+- advanced: an atypical presentation, a comorbidity, and a close differential.
+
+Every question is one decision and every answer is short (a few words). Distractors are plausible
+wrong answers of the same kind. "hints" is 3 strings that get more specific: 1 where to look,
+2 how to narrow it down, 3 the key idea. A hint must never contain the answer itself.
+
+Pick "next.area" from areas the notes cover: tests, treatment, redFlags or differentials. If it is
+"tests", the answer and distractors must be names from "tests". If you can't, give "differential" only.
+
+${DRILL_RULES}
+${DATA_RULES}
+
+Respond with ONLY valid JSON:
+{
+  "coverage": { "symptoms": boolean, "diagnosis": boolean, "differentials": boolean, "tests": boolean, "treatment": boolean, "redFlags": boolean },
+  "vignette": string,
+  "findings": [{ "id": string, "text": string }],
+  "key_findings": [string],
+  "finding_explanation": string,
+  "finding_hints": [string],
+  "diagnosis": { "answer": string, "distractors": [string], "explanation": string, "source": "notes" | "general", "hints": [string] },
+  "next": { "area": "tests" | "treatment" | "redFlags" | "differentials", "question": string, "answer": string, "distractors": [string], "explanation": string, "source": "notes" | "general", "hints": [string] },
+  "differential": { "question": string, "answer": string, "distractors": [string], "explanation": string, "source": "notes" | "general", "hints": [string] },
+  "tests": [{ "name": string, "result": string, "source": "notes" | "general" }]
+}
+findings: 4-6 short phrases taken from the vignette, ids "f1".."f6". key_findings: the 1-2 ids that point most to the diagnosis.
+tests: only when "coverage.tests" is true, only tests the notes name.`;
+
+type SealedStep = {
+  id: string;
+  kind: "choice" | "finding" | "short";
+  area: string;
+  question: string;
+  options?: { id: string; text: string }[];
+  optional?: boolean;
+  hints: string[];
+  correct?: string; // option id
+  modelAnswer?: string; // typed steps
+  explanation: string;
+  source: "notes" | "general";
+};
+type ClinicalCaseState = {
+  kind: "clinical";
+  level: PracticeLevel;
+  practiceStyle?: PracticeStyle;
+  coverage: Record<CoverKey, boolean>;
+  steps: SealedStep[];
+  findingIds: string[];
+  keyFindingIds: string[];
+  tests: { name: string; result: string; source: "notes" | "general" }[];
+  uid?: string;
+  iat?: number;
+};
+
+const GENERIC_HINTS: Record<SealedStep["kind"], string[]> = {
+  choice: ["Re-read the case: how did it start, and what came with it?", "Rule out the two options that don't fit the story.", "Look for the feature only one option explains."],
+  finding: ["Look at how it started.", "One or two findings separate this from its look-alikes.", "Which finding would you ask about first?"],
+  short: ["Re-read the case for the clue that decides it.", "Name the category first, then the specific answer.", "Use the most distinctive finding in the case."],
+};
+const hintLeaks = (hint: string, secrets: string[]) => secrets.some((s) => s.length >= 4 && hint.toLowerCase().includes(s.toLowerCase()));
+/** Three hints per step; one that contains the answer is swapped for a generic one. */
+function cleanHints(raw: unknown, secrets: string[], kind: SealedStep["kind"]): string[] {
+  const list = strList(raw, 3, 200);
+  return [0, 1, 2].map((i) => (list[i] && !hintLeaks(list[i], secrets) ? list[i] : GENERIC_HINTS[kind][i]));
+}
+
+function shuffled<T>(list: T[]): T[] {
+  const out = [...list];
+  for (let i = out.length - 1; i > 0; i--) {
+    const j = Math.floor((randomInt(0, 1_000_000) / 1_000_000) * (i + 1));
+    [out[i], out[j]] = [out[j], out[i]];
+  }
+  return out;
+}
+const unique = (list: string[]) => [...new Map(list.map((s) => [s.toLowerCase(), s])).values()];
+
+/** The answer and 2-3 distractors as shuffled options with ids; null when there aren't enough distinct wrong answers. */
+function makeOptions(answer: string, distractors: string[]) {
+  const wrong = unique(distractors.filter((d) => d && d.toLowerCase() !== answer.toLowerCase())).slice(0, 3);
+  if (!answer || wrong.length < 2) return null;
+  const options = shuffled([answer, ...wrong]).map((text, i) => ({ id: `o${i + 1}`, text }));
+  return { options, correct: options.find((o) => o.text === answer)!.id };
+}
+
+const sourceOf = (v: unknown): "notes" | "general" => (v === "general" ? "general" : "notes");
+
+export function buildClinicalCase(parsed: any, level: PracticeLevel, practiceStyle: PracticeStyle | undefined, uid?: string) {
+  const coverage = Object.fromEntries(COVER_KEYS.map((k) => [k, parsed?.coverage?.[k] === true])) as Record<CoverKey, boolean>;
+  const covered = COVER_KEYS.filter((k) => coverage[k]).length;
+  const vignette = str(parsed?.vignette, 1200);
+  const answer = str(parsed?.diagnosis?.answer, 120);
+  if (!coverage.diagnosis || covered < 2) throw new LLMError(NOT_ENOUGH, 422);
+  if (!vignette || !answer) throw new LLMError("The model didn't return a usable case. Try again.");
+
+  const typed = level === "advanced";
+  const steps: SealedStep[] = [];
+  const add = (s: Omit<SealedStep, "id">) => steps.push({ ...s, id: `s${steps.length + 1}` });
+  const choiceOrShort = (q: any, area: string, question: string, optional = false) => {
+    const a = str(q?.answer, 120);
+    if (!a) return false;
+    const opts = typed ? null : makeOptions(a, strList(q?.distractors, 4, 120));
+    const base = { area, question, explanation: str(q?.explanation, 400), source: sourceOf(q?.source), optional: optional || undefined };
+    if (opts) add({ ...base, kind: "choice", options: opts.options, correct: opts.correct, hints: cleanHints(q?.hints, [a], "choice") });
+    else add({ ...base, kind: "short", modelAnswer: a, hints: cleanHints(q?.hints, [a], "short") });
+    return true;
+  };
+
+  // 1. The diagnosis.
+  choiceOrShort(parsed.diagnosis, "diagnosis", "What is the most likely diagnosis?");
+
+  // 2. The finding that points to it most: tap it in the case.
+  const findings = (Array.isArray(parsed?.findings) ? parsed.findings : [])
+    .map((f: any) => ({ id: str(f?.id, 20), text: str(f?.text, 120) }))
+    .filter((f: { id: string; text: string }, i: number, all: { id: string }[]) => f.id && f.text && all.findIndex((g) => g.id === f.id) === i)
+    .slice(0, 6);
+  const findingIds = findings.map((f: { id: string }) => f.id);
+  const keyFindingIds = strList(parsed?.key_findings, 3, 20).filter((id) => findingIds.includes(id));
+  if (findings.length >= 3 && keyFindingIds.length) {
+    const keyText = findings.filter((f: { id: string }) => keyFindingIds.includes(f.id)).map((f: { text: string }) => f.text);
+    add({
+      kind: "finding", area: "symptoms", question: "Which finding points to it most?", explanation: str(parsed?.finding_explanation, 400),
+      source: "notes", hints: cleanHints(parsed?.finding_hints, keyText, "finding"),
+    });
+  }
+
+  // 3. What next: only an area the notes cover, and only tests the notes name.
+  const tests = coverage.tests
+    ? (Array.isArray(parsed?.tests) ? parsed.tests : [])
+        .map((t: any) => ({ name: str(t?.name, 100), result: str(t?.result, 300), source: sourceOf(t?.source) }))
+        .filter((t: { name: string; result: string }) => t.name && t.result)
+        .slice(0, 6)
+    : [];
+  const area = (NEXT_AREAS as readonly string[]).includes(parsed?.next?.area) ? (parsed.next.area as string) : "";
+  const nq = parsed?.next;
+  let nextUsed = false;
+  if (area && coverage[area as CoverKey] && str(nq?.question, 200)) {
+    if (area === "tests") {
+      const names = tests.map((t: { name: string }) => t.name);
+      const a = names.find((n: string) => n.toLowerCase() === str(nq?.answer, 120).toLowerCase());
+      if (a) nextUsed = choiceOrShort({ ...nq, answer: a, distractors: names }, area, str(nq.question, 200));
+    } else {
+      nextUsed = choiceOrShort(nq, area, str(nq.question, 200));
+    }
+  }
+
+  // 4. A close differential: a typed, optional step at Intermediate, required at Advanced.
+  // At Beginner it stands in for a "what next" step the notes couldn't support.
+  const dq = parsed?.differential;
+  if (coverage.differentials && str(dq?.question, 200) && str(dq?.answer, 120)) {
+    if (level === "beginner") {
+      if (!nextUsed) choiceOrShort(dq, "differentials", str(dq.question, 200));
+    } else {
+      const a = str(dq.answer, 120);
+      add({
+        kind: "short", area: "differentials", question: str(dq.question, 200), optional: level === "intermediate" || undefined,
+        modelAnswer: a, explanation: str(dq?.explanation, 400), source: sourceOf(dq?.source), hints: cleanHints(dq?.hints, [a], "short"),
+      });
+    }
+  }
+  if (steps.length < 2) throw new LLMError(NOT_ENOUGH, 422);
+
+  const state: ClinicalCaseState = { kind: "clinical", level, practiceStyle, coverage, steps, findingIds, keyFindingIds, tests };
+  return {
+    vignette,
+    findings,
+    coverage,
+    level,
+    steps: steps.map((s) => ({ id: s.id, kind: s.kind, area: s.area, question: s.question, ...(s.options ? { options: s.options } : {}), ...(s.optional ? { optional: true } : {}), hints: s.hints })),
+    state: sealState(state as unknown as Record<string, unknown>, uid),
+  };
+}
+
+export async function generateClinicalCase(input: {
+  concept: string; reference: Ref[]; chains?: { title: string; steps: { label: string; statement: string; why?: string }[] }[];
+  level?: string; practiceStyle?: string; uid?: string;
+}) {
+  const level = oneOf(input.level, CASE_LEVELS, "beginner");
+  const style = asStyle(input.practiceStyle);
+  return logged("clinical_case_generation", CLINICAL_CASE_PROMPT_VERSION, style, async () => {
+    const chains = (input.chains || [])
+      .map((c) => `Chain: ${c.title}\n${c.steps.map((s) => `- ${s.label}: ${s.statement}${s.why ? ` (why: ${s.why})` : ""}`).join("\n")}`)
+      .join("\n\n")
+      .slice(0, 6000);
+    const user = [`Level: ${level}`, `Topic: ${input.concept}`, `Study cards (the notes):\n${refText(input.reference)}`, chains ? `Mechanism chains (the notes):\n${chains}` : ""].filter(Boolean).join("\n\n");
+    const parsed = await callJson(CLINICAL_CASE_PROMPT, user);
+    return buildClinicalCase(parsed, level, style, input.uid);
+  });
+}
+
+const CLINICAL_SHORT_PROMPT = `You grade short answers in a practice clinical case. For each item you get the question, the model
+answer and the learner's answer. Judge only against the model answer: "correct" if it says the same
+thing, "partial" if it is on the right track but misses the key point, otherwise "not_quite". Add one
+short, calm note (no "wrong", "fail" or "great job").
+
+${DRILL_RULES}
+${DATA_RULES}
+
+Respond with ONLY valid JSON: { "results": [{ "stepId": string, "verdict": "correct" | "partial" | "not_quite", "note": string }] }`;
+
+const STEP_VERDICTS = ["correct", "partial", "not_quite"] as const;
+
+export async function checkClinicalSteps(input: {
+  state: string; uid?: string; practiceStyle?: string; finish?: boolean; ordered?: string[];
+  answers: { stepId: string; answer: string; why?: string }[];
+}) {
+  const s = openState<ClinicalCaseState>(input.state, "kind", input.uid);
+  if (s.kind !== "clinical" || !Array.isArray(s.steps)) throw new BadStateError();
+  const style = styleOf(s, input.practiceStyle);
+
+  const pending: { step: SealedStep; answer: string }[] = [];
+  const results = input.answers.map((a) => {
+    const step = s.steps.find((x) => x.id === a.stepId);
+    if (!step) throw new BadStateError("That step isn't part of this case.", "INVALID_STEP");
+    const base = { stepId: step.id, explanation: step.explanation, source: step.source };
+    if (step.kind === "choice") {
+      const chosen = step.options?.find((o) => o.id === a.answer);
+      if (!chosen) throw new BadStateError("That isn't one of the answers for this step.", "INVALID_ANSWER");
+      const test = step.area === "tests" ? s.tests.find((t) => t.name.toLowerCase() === chosen.text.toLowerCase()) : undefined;
+      return { ...base, verdict: chosen.id === step.correct ? "correct" : "not_quite", correctOptionId: step.correct, ...(test ? { testResult: test } : {}) } as Record<string, unknown>;
+    }
+    if (step.kind === "finding") {
+      if (!s.findingIds.includes(a.answer)) throw new BadStateError("That isn't one of the findings in this case.", "INVALID_ANSWER");
+      return { ...base, verdict: s.keyFindingIds.includes(a.answer) ? "correct" : "not_quite", keyFindingIds: s.keyFindingIds } as Record<string, unknown>;
+    }
+    // A typed test name ("a rapid flu test first") still counts as ordering that test.
+    const typed = a.answer.toLowerCase();
+    const test = step.area === "tests" ? s.tests.find((x) => typed.includes(x.name.toLowerCase()) || (typed.length >= 4 && x.name.toLowerCase().includes(typed))) : undefined;
+    const row = { ...base, verdict: "not_quite", modelAnswer: step.modelAnswer, note: "", ...(test ? { testResult: test } : {}) } as Record<string, unknown>;
+    pending.push({ step, answer: a.answer });
+    return row;
+  });
+
+  // Every typed answer in this request is graded in one call.
+  if (pending.length) {
+    await logged("clinical_case_check", CLINICAL_CHECK_PROMPT_VERSION, style, async () => {
+      const user = pending.map((p) => `stepId: ${p.step.id}\nQuestion: ${p.step.question}\nModel answer: ${p.step.modelAnswer}\nLearner's answer: ${p.answer}`).join("\n\n");
+      const parsed = await callJson(CLINICAL_SHORT_PROMPT, user);
+      const byId = new Map<string, any>((Array.isArray(parsed?.results) ? parsed.results : []).map((r: any) => [String(r?.stepId), r]));
+      for (const row of results) {
+        if (!pending.some((p) => p.step.id === row.stepId)) continue;
+        const r = byId.get(String(row.stepId));
+        row.verdict = oneOf(r?.verdict, STEP_VERDICTS, "not_quite");
+        row.note = str(r?.note, 200);
+      }
+    });
+  }
+
+  const last = s.steps[s.steps.length - 1];
+  const caseDone = !!input.finish || input.answers.some((a) => a.stepId === last.id);
+  const out: Record<string, unknown> = { results, caseDone };
+  if (caseDone) {
+    // Test results for tests the learner didn't order show last, marked as not ordered.
+    const ordered = new Set([
+      ...(input.ordered || []),
+      ...results.map((r) => (r.testResult as { name: string } | undefined)?.name).filter((n): n is string => !!n),
+    ].map((n) => n.toLowerCase()));
+    out.otherResults = s.tests.filter((t) => !ordered.has(t.name.toLowerCase())).map((t) => ({ ...t, ordered: false }));
+  }
+  return out;
 }

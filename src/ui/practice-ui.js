@@ -2,6 +2,7 @@ import { esc } from "./core.js";
 import { openSheet, closeSheet } from "./sheet.js";
 import { getSettings, saveSettings } from "../storage/store.js";
 import { PRACTICE_STYLES, STYLE_IDS, isStyle, resolveStyle } from "../storage/practice-style.js";
+import { LEVELS, LEVEL_IDS, isLevel, levelLabel, resolveLevel } from "../storage/practice-level.js";
 import { icon } from "./flows/shell.js";
 
 // Choosing a practice style for the system design modes (docs/prompts/38 §4):
@@ -94,3 +95,34 @@ export async function startWithStyle(sessionId, start) {
   if (style) return start(sessionId, style);
   openFirstRunSheet((chosen) => start(sessionId, chosen));
 }
+
+// --- Levels for the Medicine modes (docs/prompts/39): chosen per set, kept on this device ---
+
+export async function levelFor(sessionId) {
+  return resolveLevel(await getSettings(), sessionId);
+}
+
+export async function setLevel(sessionId, level) {
+  if (!isLevel(level)) return;
+  const settings = await getSettings();
+  await saveSettings({ practiceLevels: { ...(settings.practiceLevels || {}), [sessionId]: level } });
+}
+
+/** From the set page: pick how hard the cases and chains are for this set. */
+export async function openLevelSheet(sessionId, onChange) {
+  const current = await levelFor(sessionId);
+  openSheet("Level", `<div class="style-opts" role="group" aria-label="Level">${LEVEL_IDS.map((id) => `
+      <button type="button" class="style-opt${current === id ? " on" : ""}" data-level="${id}" aria-pressed="${current === id}">
+        <span class="style-text"><span class="t">${esc(LEVELS[id].label)}</span><span class="d">${esc(LEVELS[id].description)}</span></span>
+      </button>`).join("")}</div>
+    <div class="st-note" style="margin-top:0">Beginner is the default. You can change it any time.</div>`, false, null, { px: 22, pb: 24, gap: 16 });
+  document.querySelectorAll("#sheet .style-opt").forEach((b) => {
+    b.addEventListener("click", async () => {
+      await setLevel(sessionId, /** @type {HTMLElement} */ (b).dataset.level);
+      closeSheet();
+      onChange?.(/** @type {HTMLElement} */ (b).dataset.level);
+    });
+  });
+}
+
+export { levelLabel };
