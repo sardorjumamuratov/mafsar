@@ -32,10 +32,11 @@ test("the answer is assembled under the clinical titles, in order", () => {
 
 console.log("wiring");
 test("clinical mode and the case state reach the server", () => {
-  // Clinical cases have their own flow now; the design flow no longer sends a mode.
+  // Since docs/prompts/39 the case flow uses its own routes; the sealed case travels with every check.
   const flow = read("../src/ui/flows/clinical.js");
-  assert.ok(flow.includes('mode: "clinical"'), "the flow sends its mode");
-  assert.ok(flow.includes("state: s.task.state"), "and the encrypted case");
+  assert.ok(flow.includes('type: "CLINICAL_CASE"') && flow.includes('type: "CLINICAL_CHECK"'), "the flow uses the clinical routes");
+  assert.ok(flow.includes("state: s.kase.state"), "and sends the sealed case back with each check");
+  // The routes below stay for extensions older than 0.3.7, which still send the clinical mode through them.
   const sw = read("../src/background/service-worker.js");
   for (const msg of ["DESIGN_TASK", "DESIGN_GRADE", "DESIGN_CURVEBALL"]) {
     const block = sw.slice(sw.indexOf(`case "${msg}"`), sw.indexOf(`case "${msg}"`) + 500);

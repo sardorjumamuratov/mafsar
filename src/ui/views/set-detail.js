@@ -10,7 +10,8 @@ import { startQuiz } from "../flows/quiz.js";
 import { syncNow } from "../../sync/sync.js";
 import { addCard, updateCard, updateStudySet, setExamDate, saveSettings } from "../../storage/store.js";
 import { styleLabel } from "../../storage/practice-style.js";
-import { styleFor } from "../practice-ui.js";
+import { levelFor, styleFor } from "../practice-ui.js";
+import { levelLabel } from "../../storage/practice-level.js";
 import { chainCoverage, liveChains, orderedSteps } from "../../storage/chains.js";
 import { isLinkCard, linkId } from "../../storage/chain-links.js";
 import { cleanTitle } from "../../../shared/titles.js";
@@ -263,8 +264,11 @@ export async function paintDetail(updateInPlace = false, force = false) {
     const quizCount = Math.min(10, studySet.quiz?.length || 0);
     const cta = studyCta(studySet, settings, dueCount, cards.length, quizCount);
   // System design modes start with a practice style (docs/prompts/38 §4); show it and let it change here.
-  const practiceStyleRow = ["design", "estimation", "bottleneck"].includes(cta.mode)
-    ? `<button type="button" class="style-row" data-action="edit-practice-style" aria-haspopup="dialog">Style: <span>${esc(styleLabel(await styleFor(session.id)))}</span>${I.chevron(14, "currentColor")}</button>`
+  // The Medicine modes add a level (how hard the case is) beside the style (how much help you get).
+  const styled = ["design", "estimation", "bottleneck", "clinical-case"].includes(cta.mode);
+  const leveled = ["clinical-case", "chain-drill"].includes(cta.mode);
+  const practiceStyleRow = styled || leveled
+    ? `<div class="style-rows">${styled ? `<button type="button" class="style-row" data-action="edit-practice-style" aria-haspopup="dialog">Style: <span>${esc(styleLabel(await styleFor(session.id)))}</span>${I.chevron(14, "currentColor")}</button>` : ""}${leveled ? `<button type="button" class="style-row" data-action="edit-practice-level" aria-haspopup="dialog">Level: <span>${esc(levelLabel(await levelFor(session.id)))}</span>${I.chevron(14, "currentColor")}</button>` : ""}</div>`
     : "";
     detail.mode = cta.mode;
 

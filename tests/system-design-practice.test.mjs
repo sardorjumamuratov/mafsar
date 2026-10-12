@@ -17,7 +17,7 @@ function test(name, fn) {
   console.log(`  ✓ ${name}`);
 }
 
-const FLOWS = ["design", "estimation", "bottleneck"].map((f) => `../src/ui/flows/${f}.js`);
+const FLOWS = ["design", "estimation", "bottleneck", "clinical", "chain-drill"].map((f) => `../src/ui/flows/${f}.js`);
 const UI = [...FLOWS, "../src/ui/flows/shell.js", "../src/ui/practice-ui.js", "../src/ui/views/set-detail.js", "../src/ui/views/you.js", "../src/ui/panel.js"];
 
 /** Named imports per relative module, e.g. { "./shell.js": ["icon", "paintShell"] }. */
@@ -85,12 +85,14 @@ test("every message the practice screens send is routed by the worker, and the n
   for (const file of [...FLOWS, "../src/ui/flows/shell.js"]) for (const m of read(file).matchAll(/type:\s*"([A-Z_]+)"/g)) sent.add(m[1]);
   for (const type of sent) assert.ok(sw.includes(`case "${type}"`), `the worker doesn't route ${type}`);
   const block = (type) => sw.slice(sw.indexOf(`case "${type}"`), sw.indexOf(`case "${type}"`) + 900);
-  for (const type of ["DESIGN_TASK", "DESIGN_GRADE", "DESIGN_CHECKPOINT", "ESTIMATION_TASK", "ESTIMATION_SUMMARY", "BOTTLENECK_TASK", "BOTTLENECK_GRADE", "DRILL_CARD_SUGGESTIONS"]) {
+  for (const type of ["DESIGN_TASK", "DESIGN_GRADE", "DESIGN_CHECKPOINT", "ESTIMATION_TASK", "ESTIMATION_SUMMARY", "BOTTLENECK_TASK", "BOTTLENECK_GRADE", "DRILL_CARD_SUGGESTIONS", "CLINICAL_CASE", "CLINICAL_CHECK"]) {
     assert.ok(block(type).includes("practiceStyle"), `${type} must forward practiceStyle`);
   }
   assert.ok(block("DESIGN_GRADE").includes("answers"), "structured design answers reach the server");
   assert.ok(block("BOTTLENECK_GRADE").includes("parts") && block("BOTTLENECK_GRADE").includes("selectedComponentId"), "guided parts and the marked component reach the server");
   assert.ok(block("BOTTLENECK_HINT").includes("level"), "the hint level reaches the server");
+  assert.ok(block("CLINICAL_CASE").includes("level") && block("CLINICAL_CASE").includes("chains"), "the level and the chains reach the case writer");
+  assert.ok(block("CLINICAL_CHECK").includes("ordered") && block("CLINICAL_CHECK").includes("finish"), "the end-of-case flags reach the server");
   assert.ok(!/callApi|sendResponse\(/.test(block("DESIGN_CHECKPOINT")), "the checkpoint uses the shared api client");
   assert.ok(api.includes('post("/v1/design-checkpoint"') && api.includes('post("/v1/drill-card-suggestions"'));
   assert.ok(api.includes("code: data.error"), "the machine code survives for feature_disabled and friends");
@@ -119,9 +121,10 @@ test("the spec's wording, and no promise of a written model answer", () => {
   assert.ok(!/Great job|Perfect|\bWrong\b/.test(all), "copy rules: no harsh or gushing words");
 });
 
-test("the clinical case keeps its own wording", () => {
+test("the clinical case keeps its own wording, and says when something isn't from the notes", () => {
   const clinical = read("../src/ui/flows/clinical.js");
-  assert.ok(clinical.includes("See your answers") && !clinical.includes("Compare your diagnosis"), "that button shows the learner's answers, not a model diagnosis");
+  assert.ok(!clinical.includes("Compare your diagnosis"), "that label belongs to What breaks");
+  assert.ok(clinical.includes("General knowledge, not from your notes"), "anything outside the notes is labelled");
 });
 
 test("a new screen clears the previous screen's review-card handler", () => {
