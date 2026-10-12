@@ -45,6 +45,7 @@ for example: *"Implement docs/prompts/02-abuse-protection.md. Follow AGENTS.md."
 | 36 | [Star ratings on sets](36-set-ratings.md) | **35** | migration, `sync.ts`, `sync-map.js`, Sets, set detail, Global |
 | 37 | [Your stats and feedback](37-stats-and-feedback.md) | **35** | new Stats page, `shared/insights.js`, You, Home |
 | 38 | [System design practice: guided and interview styles](38-system-design-practice.md) | study shell (on `main`) | design/estimation/bottleneck flows, `llm.ts`, `schema.ts`, `crypto.ts`, two new routes, set detail, You |
+| 39 | [Medicine practice: grounded, bite-sized, levels, hints](39-medicine-practice.md) | **38** | clinical + chain drill flows, two new routes, levels, set detail |
 
 **24 to 30 in order:** 24 and 25 are the two that matter; 29 rewrites the
 files almost everything else touches, so run it on its own and merge it the same
