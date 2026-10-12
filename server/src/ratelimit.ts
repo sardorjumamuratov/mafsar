@@ -43,6 +43,9 @@ export const DEFAULT_LIMITS = {
   // use (e.g. 100 short practice sessions), but caps the blast radius if
   // someone scripts the endpoint.
   llmPerUser: { limit: 150, windowMs: 2 * 60 * 60 * 1000 },
+
+  // Guided design checkpoints: coaching on one step, so a tighter cap inside the LLM one.
+  checkpointPerUser: { limit: 20, windowMs: 60 * 60 * 1000 },
 };
 
 /** A simple sliding window rate limiter. */

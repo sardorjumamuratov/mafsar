@@ -58,7 +58,9 @@ everything else in that report is then worth nothing.
 ## 3. Scan the branch before you read the code
 
 - **Scratch files.** `patch_*.cjs`, `*_report.md`, `notes.txt`, one-off scripts
-  in the repo root. Delete them; they're not supposed to be committed.
+  in the repo root, `server/test-*.db` left by the server suite. Delete them;
+  they're not supposed to be committed (`.gitignore` covers the known ones, so
+  check `git diff --stat` for anything new).
 - **Secrets.** Grep the diff for keys, tokens and passwords before anything else.
 - **Line endings.** The working tree is CRLF (`core.autocrlf=true`) and the
   blobs are LF. A branch committed with mixed CRLF/CR/LF rewrites whole files:
@@ -82,6 +84,13 @@ Things that have actually shipped broken here:
 - A handler wired to a `data-action` the UI never renders, or vice versa.
 - A helper whose body calls itself (`const byId = (id) => byId(id)`, left by a
   blind find-and-replace): every caller overflows the stack.
+- A module that imports a name its target never exports, or a file pasted into
+  itself twice (duplicate imports and functions). Either is a link error that
+  blanks the **whole panel**, and node tests that never import the UI stay
+  green. Load the panel harness and read `window.__errors`, every time;
+  `tests/system-design-practice.test.mjs` checks imports statically.
+- A field the panel sends that the worker's `case` never forwards (the worker
+  rebuilds every payload by hand), so the server never sees it.
 - JS toggling a class the stylesheet doesn't style (`setNav` toggled `.on`;
   the CSS styled `.active`), or a lookup into an object that has no such key
   (`ICONS.flashcards` rendered "undefined").
@@ -108,6 +117,13 @@ Things that have actually shipped broken here:
   every CSS variable and `btn-*` class exists, and a focus view has a way out.
 
 **Server**
+- `npx tsc --noEmit` failing: the server runs under tsx, so it still boots and
+  the broken route only fails when it's called (an un-imported function is a 500).
+- A response field removed or renamed while older extensions still read it, or
+  a missing new field that silently changes old behaviour (no `practiceStyle`
+  must mean today's rules, not the most lenient ones).
+- A test edited to expect the new behaviour of a regression. Compare every
+  changed assertion with what the old one protected.
 - A new route without its quota gate and rate limit.
 - An unbounded request body or an uncapped array in a schema.
 - Errors that reach the user as a bare 500 instead of `LLMError` / `BadStateError`.

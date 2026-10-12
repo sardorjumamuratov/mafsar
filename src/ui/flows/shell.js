@@ -1,7 +1,7 @@
+import { app, bundle, esc, send, setFor, setHTML, toast } from "../core.js";
 import { openSheet, closeSheet } from "../sheet.js";
 import { addCard } from "../../storage/store.js";
-import { isDuplicate } from "../../storage/card-dedupe.js";
-import { app, esc, setHTML, send, toast } from "../core.js";
+import { selectSuggestions } from "../../storage/card-dedupe.js";
 
 // The one layout every study mode shares (docs/design/06-study.html): a top bar
 // with close, progress and counter; a scrolling body that starts with the mode
@@ -23,6 +23,9 @@ const ICONS = {
   arrowRight: '<path d="M5 12h14M13 6l6 6-6 6"/>',
   arrowUp: '<path d="M12 19V5M6 11l6-6 6 6"/>',
   bulb: '<path d="M9 18h6M10 22h4M12 2a7 7 0 0 0-4 12.7c.6.5 1 1.3 1 2.3h6c0-1 .4-1.8 1-2.3A7 7 0 0 0 12 2z"/>',
+  compass: '<circle cx="12" cy="12" r="10"/><path d="m15.5 8.5-2 5-5 2 2-5z"/>',
+  stopwatch: '<circle cx="12" cy="14" r="8"/><path d="M12 10v4l2.5 1.5M10 2h4M12 2v4"/>',
+  chevronDown: '<path d="m6 9 6 6 6-6"/>',
 };
 
 /** A 24-grid line icon. A stroke other than 2 goes in an inline style, which beats the .st-i rule. */
@@ -84,6 +87,7 @@ export function shellHtml({ mode = "", prompt = "", promptHtml = "", promptClass
  */
 export function paintShell(opts) {
   keyHandler = opts.keys || null;
+  reviewCardsHandler = null;
   setHTML(app, shellHtml(opts));
 }
 
@@ -161,135 +165,116 @@ export function revealInBody(el) {
   else if (r.top < b.top) body.scrollTop -= b.top - r.top + 16;
 }
 
+// --- Practice feedback and review cards (docs/prompts/38) ------------------------
 
+/**
+ * The top of every feedback screen: the strongest part, the highest-leverage gap,
+ * then the score line. Plain labelled lines, no box. A missing (null) line is left out.
+ */
 export function feedbackSummary({ strongest, gap, scoreLine }) {
-  let html = `<div style="display:flex;flex-direction:column;gap:12px;padding:16px;border-radius:14px;background:var(--bg-surface);border:1px solid var(--border-control)">`;
-  if (scoreLine) html += `<div style="font-size:15px;font-weight:650;color:var(--text-primary);border-bottom:1px solid var(--border-control);padding-bottom:12px;margin-bottom:4px">${esc(scoreLine)}</div>`;
-  if (strongest) {
-    html += `<div style="display:flex;gap:10px">
-      <span style="color:var(--status-mastered);margin-top:2px">${icon("check", 16, 2.5)}</span>
-      <span style="display:flex;flex-direction:column;gap:2px">
-        <span style="font-size:13px;font-weight:650;text-transform:uppercase;letter-spacing:0.04em;color:var(--status-mastered)">Strongest part</span>
-        <span style="font-size:14px;color:var(--text-primary);line-height:1.4">${esc(strongest)}</span>
-      </span>
+  const line = (label, text, cls) => `<div class="st-sumline${cls ? " " + cls : ""}"><div class="st-label">${esc(label)}</div><div class="st-sumtext">${esc(text)}</div></div>`;
+  return `<div class="st-summary">
+      ${strongest ? line("Strongest part", strongest, "ok") : ""}
+      ${gap ? line("Highest-leverage gap", gap, "gap") : ""}
+      ${scoreLine ? `<div class="st-scoreline">${esc(scoreLine)}</div>` : ""}
     </div>`;
-  }
-  if (gap) {
-    html += `<div style="display:flex;gap:10px">
-      <span style="color:var(--status-learning);margin-top:2px">${icon("arrow-up", 16, 2.5)}</span>
-      <span style="display:flex;flex-direction:column;gap:2px">
-        <span style="font-size:13px;font-weight:650;text-transform:uppercase;letter-spacing:0.04em;color:var(--status-learning)">Highest leverage gap</span>
-        <span style="font-size:14px;color:var(--text-primary);line-height:1.4">${esc(gap)}</span>
-      </span>
-    </div>`;
-  }
-  html += `</div>`;
-  return html;
 }
 
+/** Up to four of the brief's constraints as one line of pills; tapping opens the full brief. */
+export function constraintAnchor(constraints, action) {
+  const list = (constraints || []).filter(Boolean).slice(0, 4);
+  if (!list.length) return "";
+  return `<button type="button" class="st-anchor" id="stAnchor" data-action="${action}" aria-label="Constraints: ${esc(list.join(", "))}. Open the full brief">${list.map((c) => `<span class="st-pill">${esc(c)}</span>`).join("")}</button>`;
+}
 
-export async function openSuggestionSheet(sessionId, mode, gaps, topic, existingCards) {
-  const existingFronts = existingCards.map(c => c.front).slice(0, 50);
-  gaps = gaps.slice(0, 8);
-  
-  // Show a wait row in the sheet
-  openSheet("Turn gaps into cards", `
-    <div style="display:flex;align-items:center;justify-content:center;height:100px;color:var(--text-secondary)">
-      <span class="st-spin">${icon("loader", 20, 2)}</span>
-    </div>
-  `, false, null, { px: 16, pb: 24, gap: 14 });
+/** A read-only text in the shared sheet (the full brief, from the anchor). */
+export function openTextSheet(title, text) {
+  openSheet(title, `<div class="st-sheettext">${esc(text)}</div>
+    <button type="button" class="sheet-quiet" id="stSheetClose">Close</button>`, false, null, { px: 22, pb: 24, gap: 16 });
+  document.getElementById("stSheetClose")?.addEventListener("click", () => closeSheet());
+}
 
+// "Turn gaps into review cards": the current feedback screen registers what to
+// offer; the router's "review-cards" action runs it. paintShell clears it, so a
+// stale screen's handler never runs.
+let reviewCardsHandler = null;
+export function setReviewCards(fn) { reviewCardsHandler = fn; }
+export function runReviewCards() { reviewCardsHandler?.(); }
+
+export const reviewCardsAction = () => `<button type="button" class="st-link st-mt16" data-action="review-cards" id="reviewCardsBtn">Turn gaps into review cards</button><div class="st-note" id="reviewCardsNote" role="status" hidden></div>`;
+
+function reviewNote(text) {
+  const note = document.getElementById("reviewCardsNote");
+  const btn = /** @type {HTMLButtonElement|null} */ (document.getElementById("reviewCardsBtn"));
+  if (note) { note.hidden = false; note.textContent = text; }
+  if (btn) btn.hidden = true;
+}
+
+/**
+ * Ask the server for at most three cards from the drill's gaps, hide any the set
+ * already has, and let the learner pick. Nothing is saved without "Add selected
+ * cards". `onSaved(ids)` gets the new card ids for the drill-log row.
+ */
+export async function offerReviewCards({ sessionId, mode, gaps, topic, practiceStyle, onSaved }) {
+  const list = (gaps || []).filter((g) => g && g.text).slice(0, 8);
+  if (!list.length) return reviewNote("No gaps to turn into cards this time.");
+  const btn = /** @type {HTMLButtonElement|null} */ (document.getElementById("reviewCardsBtn"));
+  if (btn) { btn.disabled = true; btn.textContent = "Finding cards…"; }
+  const { studySets } = await bundle();
+  const existingFronts = ((setFor(sessionId, studySets)?.flashcards) || []).filter((c) => !c.deleted).map((c) => String(c.front || "").slice(0, 200));
   let res;
   try {
-    res = await send({ type: "DRILL_CARD_SUGGESTIONS", mode, gaps, topic, existingFronts });
+    res = await send({ type: "DRILL_CARD_SUGGESTIONS", mode, gaps: list, topic, existingFronts: existingFronts.slice(0, 50), practiceStyle });
   } catch (e) {
-    if (e.error === "feature_disabled") {
-      closeSheet();
-      toast("Suggestions are currently disabled.");
-      return;
-    }
-    closeSheet();
-    toast(e.message || "Could not generate suggestions.");
-    return;
+    if (e.code === "feature_disabled") return reviewNote("Review-card suggestions aren't available right now.");
+    if (btn) { btn.disabled = false; btn.textContent = "Turn gaps into review cards"; }
+    return toast(e.message || "Couldn't suggest cards. Try again.");
   }
-  
-  if (!res.suggestions || res.suggestions.length === 0) {
-    openSheet("Turn gaps into cards", `
-      <div class="st-text15" style="text-align:center;color:var(--text-secondary);padding:24px 0">
-        No new concepts needed.
-      </div>
-      <button type="button" class="sheet-quiet" id="sugg-close">Close</button>
-    `, false, null, { px: 16, pb: 24, gap: 14 });
-    document.getElementById("sugg-close")?.addEventListener("click", () => closeSheet());
-    return;
-  }
+  if (btn) { btn.disabled = false; btn.textContent = "Turn gaps into review cards"; }
+  const { kept, skipped } = selectSuggestions(res.suggestions, existingFronts, 3);
+  const already = skipped ? `${skipped} ${skipped === 1 ? "is" : "are"} already in your set.` : "";
+  if (!kept.length) return reviewNote(already || "No new cards to suggest this time.");
 
-  let skippedCount = 0;
-  const validSuggestions = [];
-  for (const sugg of res.suggestions) {
-    if (isDuplicate(sugg.front, existingFronts, 0.7)) {
-      skippedCount++;
-    } else {
-      validSuggestions.push(sugg);
-    }
-  }
+  openSheet("Turn gaps into review cards", `
+    <div class="st-sugglist">${kept.map((s, i) => `
+      <label class="st-sugg">
+        <input type="checkbox" data-sugg="${i}" checked>
+        <span class="st-suggtext"><span class="f">${esc(s.front)}</span><span class="b">${esc(s.back)}</span></span>
+      </label>`).join("")}</div>
+    ${already ? `<div class="st-note">${esc(already)}</div>` : ""}
+    <div style="display:flex;flex-direction:column;gap:8px">
+      <button type="button" class="sheet-primary" id="suggAdd">Add selected cards</button>
+      <button type="button" class="sheet-quiet" id="suggLater">Not now</button>
+    </div>`, false, null, { px: 22, pb: 24, gap: 16 });
 
-  if (validSuggestions.length === 0) {
-    openSheet("Turn gaps into cards", `
-      <div class="st-text15" style="text-align:center;color:var(--text-secondary);padding:24px 0">
-        ${skippedCount} ${skippedCount === 1 ? "is" : "are"} already in your set. No new cards to add.
-      </div>
-      <button type="button" class="sheet-quiet" id="sugg-close">Close</button>
-    `, false, null, { px: 16, pb: 24, gap: 14 });
-    document.getElementById("sugg-close")?.addEventListener("click", () => closeSheet());
-    return;
-  }
-
-  const html = validSuggestions.map((s, i) => `
-    <label style="display:flex;gap:12px;padding:12px;background:var(--bg-surface);border:1px solid var(--border-control);border-radius:12px;cursor:pointer">
-      <input type="checkbox" checked data-sugg-idx="${i}" style="margin-top:2px">
-      <div style="display:flex;flex-direction:column;gap:4px">
-        <div style="font-weight:650;font-size:14px;color:var(--text-primary)">${esc(s.front)}</div>
-        <div style="font-size:14px;color:var(--text-secondary);line-height:1.4">${esc(s.back)}</div>
-        ${s.reason ? `<div style="font-size:13px;color:var(--status-learning);margin-top:4px">${esc(s.reason)}</div>` : ""}
-      </div>
-    </label>
-  `).join("");
-
-  openSheet("Turn gaps into cards", `
-    ${skippedCount > 0 ? `<div class="st-note" style="margin-bottom:12px">${skippedCount} ${skippedCount === 1 ? "is" : "are"} already in your set.</div>` : ""}
-    <div style="display:flex;flex-direction:column;gap:12px;max-height:400px;overflow-y:auto;margin:0 -16px;padding:0 16px">${html}</div>
-    <div style="display:flex;flex-direction:column;gap:8px;margin-top:16px">
-      <button type="button" class="sheet-primary" id="sugg-add">Add selected cards</button>
-      <button type="button" class="sheet-quiet" id="sugg-cancel">Not now</button>
-    </div>
-  `, false, null, { px: 16, pb: 24, gap: 0 });
-
-  document.getElementById("sugg-cancel")?.addEventListener("click", () => closeSheet());
-  
-  const addBtn = /** @type {HTMLButtonElement} */ (document.getElementById("sugg-add"));
-  const checkboxes = /** @type {HTMLInputElement[]} */ (Array.from(document.querySelectorAll('input[data-sugg-idx]')));
-  
-  checkboxes.forEach(cb => {
-    cb.addEventListener("change", () => {
-      addBtn.disabled = !checkboxes.some(c => c.checked);
-    });
-  });
-
-  addBtn?.addEventListener("click", async () => {
-    const selected = checkboxes.filter(c => c.checked).map(c => validSuggestions[parseInt(c.getAttribute("data-sugg-idx"), 10)]);
-    addBtn.disabled = true;
-    addBtn.textContent = "Adding...";
+  const add = /** @type {HTMLButtonElement} */ (document.getElementById("suggAdd"));
+  const boxes = /** @type {HTMLInputElement[]} */ ([...document.querySelectorAll("#sheet input[data-sugg]")]);
+  boxes.forEach((b) => b.addEventListener("change", () => { add.disabled = !boxes.some((x) => x.checked); }));
+  document.getElementById("suggLater")?.addEventListener("click", () => closeSheet());
+  add.addEventListener("click", async () => {
+    const chosen = boxes.filter((b) => b.checked).map((b) => kept[Number(b.dataset.sugg)]);
+    if (!chosen.length) return;
+    add.disabled = true;
+    add.textContent = "Adding…";
     try {
-      for (const s of selected) {
-        await addCard(sessionId, s.front, s.back);
+      const ids = [];
+      for (const s of chosen) {
+        const card = await addCard(sessionId, s.front, s.back);
+        if (card) ids.push(card.id);
       }
-      toast(`Added ${selected.length} card${selected.length === 1 ? "" : "s"}.`);
       closeSheet();
+      reviewNote(`Added ${ids.length} review card${ids.length === 1 ? "" : "s"} to this set.`);
+      onSaved?.(ids);
     } catch (e) {
-      toast("Failed to add cards.");
-      addBtn.disabled = false;
-      addBtn.textContent = "Add selected cards";
+      add.disabled = false;
+      add.textContent = "Add selected cards";
+      toast(e.message || "Couldn't add the cards.");
     }
   });
+}
+
+/** mm:ss since `startedAt` (ms). */
+export function elapsed(startedAt) {
+  const s = Math.max(0, Math.floor((Date.now() - startedAt) / 1000));
+  return `${String(Math.floor(s / 60)).padStart(2, "0")}:${String(s % 60).padStart(2, "0")}`;
 }

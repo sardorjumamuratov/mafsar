@@ -16,3 +16,15 @@ dist/
 
 # Local server database
 server/mafsar.db
+
+# Throwaway test databases left by the server suite
+server/test-*.db
+
+# One-off edit scripts agents write in the repo root; never committed
+/patch*.py
+/patch*.cjs
+/patch*.mjs
+/patch*.js
+
+# Local preview config (points at a machine-specific path)
+.claude/launch.json

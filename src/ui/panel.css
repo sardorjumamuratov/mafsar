@@ -2807,3 +2807,71 @@ input[type="checkbox"].switch:checked::after, .toggle-switch:checked::after {
 .st-qrow { margin-top: 24px; display: flex; justify-content: space-between; align-items: baseline; }
 .st-wait { margin-top: 24px; display: flex; align-items: center; gap: 10px; font-size: 14px; color: var(--st-muted); }
 .st-wait .spinner { margin: 0; border-color: var(--border-control); border-top-color: var(--accent); }
+
+
+/* ============================================================
+   System design practice (docs/prompts/38): practice styles, guided
+   steps, the constraint anchor, feedback summary, review-card sheet,
+   and the selectable architecture rail. Tokens only, both themes.
+   ============================================================ */
+/* The hidden attribute must win over the display set by .st-btn, .st-link and friends. */
+.st [hidden], #sheet [hidden] { display: none !important; }
+.st button:focus-visible, .st a:focus-visible, .style-opt:focus-visible, .st-sugg:focus-within, .style-row:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+.st-q { margin-top: 6px; font-size: 17px; font-weight: 650; line-height: 1.35; color: var(--st-text); text-wrap: pretty; }
+.st-hint { margin-top: 4px; font-size: 14px; line-height: 1.5; color: var(--st-muted); }
+.st-muted { color: var(--st-muted); }
+.st-chip.btn { cursor: pointer; }
+.st-chip.btn:hover { border-color: var(--border-hover); }
+.st-chip.btn.on { background: var(--bg-segment-active); border-color: var(--border-hover); color: var(--st-text); font-weight: 600; }
+.st-coach { padding-left: 12px; border-left: 2px solid var(--st-tint-bd); }
+
+/* The constraint anchor stays pinned while the learner writes. */
+.st-anchorwrap { position: sticky; top: 0; z-index: 1; margin: 12px -24px 0; padding: 6px 24px; background: var(--bg-app); }
+.st-anchor { display: flex; gap: 6px; width: 100%; padding: 0; border: 0; background: transparent; overflow: hidden; cursor: pointer; }
+.st-pill { flex-shrink: 0; height: 26px; padding: 0 9px; border-radius: 13px; display: inline-flex; align-items: center; white-space: nowrap; background: var(--st-tint-bg); border: 1px solid var(--st-tint-bd); color: var(--accent-text); font-size: 12px; font-weight: 600; }
+
+/* Feedback: strongest part, highest-leverage gap, score. No box. */
+.st-summary { display: flex; flex-direction: column; gap: 14px; }
+.st-sumtext { margin-top: 4px; font-size: 15px; line-height: 1.5; color: var(--st-text); overflow-wrap: anywhere; }
+.st-sumline.ok .st-label { color: var(--accent-text); }
+.st-sumline.gap .st-label { color: var(--st-amber-text); }
+.st-scoreline { font-size: 14px; font-weight: 600; color: var(--st-secondary); font-variant-numeric: tabular-nums; }
+.st-summaryline { display: flex; justify-content: space-between; gap: 12px; font-size: 13px; color: var(--st-muted); font-variant-numeric: tabular-nums; }
+
+/* Sheets: full brief, review-card suggestions, practice style. */
+.st-sheettext { max-height: 60vh; overflow-y: auto; font-size: 15px; line-height: 1.55; color: var(--st-text); white-space: pre-wrap; }
+.st-sugglist { display: flex; flex-direction: column; }
+.st-sugg { display: flex; gap: 12px; padding: 12px 0; border-bottom: 1px solid var(--border-divider); cursor: pointer; }
+.st-sugg:last-child { border-bottom: 0; }
+.st-sugg input { width: 18px; height: 18px; margin-top: 2px; flex-shrink: 0; accent-color: var(--accent); }
+.st-suggtext { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+.st-suggtext .f { font-size: 15px; font-weight: 600; color: var(--st-text); overflow-wrap: anywhere; }
+.st-suggtext .b { font-size: 14px; line-height: 1.45; color: var(--st-answer); overflow-wrap: anywhere; }
+.style-opts { display: flex; flex-direction: column; gap: 8px; }
+.style-opt { width: 100%; display: flex; gap: 12px; align-items: flex-start; padding: 14px; border-radius: 14px; border: 1px solid var(--border-control); background: var(--bg-surface); color: var(--st-text); text-align: left; cursor: pointer; }
+.style-opt:hover { border-color: var(--border-hover); }
+.style-opt.on { border-color: var(--accent); background: var(--st-tint-bg); }
+.style-ic { width: 36px; height: 36px; flex-shrink: 0; border-radius: 10px; display: grid; place-items: center; background: var(--bg-surface2); color: var(--accent-text); }
+.style-text { display: flex; flex-direction: column; gap: 2px; }
+.style-text .t { font-size: 15px; font-weight: 650; }
+.style-text .d { font-size: 13px; line-height: 1.4; color: var(--st-secondary); }
+.style-default { display: flex; align-items: center; gap: 8px; font-size: 14px; color: var(--st-text); cursor: pointer; }
+.style-default input { width: 18px; height: 18px; accent-color: var(--accent); }
+.style-row { align-self: flex-start; display: inline-flex; align-items: center; gap: 4px; padding: 0 2px; border: 0; background: transparent; font-size: 13px; color: var(--text-muted); cursor: pointer; }
+.style-row span { color: var(--text-secondary); font-weight: 600; }
+
+/* What breaks: the rail's rows can be marked as the suspected bottleneck. */
+.st-railbtn, .st-railitem { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; }
+.st-railbtn { flex: 1; min-width: 0; margin: -4px -8px 10px; padding: 4px 8px; border: 1px solid transparent; border-radius: 10px; background: transparent; color: var(--st-text); text-align: left; cursor: pointer; }
+.st-railbtn:hover { border-color: var(--border-hover); }
+.st-railbtn.sel { border-color: var(--accent); background: var(--st-tint-bg); }
+.st-row.last .st-railbtn { margin-bottom: 0; }
+.st-row:has(.st-railbtn) .st-dot.sm { margin-top: 6px; }
+.st-railname { min-width: 0; overflow-wrap: anywhere; }
+.st-railtag { flex-shrink: 0; font-size: 12px; font-weight: 600; color: var(--accent-text); white-space: nowrap; }
+.st-railitem.fail .st-railtag { color: var(--st-amber-text); }
+.st-dot.sm.sel { background: var(--accent); }
+.st-markline { margin-top: 8px; display: flex; flex-wrap: wrap; justify-content: space-between; align-items: baseline; gap: 6px 12px; font-size: 13px; color: var(--st-secondary); }

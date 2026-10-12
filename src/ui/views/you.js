@@ -1,6 +1,7 @@
 import { activeTab, setNav, showChrome } from "../nav.js";
 import { GOOGLE_G, app, bundle, esc, send, setFor, setHTML, toast, topOfView } from "../core.js";
-import { getDefaultPracticeStyle, STYLES } from "../../storage/practice-style.js";
+import { styleLabel } from "../../storage/practice-style.js";
+import { defaultStyle } from "../practice-ui.js";
 import { dayKey, exportAll, importAll } from "../../storage/store.js";
 import { getAuth, googleSignIn, login, register } from "../../sync/auth.js";
 import { renderHome } from "../views/home.js";
@@ -27,6 +28,7 @@ const ICON = {
   logout: '<path d="M9 20H6a2 2 0 01-2-2V6a2 2 0 012-2h3M16 16l4-4-4-4M20 12H9"/>',
   login: '<path d="M15 4h3a2 2 0 012 2v12a2 2 0 01-2 2h-3M10 16l4-4-4-4M14 12H4"/>',
   trash: '<path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13"/>',
+  compass: '<circle cx="12" cy="12" r="9"/><path d="m15.5 8.5-2 5-5 2 2-5z"/>',
 };
 const CHEVRON = `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--text-faint)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 6l6 6-6 6"/></svg>`;
 
@@ -77,8 +79,7 @@ export async function renderYou() {
   const auth = await getAuth();
   const signedIn = !!auth?.user;
   const openInTab = !!settings.openInTab;
-  const practiceStyle = await getDefaultPracticeStyle();
-  const styleName = practiceStyle === STYLES.GUIDED ? "Learn concepts" : "Interview simulation";
+  const styleName = styleLabel(await defaultStyle());
 
   const profile = signedIn
     ? `<div style="padding:14px;border-radius:14px;background:var(--bg-surface);border:1px solid var(--border-card);display:flex;align-items:center;gap:12px">
@@ -99,7 +100,7 @@ export async function renderYou() {
       ${signedIn ? group("Plan", `<div id="billingSlot">${billingSkeleton()}</div>`) : ""}
       ${group("Study", row({ icon: ICON.team, title: "Teams", sub: "Study with a group", attrs: 'data-action="nav-teams"' }))}
       ${group("Preferences", row({
-          icon: ICON.design, title: "Practice style", sub: styleName,
+          icon: ICON.compass, title: "Practice style", sub: styleName,
           attrs: `data-action="you-practice-style"`
         }) + row({
         icon: ICON.external, title: "Open in a tab", sub: "Full page instead of the side panel",

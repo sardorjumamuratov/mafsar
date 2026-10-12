@@ -9,7 +9,8 @@ import { isDue, masteryOf } from "../../../shared/srs.js";
 import { startQuiz } from "../flows/quiz.js";
 import { syncNow } from "../../sync/sync.js";
 import { addCard, updateCard, updateStudySet, setExamDate, saveSettings } from "../../storage/store.js";
-import { getDefaultPracticeStyle, STYLES } from "../../storage/practice-style.js";
+import { styleLabel } from "../../storage/practice-style.js";
+import { styleFor } from "../practice-ui.js";
 import { chainCoverage, liveChains, orderedSteps } from "../../storage/chains.js";
 import { isLinkCard, linkId } from "../../storage/chain-links.js";
 import { cleanTitle } from "../../../shared/titles.js";
@@ -27,7 +28,6 @@ export let editingCardId = null;
 let state = {
   expandedCardId: null,
   studyMenuOpen: false,
-  practiceStyle: null,
 };
 
 // Icons, from the reference unless it has none for that mode.
@@ -213,7 +213,6 @@ function cardRowHtml(c, { expanded = false, editing = false, dim = false } = {})
 }
 
 export async function paintDetail(updateInPlace = false, force = false) {
-    if (!state.practiceStyle) state.practiceStyle = await getDefaultPracticeStyle();
   if (updateInPlace && !force && (editingCardId || detail?.addingCard)) return;
   if (!detail) return;
   const { session, studySet, tab } = detail;
@@ -263,6 +262,10 @@ export async function paintDetail(updateInPlace = false, force = false) {
     const dueCount = s.due || 0;
     const quizCount = Math.min(10, studySet.quiz?.length || 0);
     const cta = studyCta(studySet, settings, dueCount, cards.length, quizCount);
+  // System design modes start with a practice style (docs/prompts/38 §4); show it and let it change here.
+  const practiceStyleRow = ["design", "estimation", "bottleneck"].includes(cta.mode)
+    ? `<button type="button" class="style-row" data-action="edit-practice-style" aria-haspopup="dialog">Style: <span>${esc(styleLabel(await styleFor(session.id)))}</span>${I.chevron(14, "currentColor")}</button>`
+    : "";
     detail.mode = cta.mode;
 
     const exam = studySet.examDate ? examReadiness({ examDate: studySet.examDate, total: cards.length, mastered, due: dueCount }) : null;
@@ -290,7 +293,7 @@ export async function paintDetail(updateInPlace = false, force = false) {
           </div>
         </div>
         <div style="font-size:13px;color:var(--text-muted);padding:0 2px">Mode: <span style="color:var(--text-secondary);font-weight:600">${esc(cta.name)}</span></div>
-        ${["design", "estimation", "bottleneck"].includes(cta.mode) ? `<button type="button" data-action="edit-practice-style" style="background:transparent;border:none;padding:0;color:var(--text-secondary);font-weight:600;font-size:13px;cursor:pointer;display:flex;align-items:center;gap:2px">Style: ${state.practiceStyle === STYLES.GUIDED ? "Learn concepts" : "Interview simulation"} ${I.chevron(14, "currentColor")}</button>` : ""}
+        ${practiceStyleRow}
         <button type="button" class="exam-row" data-action="exam-edit-set" style="display:flex;align-items:center;gap:12px;padding:12px 14px;border-radius:14px;border:1px solid var(--border-control);background:var(--bg-surface);color:var(--text-primary);text-align:left;cursor:pointer;font-family:inherit;width:100%">
           <span style="width:36px;height:36px;border-radius:10px;background:var(--bg-surface2);display:flex;align-items:center;justify-content:center;color:var(--accent-text);flex-shrink:0">${I.calendar}</span>
           <span style="flex:1;display:flex;flex-direction:column;gap:2px">
@@ -1169,58 +1172,3 @@ function openTypeMenu() {
   byId("sheet").querySelectorAll(".type-opt").forEach((btn) => btn.addEventListener("click", () => closeSheet()));
 }
 
-
-export function openPracticeStyleEditor() {
-  const isGuided = state.practiceStyle === STYLES.GUIDED;
-  openSheet("Practice style", `
-    <div style="display:flex;flex-direction:column;gap:12px;padding:8px 16px 24px">
-      <button type="button" data-action="set-practice-style" data-style="${STYLES.GUIDED}" class="opt-row ${isGuided ? "selected" : ""}" style="text-align:left;height:auto;padding:12px 14px">
-        <span style="display:flex;flex-direction:column;gap:2px">
-          <span style="font-weight:600;font-size:15px">Learn concepts</span>
-          <span style="font-size:13px;color:var(--text-muted)">Step-by-step guidance and hints. Best for learning a new system.</span>
-        </span>
-      </button>
-      <button type="button" data-action="set-practice-style" data-style="${STYLES.SIMULATION}" class="opt-row ${!isGuided ? "selected" : ""}" style="text-align:left;height:auto;padding:12px 14px">
-        <span style="display:flex;flex-direction:column;gap:2px">
-          <span style="font-weight:600;font-size:15px">Interview simulation</span>
-          <span style="font-size:13px;color:var(--text-muted)">Blank canvas, elapsed timer, strict grading. No hints.</span>
-        </span>
-      </button>
-      <label style="display:flex;align-items:center;gap:8px;font-size:14px;margin-top:8px;cursor:pointer">
-        <input type="checkbox" id="practice-style-default" style="width:16px;height:16px" />
-        Make this my default
-      </label>
-    </div>
-  `, false, null, { px: 0, pb: 0 });
-}
-
-
-export async function applyPracticeStyle(style, makeDefault) {
-  state.practiceStyle = style;
-  if (makeDefault) {
-    const { setDefaultPracticeStyle } = await import("../../storage/practice-style.js");
-    await setDefaultPracticeStyle(style);
-  }
-  closeSheet();
-  paintDetail(true, true);
-}
-
-
-export function openFirstRunSheet(nextAction, id) {
-  openSheet("What are you practicing for?", `
-    <div style="display:flex;flex-direction:column;gap:12px;padding:8px 16px 24px">
-      <button type="button" data-action="set-first-run-style" data-style="${STYLES.GUIDED}" data-next="${nextAction}" data-id="${esc(id)}" class="opt-row" style="text-align:left;height:auto;padding:12px 14px">
-        <span style="display:flex;flex-direction:column;gap:2px">
-          <span style="font-weight:600;font-size:15px">Learn concepts</span>
-          <span style="font-size:13px;color:var(--text-muted)">Get guidance, optional hints, and feedback as you go.</span>
-        </span>
-      </button>
-      <button type="button" data-action="set-first-run-style" data-style="${STYLES.SIMULATION}" data-next="${nextAction}" data-id="${esc(id)}" class="opt-row" style="text-align:left;height:auto;padding:12px 14px">
-        <span style="display:flex;flex-direction:column;gap:2px">
-          <span style="font-weight:600;font-size:15px">Interview simulation</span>
-          <span style="font-size:13px;color:var(--text-muted)">Blank canvas, elapsed timer, strict grading. No hints.</span>
-        </span>
-      </button>
-    </div>
-  `, false, null, { px: 0, pb: 0 });
-}
